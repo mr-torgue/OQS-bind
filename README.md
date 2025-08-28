@@ -1,3 +1,10 @@
+
+# Edit
+OQS-Bind is currently lacking hybrid signatures, such as p256_falcon512.
+Hybrid signatures are supported by oqs-provider https://github.com/open-quantum-safe/oqs-provider.
+PQC algorithms might still be vulnerable because of their infancy.
+Bringing hybrid signatures to bind9 allows us transition safely to quantum-safe algorithms by combining traditional signature schemes with post-quantum signature schemes.
+
 # OQS-Bind
 [![CodeQL](https://github.com/Martyrshot/OQS-bind/actions/workflows/codeql.yml/badge.svg)](https://github.com/Martyrshot/OQS-bind/actions/workflows/codeql.yml)
 
