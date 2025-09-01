@@ -231,6 +231,7 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_FALCON512]));
 
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);
@@ -1473,6 +1474,9 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	case DST_ALG_SPHINCSSHA256128S:
 		*n = DNS_SIG_SPHINCSSHA256128SSIZE;
 		break;
+	case DST_ALG_P256_FALCON512:
+		*n = DNS_SIG_P256_FALCON512SIZE;
+	break;
 	case DST_ALG_DH:
 	default:
 		return (DST_R_UNSUPPORTEDALG);

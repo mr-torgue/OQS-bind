@@ -98,6 +98,7 @@ typedef enum dst_algorithm {
 	DST_ALG_FALCON512 = 17,
 	DST_ALG_DILITHIUM2 = 18,
 	DST_ALG_SPHINCSSHA256128S = 19,
+	DST_ALG_P256_FALCON512 = 20,
 
 	/*
 	 * Do not renumber HMAC algorithms as they are used externally to named

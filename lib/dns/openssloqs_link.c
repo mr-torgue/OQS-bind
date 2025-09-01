@@ -42,6 +42,7 @@
 #define FALCON512_PRIVATEKEYSIZE	 1281
 #define DILITHIUM2_PRIVATEKEYSIZE	 2528
 #define SPHINCSSHA256128S_PRIVATEKEYSIZE 64
+#define P256_FALCON512_PRIVATEKEYSIZE	 1313
 
 typedef struct oqs_tags {
 	unsigned int ntags, private_key_tag, public_key_tag, engine_tag,
@@ -100,6 +101,22 @@ openssloqs_alg_info(unsigned int key_alg) {
 				.public_key_tag = TAG_SPHINCSSHA256128S_PUBLICKEY,
 				.engine_tag = TAG_SPHINCSSHA256128S_ENGINE,
 				.label_tag = TAG_SPHINCSSHA256128S_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P256_FALCON512) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p256_falcon512",
+			.key_size = DNS_KEY_P256_FALCON512SIZE,
+			.priv_key_size = P256_FALCON512_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P256_FALCON512SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P256_FALCON512_PRIVATEKEY,
+				.public_key_tag = TAG_P256_FALCON512_PUBLICKEY,
+				.engine_tag = TAG_P256_FALCON512_ENGINE,
+				.label_tag = TAG_P256_FALCON512_LABEL,
 			},
 		};
 		return &oqs_alginfo;
