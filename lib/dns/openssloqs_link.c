@@ -42,7 +42,7 @@
 #define FALCON512_PRIVATEKEYSIZE	 1281
 #define DILITHIUM2_PRIVATEKEYSIZE	 2528
 #define SPHINCSSHA256128S_PRIVATEKEYSIZE 64
-#define P256_FALCON512_PRIVATEKEYSIZE	 1313
+#define P256_FALCON512_PRIVATEKEYSIZE	 1406 //1313
 
 typedef struct oqs_tags {
 	unsigned int ntags, private_key_tag, public_key_tag, engine_tag,
@@ -365,19 +365,23 @@ openssloqs_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	REQUIRE(alginfo != NULL);
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, alginfo->alg_name, NULL);
+	fprintf(stderr, "alg_name: %s\n", alginfo->alg_name);
 	if (ctx == NULL) {
+		fprintf(stderr, "ctx == null");
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen_init(ctx);
 	if (status != 1) {
+		fprintf(stderr, "init not working");
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
 					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen(ctx, &pkey);
 	if (status != 1) {
+		fprintf(stderr, "keygen not working");
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
 					       DST_R_OPENSSLFAILURE));
 	}
@@ -405,11 +409,20 @@ openssloqs_todns(const dst_key_t *key, isc_buffer_t *data) {
 	len = alginfo->key_size;
 	isc_buffer_availableregion(data, &r);
 	if (r.length < len) {
+		fprintf(stderr, "r.length < len failed!\n");
 		return (ISC_R_NOSPACE);
 	}
+	fprintf(stderr, "len: %d, r.length: %d\n", len, r.length);
+	fprintf(stderr, "data: %s\n", data);
+	fprintf(stderr, "pkey: %s\n", pkey);
+	if (EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1) {
+		unsigned long err = ERR_get_error(); // Retrieve the most recent error
+		char err_buf[256];
+		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
+		fprintf(stderr, "EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1 failed!\nlen: %d, r.length: %d\nError msg: %s\n", len, r.length, err_buf);
 
-	if (EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1)
 		return (dst__openssl_toresult(ISC_R_FAILURE));
+	}
 
 	isc_buffer_add(data, len);
 	return (ISC_R_SUCCESS);
@@ -470,11 +483,16 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 
 	i = 0;
 
+	fprintf(stderr, "privlen: %d\n", privlen);
 	if (dst__openssl_keypair_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
-		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv,
-						 privbuf, &privlen) != 1)
+		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1) {
+			unsigned long err = ERR_get_error(); // Retrieve the most recent error
+			char err_buf[256];
+			ERR_error_string(err, err_buf); // Convert error code to a human-readable string
+			fprintf(stderr, "EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1 failed!\nprivlen: %d\nError msg: %s\n", privlen, err_buf);
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		}
 		priv.elements[i].tag = alginfo->tags.private_key_tag;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
@@ -543,21 +561,25 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_FALCON512_ENGINE:
 		case TAG_DILITHIUM2_ENGINE:
 		case TAG_SPHINCSSHA256128S_ENGINE:
+		case TAG_P256_FALCON512_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
 		case TAG_FALCON512_LABEL:
 		case TAG_DILITHIUM2_LABEL:
 		case TAG_SPHINCSSHA256128S_LABEL:
+		case TAG_P256_FALCON512_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
 		case TAG_FALCON512_PRIVATEKEY:
 		case TAG_DILITHIUM2_PRIVATEKEY:
 		case TAG_SPHINCSSHA256128S_PRIVATEKEY:
+		case TAG_P256_FALCON512_PRIVATEKEY:
 			privkey_index = i;
 			break;
 		case TAG_FALCON512_PUBLICKEY:
 		case TAG_DILITHIUM2_PUBLICKEY:
 		case TAG_SPHINCSSHA256128S_PUBLICKEY:
+		case TAG_P256_FALCON512_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:

@@ -716,10 +716,12 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	REQUIRE(target != NULL);
 	CHECKALG(key->key_alg);
 	if (key->func->todns == NULL) {
+		fprintf(stderr, "key->func->todns == NULL failed!\n");
 		return (DST_R_UNSUPPORTEDALG);
 	}
 
 	if (isc_buffer_availablelength(target) < 4) {
+		fprintf(stderr, "isc_buffer_availablelength(target) < 4 failed!\n");
 		return (ISC_R_NOSPACE);
 	}
 	isc_buffer_putuint16(target, (uint16_t)(key->key_flags & 0xffff));
@@ -728,6 +730,7 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 
 	if ((key->key_flags & DNS_KEYFLAG_EXTENDED) != 0) {
 		if (isc_buffer_availablelength(target) < 2) {
+			fprintf(stderr, "isc_buffer_availablelength(target) < 2 failed!\n");
 			return (ISC_R_NOSPACE);
 		}
 		isc_buffer_putuint16(
@@ -737,6 +740,7 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	if (key->keydata.generic == NULL) { /*%< NULL KEY */
 		return (ISC_R_SUCCESS);
 	}
+	fprintf(stderr, "dst_key_todns worked!\n");
 	return (key->func->todns(key, target));
 }
 
@@ -1051,9 +1055,11 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 		dst_key_free(&key);
 		return (ret);
 	}
+	fprintf(stderr, "Key generation succesful!\n");
 
 	ret = computeid(key);
 	if (ret != ISC_R_SUCCESS) {
+		fprintf(stderr, "computeid failed!\n");
 		dst_key_free(&key);
 		return (ret);
 	}
@@ -2295,6 +2301,7 @@ computeid(dst_key_t *key) {
 	isc_buffer_init(&dnsbuf, dns_array, sizeof(dns_array));
 	ret = dst_key_todns(key, &dnsbuf);
 	if (ret != ISC_R_SUCCESS) {
+		fprintf(stderr, "dst_key_todns failed!\n");
 		return (ret);
 	}
 

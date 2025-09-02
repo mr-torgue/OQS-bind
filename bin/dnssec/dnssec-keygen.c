@@ -600,7 +600,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		ctx->size = 256;
 		break;
 	case DST_ALG_P256_FALCON512:
-		ctx->size = 7432;
+		ctx->size = 7728; // 7432;
 		break;
 	}
 

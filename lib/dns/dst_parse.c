@@ -125,6 +125,11 @@ static struct parse_map map[] = {
 						     // now
 	{ TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
 
+	{ TAG_P256_FALCON512_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P256_FALCON512_PUBLICKEY, "PublicKey:" },
+	{ TAG_P256_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P256_FALCON512_LABEL, "Label:" },   // Probably won't use for now
+
 	{ 0, NULL }
 };
 
@@ -416,6 +421,7 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	case DST_ALG_FALCON512:
 	case DST_ALG_DILITHIUM2:
 	case DST_ALG_SPHINCSSHA256128S:
+	case DST_ALG_P256_FALCON512:
 		return (check_oqs(priv, alg, external));
 	default:
 		return (DST_R_UNSUPPORTEDALG);
@@ -766,6 +772,9 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		break;
 	case DST_ALG_SPHINCSSHA256128S:
 		fprintf(fp, "(SPHINCS+-SHA256-128S)\n");
+		break;
+	case DST_ALG_P256_FALCON512:
+		fprintf(fp, "(P256_FALCON512)\n");
 		break;
 	default:
 		fprintf(fp, "(?)\n");
