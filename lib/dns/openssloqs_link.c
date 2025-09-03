@@ -40,7 +40,7 @@
 	}
 
 #define FALCON512_PRIVATEKEYSIZE	 1281
-#define DILITHIUM2_PRIVATEKEYSIZE	 2528
+#define DILITHIUM2_PRIVATEKEYSIZE	 2560
 #define SPHINCSSHA256128S_PRIVATEKEYSIZE 64
 #define P256_FALCON512_PRIVATEKEYSIZE	 1406 //1313
 
@@ -59,7 +59,7 @@ static const oqs_alginfo_t *
 openssloqs_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "falcon512",
+			.alg_name = "falconpadded512", //"falcon512",
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
@@ -75,7 +75,7 @@ openssloqs_alg_info(unsigned int key_alg) {
 	}
 	if (key_alg == DST_ALG_DILITHIUM2) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "dilithium2",
+			.alg_name = "mldsa44", //"dilithium2",
 			.key_size = DNS_KEY_DILITHIUM2SIZE,
 			.priv_key_size = DILITHIUM2_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_DILITHIUM2SIZE,
@@ -107,7 +107,7 @@ openssloqs_alg_info(unsigned int key_alg) {
 	}
 	if (key_alg == DST_ALG_P256_FALCON512) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "p256_falcon512",
+			.alg_name = "p256_falconpadded512", //"p256_falcon512",
 			.key_size = DNS_KEY_P256_FALCON512SIZE,
 			.priv_key_size = P256_FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_P256_FALCON512SIZE,
@@ -282,9 +282,14 @@ openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(
 			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
 	}
-	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base,
-			   tbsreg.length) != 1)
+
+	fprintf(stderr, "siglen: %d, tbsreg.length: %d\n", siglen, tbsreg.length);
+	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1)
 	{
+		unsigned long err = ERR_get_error(); // Retrieve the most recent error
+		char err_buf[256];
+		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
+		fprintf(stderr, "EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1 failed!\nsiglen: %d, tbsreg.length: %d\nError msg: %s\n", siglen, tbsreg.length, err_buf);
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
@@ -413,8 +418,6 @@ openssloqs_todns(const dst_key_t *key, isc_buffer_t *data) {
 		return (ISC_R_NOSPACE);
 	}
 	fprintf(stderr, "len: %d, r.length: %d\n", len, r.length);
-	fprintf(stderr, "data: %s\n", data);
-	fprintf(stderr, "pkey: %s\n", pkey);
 	if (EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1) {
 		unsigned long err = ERR_get_error(); // Retrieve the most recent error
 		char err_buf[256];
