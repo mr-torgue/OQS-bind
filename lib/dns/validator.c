@@ -151,6 +151,7 @@ expire_rdatasets(dns_validator_t *val) {
 }
 
 
+/*
 static void
 printmessage(dns_message_t *msg) {
 
@@ -181,7 +182,7 @@ printmessage(dns_message_t *msg) {
 		isc_mem_put(mctx, buf, len);
 	}
 	isc_mem_destroy(&mctx);
-}
+}*/
 
 /*%
  * Ensure the validator's rdatasets are disassociated.
@@ -1458,12 +1459,13 @@ validate_answer(dns_validator_t *val, bool resume) {
 	isc_result_t result, vresult = DNS_R_NOVALIDSIG;
 	dns_rdata_t rdata = DNS_RDATA_INIT;
 
+	/*
 	if (val->message != NULL) {
 		printmessage(val->message);
 	}
 	else {
 		validator_log(val, ISC_LOG_DEBUG(3), "could not print message!");
-	}
+	}*/
 
 	/*
 	 * Caller must be holding the validator lock.
@@ -1747,12 +1749,13 @@ validate_dnskey(dns_validator_t *val) {
 	bool supported_algorithm;
 	char digest_types[256];
 
+	/*
 	if (val->message != NULL) {
 		printmessage(val->message);
 	}
 	else {
 		validator_log(val, ISC_LOG_DEBUG(3), "could not print message!");
-	}
+	}*/
 
 	/*
 	 * If we don't already have a DS RRset, check to see if there's
