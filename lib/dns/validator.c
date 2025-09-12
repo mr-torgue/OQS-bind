@@ -150,6 +150,34 @@ expire_rdatasets(dns_validator_t *val) {
 	}
 }
 
+
+static void
+printmessage(dns_message_t *msg) {
+	isc_buffer_t b;
+	char *buf = NULL;
+	int len = 1024;
+	isc_result_t result = ISC_R_SUCCESS;
+
+
+	do {
+		buf = isc_mem_get(msg->mctx, len);
+
+		isc_buffer_init(&b, buf, len);
+		result = dns_message_totext(msg, &dns_master_style_debug, 0,
+					    &b);
+		if (result == ISC_R_NOSPACE) {
+			isc_mem_put(msg->mctx, buf, len);
+			len *= 2;
+		} else if (result == ISC_R_SUCCESS) {
+			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
+		}
+	} while (result == ISC_R_NOSPACE);
+
+	if (buf != NULL) {
+		isc_mem_put(msg->mctx, buf, len);
+	}
+}
+
 /*%
  * Ensure the validator's rdatasets are disassociated.
  */
@@ -1424,6 +1452,7 @@ static isc_result_t
 validate_answer(dns_validator_t *val, bool resume) {
 	isc_result_t result, vresult = DNS_R_NOVALIDSIG;
 	dns_rdata_t rdata = DNS_RDATA_INIT;
+	printmessage(val->message);
 
 	/*
 	 * Caller must be holding the validator lock.
