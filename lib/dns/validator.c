@@ -1452,7 +1452,13 @@ static isc_result_t
 validate_answer(dns_validator_t *val, bool resume) {
 	isc_result_t result, vresult = DNS_R_NOVALIDSIG;
 	dns_rdata_t rdata = DNS_RDATA_INIT;
-	printmessage(val->message);
+
+	if (val->message == NULL) {
+		printmessage(val->message);
+	}
+	else {
+		validator_log(val, ISC_LOG_DEBUG(3), "could not print message!");
+	}
 
 	/*
 	 * Caller must be holding the validator lock.
@@ -1473,10 +1479,13 @@ validate_answer(dns_validator_t *val, bool resume) {
 	{
 		dns_rdata_reset(&rdata);
 		dns_rdataset_current(val->sigrdataset, &rdata);
+		validator_log(val, ISC_LOG_DEBUG(3), "rdata: %s", rdata);
 		if (val->siginfo == NULL) {
 			val->siginfo = isc_mem_get(val->view->mctx,
 						   sizeof(*val->siginfo));
 		}
+
+		validator_log(val, ISC_LOG_DEBUG(3), "siginfo: %s", val->siginfo);
 		result = dns_rdata_tostruct(&rdata, val->siginfo, NULL);
 		if (result != ISC_R_SUCCESS) {
 			return (result);
@@ -1490,6 +1499,7 @@ validate_answer(dns_validator_t *val, bool resume) {
 						      val->name,
 						      val->siginfo->algorithm))
 		{
+			validator_log(val, ISC_LOG_DEBUG(3), "Algorithm not supported!");
 			resume = false;
 			continue;
 		}
@@ -1512,6 +1522,7 @@ validate_answer(dns_validator_t *val, bool resume) {
 			resume = false;
 			continue;
 		}
+		validator_log(val, ISC_LOG_DEBUG(3), "key: %s", val->key);
 
 		do {
 			isc_result_t tresult;
@@ -1733,6 +1744,13 @@ validate_dnskey(dns_validator_t *val) {
 	dns_rdata_ds_t ds;
 	bool supported_algorithm;
 	char digest_types[256];
+
+	if (val->message == NULL) {
+		printmessage(val->message);
+	}
+	else {
+		validator_log(val, ISC_LOG_DEBUG(3), "could not print message!");
+	}
 
 	/*
 	 * If we don't already have a DS RRset, check to see if there's
