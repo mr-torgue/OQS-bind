@@ -1453,7 +1453,7 @@ validate_answer(dns_validator_t *val, bool resume) {
 	isc_result_t result, vresult = DNS_R_NOVALIDSIG;
 	dns_rdata_t rdata = DNS_RDATA_INIT;
 
-	if (val->message == NULL) {
+	if (val->message != NULL) {
 		printmessage(val->message);
 	}
 	else {
@@ -1742,7 +1742,7 @@ validate_dnskey(dns_validator_t *val) {
 	bool supported_algorithm;
 	char digest_types[256];
 
-	if (val->message == NULL) {
+	if (val->message != NULL) {
 		printmessage(val->message);
 	}
 	else {
