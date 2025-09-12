@@ -153,6 +153,10 @@ expire_rdatasets(dns_validator_t *val) {
 
 static void
 printmessage(dns_message_t *msg) {
+
+	isc_mem_t *mctx = NULL;
+	isc_mem_create(&mctx);
+
 	isc_buffer_t b;
 	char *buf = NULL;
 	int len = 1024;
@@ -160,13 +164,13 @@ printmessage(dns_message_t *msg) {
 
 
 	do {
-		buf = isc_mem_get(msg->mctx, len);
+		buf = isc_mem_get(mctx, len);
 
 		isc_buffer_init(&b, buf, len);
 		result = dns_message_totext(msg, &dns_master_style_debug, 0,
 					    &b);
 		if (result == ISC_R_NOSPACE) {
-			isc_mem_put(msg->mctx, buf, len);
+			isc_mem_put(mctx, buf, len);
 			len *= 2;
 		} else if (result == ISC_R_SUCCESS) {
 			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
@@ -174,8 +178,9 @@ printmessage(dns_message_t *msg) {
 	} while (result == ISC_R_NOSPACE);
 
 	if (buf != NULL) {
-		isc_mem_put(msg->mctx, buf, len);
+		isc_mem_put(mctx, buf, len);
 	}
+	isc_mem_destroy(&mctx);
 }
 
 /*%
