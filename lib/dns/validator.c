@@ -1479,13 +1479,11 @@ validate_answer(dns_validator_t *val, bool resume) {
 	{
 		dns_rdata_reset(&rdata);
 		dns_rdataset_current(val->sigrdataset, &rdata);
-		validator_log(val, ISC_LOG_DEBUG(3), "rdata: %s", rdata);
 		if (val->siginfo == NULL) {
 			val->siginfo = isc_mem_get(val->view->mctx,
 						   sizeof(*val->siginfo));
 		}
 
-		validator_log(val, ISC_LOG_DEBUG(3), "siginfo: %s", val->siginfo);
 		result = dns_rdata_tostruct(&rdata, val->siginfo, NULL);
 		if (result != ISC_R_SUCCESS) {
 			return (result);
@@ -1522,7 +1520,6 @@ validate_answer(dns_validator_t *val, bool resume) {
 			resume = false;
 			continue;
 		}
-		validator_log(val, ISC_LOG_DEBUG(3), "key: %s", val->key);
 
 		do {
 			isc_result_t tresult;
