@@ -43,6 +43,8 @@
 #define DILITHIUM2_PRIVATEKEYSIZE	 2560
 #define SPHINCSSHA256128S_PRIVATEKEYSIZE 64
 #define P256_FALCON512_PRIVATEKEYSIZE	 1406 //1313
+#define P256_DILITHIUM2_PRIVATEKEYSIZE	 2685 //2592
+#define MAYO1_PRIVATEKEYSIZE	 24
 
 typedef struct oqs_tags {
 	unsigned int ntags, private_key_tag, public_key_tag, engine_tag,
@@ -117,6 +119,38 @@ openssloqs_alg_info(unsigned int key_alg) {
 				.public_key_tag = TAG_P256_FALCON512_PUBLICKEY,
 				.engine_tag = TAG_P256_FALCON512_ENGINE,
 				.label_tag = TAG_P256_FALCON512_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P256_DILITHIUM2) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p256_mldsa44", //"p256_dilithium2",
+			.key_size = DNS_KEY_P256_DILITHIUM2SIZE,
+			.priv_key_size = P256_DILITHIUM2_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P256_DILITHIUM2SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P256_DILITHIUM2_PRIVATEKEY,
+				.public_key_tag = TAG_P256_DILITHIUM2_PUBLICKEY,
+				.engine_tag = TAG_P256_DILITHIUM2_ENGINE,
+				.label_tag = TAG_P256_DILITHIUM2_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_MAYO1) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "mayo1", 
+			.key_size = DNS_KEY_MAYO1SIZE,
+			.priv_key_size = MAYO1_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_MAYO1SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_MAYO1_PRIVATEKEY,
+				.public_key_tag = TAG_MAYO1_PUBLICKEY,
+				.engine_tag = TAG_MAYO1_ENGINE,
+				.label_tag = TAG_MAYO1_LABEL,
 			},
 		};
 		return &oqs_alginfo;
@@ -283,13 +317,12 @@ openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
 	}
 
-	fprintf(stderr, "siglen: %d, tbsreg.length: %d\n", siglen, tbsreg.length);
 	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1)
 	{
 		unsigned long err = ERR_get_error(); // Retrieve the most recent error
 		char err_buf[256];
 		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-		fprintf(stderr, "EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1 failed!\nsiglen: %d, tbsreg.length: %d\nError msg: %s\n", siglen, tbsreg.length, err_buf);
+		fprintf(stderr, "EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1 failed!\nSignature needs at least: %d bytes, tbsreg.length: %d\nError msg: %s\n", siglen, tbsreg.length, err_buf);
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
@@ -417,12 +450,11 @@ openssloqs_todns(const dst_key_t *key, isc_buffer_t *data) {
 		fprintf(stderr, "r.length < len failed!\n");
 		return (ISC_R_NOSPACE);
 	}
-	fprintf(stderr, "len: %d, r.length: %d\n", len, r.length);
 	if (EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1) {
 		unsigned long err = ERR_get_error(); // Retrieve the most recent error
 		char err_buf[256];
 		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-		fprintf(stderr, "EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1 failed!\nlen: %d, r.length: %d\nError msg: %s\n", len, r.length, err_buf);
+		fprintf(stderr, "EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1 failed!\nPublic key needs at least: %d bytes, r.length: %d\nError msg: %s\n", len, r.length, err_buf);
 
 		return (dst__openssl_toresult(ISC_R_FAILURE));
 	}
@@ -486,14 +518,13 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 
 	i = 0;
 
-	fprintf(stderr, "privlen: %d\n", privlen);
 	if (dst__openssl_keypair_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1) {
 			unsigned long err = ERR_get_error(); // Retrieve the most recent error
 			char err_buf[256];
 			ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-			fprintf(stderr, "EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1 failed!\nprivlen: %d\nError msg: %s\n", privlen, err_buf);
+			fprintf(stderr, "EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1 failed!\nPrivate key needs at least: %d bytes\nError msg: %s\n", privlen, err_buf);
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
 		priv.elements[i].tag = alginfo->tags.private_key_tag;
@@ -565,24 +596,32 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_DILITHIUM2_ENGINE:
 		case TAG_SPHINCSSHA256128S_ENGINE:
 		case TAG_P256_FALCON512_ENGINE:
+		case TAG_P256_DILITHIUM2_ENGINE:
+		case TAG_MAYO1_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
 		case TAG_FALCON512_LABEL:
 		case TAG_DILITHIUM2_LABEL:
 		case TAG_SPHINCSSHA256128S_LABEL:
 		case TAG_P256_FALCON512_LABEL:
+		case TAG_P256_DILITHIUM2_LABEL:
+		case TAG_MAYO1_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
 		case TAG_FALCON512_PRIVATEKEY:
 		case TAG_DILITHIUM2_PRIVATEKEY:
 		case TAG_SPHINCSSHA256128S_PRIVATEKEY:
 		case TAG_P256_FALCON512_PRIVATEKEY:
+		case TAG_P256_DILITHIUM2_PRIVATEKEY:
+		case TAG_MAYO1_PRIVATEKEY:
 			privkey_index = i;
 			break;
 		case TAG_FALCON512_PUBLICKEY:
 		case TAG_DILITHIUM2_PUBLICKEY:
 		case TAG_SPHINCSSHA256128S_PUBLICKEY:
 		case TAG_P256_FALCON512_PUBLICKEY:
+		case TAG_P256_DILITHIUM2_PUBLICKEY:
+		case TAG_MAYO1_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:

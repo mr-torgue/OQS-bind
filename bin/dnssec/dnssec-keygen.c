@@ -163,6 +163,7 @@ usage(void) {
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
 	fprintf(stderr, "        FALCON512 | DILITHIUM2 |\n");	
 	fprintf(stderr, "        SPHINCS+-SHA256-128S | P256_FALCON512\n");
+	fprintf(stderr, "        P256_DILITHIUM2 | MAYO1\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -b <key size in bits>:\n");
 	if (!isc_fips_mode()) {
@@ -178,9 +179,11 @@ usage(void) {
 	fprintf(stderr, "        ED25519:\tignored\n");
 	fprintf(stderr, "        ED448:\tignored\n");
 	fprintf(stderr, "        FALCON512:\tignored\n");
-	fprintf(stderr, "        P256_FALCON512:\tignored\n");
 	fprintf(stderr, "        DILITHIUM2:\tignored\n");
 	fprintf(stderr, "        SPHINCS+-SHA256-128S:\tignored\n");
+	fprintf(stderr, "        P256_FALCON512:\tignored\n");
+	fprintf(stderr, "        P256_DILITHIUM2:\tignored\n");
+	fprintf(stderr, "        MAYO1:\tignored\n");
 	fprintf(stderr, "        (key size defaults are set according to\n"
 			"        algorithm and usage (ZSK or KSK)\n");
 	fprintf(stderr, "    -n <nametype>: ZONE | HOST | ENTITY | "
@@ -372,6 +375,8 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_DILITHIUM2:
 			case DST_ALG_SPHINCSSHA256128S:
 			case DST_ALG_P256_FALCON512:
+			case DST_ALG_P256_DILITHIUM2:
+			case DST_ALG_MAYO1:
 				break;
 			default:
 				fatal("algorithm %s is incompatible with NSEC3"
@@ -426,6 +431,8 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_DILITHIUM2:
 			case DST_ALG_SPHINCSSHA256128S:
 			case DST_ALG_P256_FALCON512:
+			case DST_ALG_P256_DILITHIUM2:
+			case DST_ALG_MAYO1:
 				break;
 			default:
 				fatal("key size not specified (-b option)");
@@ -601,6 +608,12 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		break;
 	case DST_ALG_P256_FALCON512:
 		ctx->size = 7728; // 7432;
+		break;
+	case DST_ALG_P256_DILITHIUM2:
+		ctx->size = 11048;
+		break;
+	case DST_ALG_MAYO1:
+		ctx->size = 11360;
 		break;
 	}
 

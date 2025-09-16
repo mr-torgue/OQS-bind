@@ -232,6 +232,8 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_FALCON512]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_DILITHIUM2]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MAYO1]));
 
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);
@@ -740,7 +742,6 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	if (key->keydata.generic == NULL) { /*%< NULL KEY */
 		return (ISC_R_SUCCESS);
 	}
-	fprintf(stderr, "dst_key_todns worked!\n");
 	return (key->func->todns(key, target));
 }
 
@@ -1482,7 +1483,13 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 		break;
 	case DST_ALG_P256_FALCON512:
 		*n = DNS_SIG_P256_FALCON512SIZE;
-	break;
+		break;
+	case DST_ALG_P256_DILITHIUM2:
+		*n = DNS_SIG_P256_DILITHIUM2SIZE;
+		break;
+	case DST_ALG_MAYO1:
+		*n = DNS_SIG_MAYO1SIZE;
+		break;
 	case DST_ALG_DH:
 	default:
 		return (DST_R_UNSUPPORTEDALG);
