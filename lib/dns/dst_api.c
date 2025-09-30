@@ -229,11 +229,18 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__gssapi_init(&dst_t_func[DST_ALG_GSSAPI]));
 #endif /* HAVE_GSSAPI */
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_FALCON512]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_FALCON512]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_DILITHIUM2]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_DILITHIUM2]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_SPHINCSSHA256128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_SPHINCSSHA256128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MAYO1]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_MAYO1]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SNOVA2454]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_SNOVA2454]));
 
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);
@@ -1475,20 +1482,41 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	case DST_ALG_FALCON512:
 		*n = DNS_SIG_FALCON512SIZE;
 		break;
-	case DST_ALG_DILITHIUM2:
-		*n = DNS_SIG_DILITHIUM2SIZE;
-		break;
-	case DST_ALG_SPHINCSSHA256128S:
-		*n = DNS_SIG_SPHINCSSHA256128SSIZE;
-		break;
 	case DST_ALG_P256_FALCON512:
 		*n = DNS_SIG_P256_FALCON512SIZE;
+		break;
+	case DST_ALG_RSA3072_FALCON512:
+		*n = DNS_SIG_RSA3072_FALCON512SIZE;
+		break;
+	case DST_ALG_DILITHIUM2:
+		*n = DNS_SIG_DILITHIUM2SIZE;
 		break;
 	case DST_ALG_P256_DILITHIUM2:
 		*n = DNS_SIG_P256_DILITHIUM2SIZE;
 		break;
+	case DST_ALG_RSA3072_DILITHIUM2:
+		*n = DNS_SIG_RSA3072_DILITHIUM2SIZE;
+		break;
+	case DST_ALG_SPHINCSSHA256128S:
+		*n = DNS_SIG_SPHINCSSHA256128SSIZE;
+		break;
+	case DST_ALG_P256_SPHINCSSHA256128S:
+		*n = DNS_SIG_P256_SPHINCSSHA256128SSIZE;
+		break;
+	case DST_ALG_RSA3072_SPHINCSSHA256128S:
+		*n = DNS_SIG_RSA3072_SPHINCSSHA256128SSIZE;
+		break;
 	case DST_ALG_MAYO1:
 		*n = DNS_SIG_MAYO1SIZE;
+		break;
+	case DST_ALG_P256_MAYO1:
+		*n = DNS_SIG_P256_MAYO1SIZE;
+		break;
+	case DST_ALG_SNOVA2454:
+		*n = DNS_SIG_SNOVA2454SIZE;
+		break;
+	case DST_ALG_P256_SNOVA2454:
+		*n = DNS_SIG_P256_SNOVA2454SIZE;
 		break;
 	case DST_ALG_DH:
 	default:

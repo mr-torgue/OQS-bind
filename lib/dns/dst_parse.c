@@ -114,31 +114,65 @@ static struct parse_map map[] = {
 	{ TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
 	{ TAG_FALCON512_LABEL, "Label:" },   // Probably won't use for now
 
-	{ TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
-	{ TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
-	{ TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
-	{ TAG_DILITHIUM2_LABEL, "Label:" },   // Probably won't use for now
-
-	{ TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
-	{ TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
-	{ TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for
-						     // now
-	{ TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
-
 	{ TAG_P256_FALCON512_PRIVATEKEY, "PrivateKey:" },
 	{ TAG_P256_FALCON512_PUBLICKEY, "PublicKey:" },
 	{ TAG_P256_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
 	{ TAG_P256_FALCON512_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_RSA3072_FALCON512_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_RSA3072_FALCON512_PUBLICKEY, "PublicKey:" },
+	{ TAG_RSA3072_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_RSA3072_FALCON512_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
+	{ TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_DILITHIUM2_LABEL, "Label:" },   // Probably won't use for now
 
 	{ TAG_P256_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
 	{ TAG_P256_DILITHIUM2_PUBLICKEY, "PublicKey:" },
 	{ TAG_P256_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
 	{ TAG_P256_DILITHIUM2_LABEL, "Label:" },   // Probably won't use for now
 
+	{ TAG_RSA3072_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_RSA3072_DILITHIUM2_PUBLICKEY, "PublicKey:" },
+	{ TAG_RSA3072_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_RSA3072_DILITHIUM2_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+	{ TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
+
+	{ TAG_P256_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P256_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+	{ TAG_P256_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P256_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
+
+	{ TAG_RSA3072_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_RSA3072_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+	{ TAG_RSA3072_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_RSA3072_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
+
 	{ TAG_MAYO1_PRIVATEKEY, "PrivateKey:" },
 	{ TAG_MAYO1_PUBLICKEY, "PublicKey:" },
 	{ TAG_MAYO1_ENGINE, "Engine:" }, // Probably won't use for now
 	{ TAG_MAYO1_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_P256_MAYO1_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P256_MAYO1_PUBLICKEY, "PublicKey:" },
+	{ TAG_P256_MAYO1_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P256_MAYO1_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_SNOVA2454_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_SNOVA2454_PUBLICKEY, "PublicKey:" },
+	{ TAG_SNOVA2454_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_SNOVA2454_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_P256_SNOVA2454_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P256_SNOVA2454_PUBLICKEY, "PublicKey:" },
+	{ TAG_P256_SNOVA2454_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P256_SNOVA2454_LABEL, "Label:" },   // Probably won't use for now
 
 	{ 0, NULL }
 };
@@ -429,11 +463,18 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	case DST_ALG_HMACSHA512:
 		return (check_hmac_sha(priv, HMACSHA512_NTAGS, alg));
 	case DST_ALG_FALCON512:
-	case DST_ALG_DILITHIUM2:
-	case DST_ALG_SPHINCSSHA256128S:
 	case DST_ALG_P256_FALCON512:
+	case DST_ALG_RSA3072_FALCON512:
+	case DST_ALG_DILITHIUM2:
 	case DST_ALG_P256_DILITHIUM2:
+	case DST_ALG_RSA3072_DILITHIUM2:
+	case DST_ALG_SPHINCSSHA256128S:
+	case DST_ALG_P256_SPHINCSSHA256128S:
+	case DST_ALG_RSA3072_SPHINCSSHA256128S:
 	case DST_ALG_MAYO1:
+	case DST_ALG_P256_MAYO1:
+	case DST_ALG_SNOVA2454:
+	case DST_ALG_P256_SNOVA2454:
 		return (check_oqs(priv, alg, external));
 	default:
 		return (DST_R_UNSUPPORTEDALG);
@@ -779,20 +820,41 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	case DST_ALG_FALCON512:
 		fprintf(fp, "(FALCON512)\n");
 		break;
-	case DST_ALG_DILITHIUM2:
-		fprintf(fp, "(DILITHIUM2)\n");
-		break;
-	case DST_ALG_SPHINCSSHA256128S:
-		fprintf(fp, "(SPHINCS+-SHA256-128S)\n");
-		break;
 	case DST_ALG_P256_FALCON512:
 		fprintf(fp, "(P256_FALCON512)\n");
+		break;
+	case DST_ALG_RSA3072_FALCON512:
+		fprintf(fp, "(RSA3072_FALCON512)\n");
+		break;
+	case DST_ALG_DILITHIUM2:
+		fprintf(fp, "(DILITHIUM2)\n");
 		break;
 	case DST_ALG_P256_DILITHIUM2:
 		fprintf(fp, "(P256_DILITHIUM2)\n");
 		break;
+	case DST_ALG_RSA3072_DILITHIUM2:
+		fprintf(fp, "(RSA3072_DILITHIUM2)\n");
+		break;
+	case DST_ALG_SPHINCSSHA256128S:
+		fprintf(fp, "(SPHINCS+-SHA256-128S)\n");
+		break;
+	case DST_ALG_P256_SPHINCSSHA256128S:
+		fprintf(fp, "(P256_SPHINCS+-SHA256-128S)\n");
+		break;
+	case DST_ALG_RSA3072_SPHINCSSHA256128S:
+		fprintf(fp, "(RSA3072_SPHINCS+-SHA256-128S)\n");
+		break;
 	case DST_ALG_MAYO1:
 		fprintf(fp, "(MAYO1)\n");
+		break;
+	case DST_ALG_P256_MAYO1:
+		fprintf(fp, "(P256_MAYO1)\n");
+		break;
+	case DST_ALG_SNOVA2454:
+		fprintf(fp, "(SNOVA2454)\n");
+		break;
+	case DST_ALG_P256_SNOVA2454:
+		fprintf(fp, "(P256_SNOVA2454)\n");
 		break;
 	default:
 		fprintf(fp, "(?)\n");
