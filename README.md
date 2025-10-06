@@ -25,10 +25,19 @@ we support in DNSSEC are as follows:
 ### DNSSEC Algorithms
 |            Algorithm         | DNSSEC Algorithm ID |
 | ---------------------------- | ------------------- |
-|           Falcon-512         |         17          |
-|           Dilithium2         |         18          |
-| SPHINCS+-SHA-256-128s Simple |         19          |
-| Falcon-512-P256 Hybrid       |         20          |
+| FALCON512                    |         17          |
+| P256_FALCON512 (Hybrid)      |         18          |
+| RSA3072_FALCON512 (Hybrid)   |         19          |
+| DILITHIUM2                   |         20          |
+| P256_DILITHIUM2 (Hybrid)     |         21          |
+| RSA3072_DILITHIUM2 (Hybrid)  |         22          |
+| SPHINCS+-SHA-256-128s Simple |         23          |
+| P256_SPHINCS+-SHA-256-128s Simple (Hybrid)    |         24          |
+| RSA3072_SPHINCS+-SHA-256-128s Simple (Hybrid) |         25          |
+| MAYO1                        |         26          |
+| P256_MAYO1                   |         27          |
+| SNOVA2454                    |         29          |
+| P256_SNOVA2454               |         30          |
 
 We opted to start the algorithm IDs at 17 because of the discussion seen
 [here](https://mailarchive.ietf.org/arch/msg/dnsop/2xKvE-g1WU5VozEDN7-h2e5y-MQ/).
