@@ -336,6 +336,12 @@ struct dns_message {
 	dns_indent_t indent;
 
 	dns_minttl_t minttl[DNS_SECTION_MAX];
+
+	// UDP Fragmentation
+	bool use_UDP_fragmentation;
+	bool is_fragment;
+	unsigned long fragment_nr; // for strtol
+
 };
 
 struct dns_ednsopt {

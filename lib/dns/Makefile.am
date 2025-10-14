@@ -73,6 +73,7 @@ libdns_la_HEADERS =			\
 	include/dns/dyndb.h		\
 	include/dns/ecs.h		\
 	include/dns/edns.h		\
+	include/dns/fcache.h		\
 	include/dns/fixedname.h		\
 	include/dns/forward.h		\
 	include/dns/geoip.h		\
@@ -180,6 +181,7 @@ libdns_la_SOURCES =			\
 	dst_parse.h			\
 	dyndb.c				\
 	ecs.c				\
+	fcache.c			\
 	fixedname.c			\
 	forward.c			\
 	gssapictx.c			\
