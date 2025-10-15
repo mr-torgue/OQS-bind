@@ -6,6 +6,7 @@
 #include <dns/message.h>
 #include <isc/buffer.h>
 #include <isc/ht.h>
+#include <isc/job.h>
 #include <isc/mem.h>
 #include <isc/time.h>
 #include <isc/util.h>
@@ -41,7 +42,8 @@ typedef struct fragment_cache_entry {
 
 
 // global variables
-isc_loopmgr_t *frag_loopmgr = NULL;     // handles loops/timers
+isc_loopmgr_t *frag_loopmgr = NULL;     // loop manager (inherited)
+isc_loop_t *frag_loop = NULL;           // handles loops/timers
 isc_mem_t *frag_mctx = NULL;            // for memory allocations
 isc_ht_t *fragment_cache = NULL;        // fragment hashtable
 ISC_LIST(fragment_cache_entry_t) expiry_list; // linked list to keep track of which fragment entries need to be removed
@@ -50,7 +52,8 @@ isc_time_t fragment_ttl;                // specifies ttl in the cache for a cach
 isc_time_t loop_timeout;                // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
 
 // initializes the global variables
-void fcache_init(void);
+// initializes the timer (hardcoded intervals currently)
+void fcache_init(isc_loopmgr_t *frag_loopmgr_p);
 
 // add a fragment to cache
 // creates a new cache entry if not exists
