@@ -40,29 +40,41 @@ typedef struct fragment_cache_entry {
     LINK(struct fragment_cache_entry) link;  // for the expiration list
 } fragment_cache_entry_t;
 
+typedef ISC_LIST(fragment_cache_entry_t) fragmentlist_t;
 
 // global variables
-isc_loopmgr_t *frag_loopmgr = NULL;     // loop manager (inherited)
-isc_loop_t *frag_loop = NULL;           // handles loops/timers
 isc_mem_t *frag_mctx = NULL;            // for memory allocations
 isc_ht_t *fragment_cache = NULL;        // fragment hashtable
-ISC_LIST(fragment_cache_entry_t) expiry_list; // linked list to keep track of which fragment entries need to be removed
+fragmentlist_t expiry_list; // linked list to keep track of which fragment entries need to be removed
 isc_timer_t *expiry_timer = NULL;       // timer
 isc_time_t fragment_ttl;                // specifies ttl in the cache for a cache entry
 isc_time_t loop_timeout;                // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
 
 // initializes the global variables
 // initializes the timer (hardcoded intervals currently)
-void fcache_init(isc_loopmgr_t *frag_loopmgr_p);
+void fcache_init(isc_loop_t *frag_loopmgr_p);
+
+// deinitializes the timer and cleans up
+void fcache_deinit(void);
 
 // add a fragment to cache
 // creates a new cache entry if not exists
 // if already exists, add to the fragments array
-bool fcache_add(dns_message_t *frag, unsigned nr_fragments, unsigned char *key, unsigned keysize);
+bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments);
 
 // removes a cache entry from cache
 bool fcache_remove(unsigned char *key, unsigned keysize);
 
+// returns a cache entry
+// returns false if not in cache
+bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry);
+
 // returns the fragment in out_frag
 // returns false if unsuccessful
-bool fcache_get_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t *out_frag);
+bool fcache_get_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag);
+
+// purges the cache (hashtable)
+bool fcache_purge(void);
+
+// return the number of elements in the cache
+unsigned fcache_count(void);

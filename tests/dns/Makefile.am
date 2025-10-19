@@ -18,6 +18,7 @@ LDADD +=				\
 	$(LIBDNS_LIBS)
 
 check_PROGRAMS =		\
+	fcache_test		\
 	acl_test		\
 	badcache_test		\
 	db_test			\
