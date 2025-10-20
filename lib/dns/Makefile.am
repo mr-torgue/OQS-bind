@@ -76,6 +76,7 @@ libdns_la_HEADERS =			\
 	include/dns/fcache.h		\
 	include/dns/fixedname.h		\
 	include/dns/forward.h		\
+	include/dns/fragment.h		\
 	include/dns/geoip.h		\
 	include/dns/ipkeylist.h		\
 	include/dns/iptable.h		\
@@ -184,6 +185,7 @@ libdns_la_SOURCES =			\
 	fcache.c			\
 	fixedname.c			\
 	forward.c			\
+	fragment.c 		\
 	gssapictx.c			\
 	hmac_link.c			\
 	ipkeylist.c			\

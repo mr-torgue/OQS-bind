@@ -43,12 +43,12 @@ typedef struct fragment_cache_entry {
 typedef ISC_LIST(fragment_cache_entry_t) fragmentlist_t;
 
 // global variables
-isc_mem_t *frag_mctx = NULL;            // for memory allocations
-isc_ht_t *fragment_cache = NULL;        // fragment hashtable
-fragmentlist_t expiry_list; // linked list to keep track of which fragment entries need to be removed
-isc_timer_t *expiry_timer = NULL;       // timer
-isc_time_t fragment_ttl;                // specifies ttl in the cache for a cache entry
-isc_time_t loop_timeout;                // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
+static isc_mem_t *frag_mctx = NULL;            // for memory allocations
+static isc_ht_t *fragment_cache = NULL;        // fragment hashtable
+static fragmentlist_t expiry_list; // linked list to keep track of which fragment entries need to be removed
+static isc_timer_t *expiry_timer = NULL;       // timer
+static isc_time_t fragment_ttl;                // specifies ttl in the cache for a cache entry
+static isc_time_t loop_timeout;                // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
 
 // initializes the global variables
 // initializes the timer (hardcoded intervals currently)

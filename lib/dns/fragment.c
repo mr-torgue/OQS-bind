@@ -1,7 +1,4 @@
-#include <isc/buffer.h>
-#include <isc/util.h>
 #include <dns/fragment.h>
-#include <dns/fcache.h>
 
 // key = id + client ip:port
 static void fcache_create_key(dns_messageid_t id, char *client_address,unsigned client_address_size, unsigned char *buffer, unsigned bufsize) {
@@ -10,12 +7,20 @@ static void fcache_create_key(dns_messageid_t id, char *client_address,unsigned 
     memcpy(buffer + sizeof(id), &client_address, client_address_size);
 }
 
-bool is_fragment(dns_message_t *msg) {
-    const char *qname = (const char*)msg->cursors[DNS_SECTION_QUESTION]->ndata;
+bool is_fragment(isc_mem_t *mctx, dns_message_t *msg) {
     // check if already done
-    if (msg.is_fragment) {
+    if (msg->is_fragment) {
         return true;
     }
+    // check if it has name in the question section
+    if(dns_message_firstname(msg, DNS_SECTION_QUESTION) != ISC_R_SUCCESS) {
+        return false;
+    }
+    bool success = true;
+    // names are compressed use dns_name_tostring to get decompressed string
+    char *qname = NULL;
+    dns_name_tostring(msg->cursors[DNS_SECTION_QUESTION], &qname, mctx);
+
     // should start with '?'
     if (qname[0] == '?') {
         int i = 1;
@@ -30,27 +35,32 @@ bool is_fragment(dns_message_t *msg) {
         // second '?' not found
         if (i == qname_len) {
 		    fprintf(stderr, "not a valid fragment for qname %s", qname);
-            return false;
+            success = false;
         }
-
-        // parse fragment number
-        char frag_str[i]; // include space for \0
-        strncpy(frag_str, qname + 1, i -1);
-        frag_str[i - 1] = '\0';
-        char* end;
-        unsigned long nr = strtoul(frag_str, &end, 10);
-        if (frag_str == end) {
-		    fprintf(stderr, "fragment number could not be parsed for qname %s", qname);
-            return false;
+        else {
+            // parse fragment number
+            char *frag_str = isc_mem_get(mctx, i * sizeof(char)); // include space for \0
+            strncpy(frag_str, qname + 1, i -1);
+            frag_str[i - 1] = '\0';
+            char* end;
+            unsigned long nr = strtoul(frag_str, &end, 10);
+            if (frag_str == end) {
+                fprintf(stderr, "fragment number could not be parsed for qname %s", qname);
+                success = false;
+            }
+            else {
+                // fragment found, set msg values
+                msg->fragment_nr = nr;
+                msg->is_fragment = true;
+                // TODO: parse qname
+                success = true;
+            }
+            // free memory
+            isc_mem_put(mctx, frag_str, i * sizeof(char));
         }
-
-        // fragment found, set msg values
-        msg->fragment_nr = nr;
-        msg.is_fragment = true;
-        // TODO: parse qname
-        return true;
     }
-    return false;
+    isc_mem_free(mctx, qname);
+    return success;
 }
 
 unsigned get_nr_fragments(dns_message_t *msg) {
@@ -71,7 +81,8 @@ bool fragment(dns_message_t *msg) {
         printf("adding fragment %d to the fcache!\n", i);
         dns_message_t *frag;
         unsigned char *key;
-        fcache_add(frag, nr_fragments, key, keysize);
+        unsigned int keysize;
+        fcache_add(key, keysize, frag, nr_fragments);
     }
     
     // change first fragment so it fits in one packet
@@ -90,17 +101,17 @@ static bool reassemble_fragments(fragment_cache_entry_t *entry, dns_message_t *o
     unsigned offset = 0;
     for(unsigned i = 0; i < entry->nr_fragments; i++) {
         isc_region_t region;
-        region.base = entry->fragments[i].base;
-        region.length = entry->fragments[i].used;
+        region.base = entry->fragments[i]->base;
+        region.length = entry->fragments[i]->used;
         isc_buffer_copyregion(msg_buf + offset, &region);
-        offset += entry->fragments[i].used;
+        offset += entry->fragments[i]->used;
     }
     REQUIRE(offset == entry->size);
     // set ignore TC flag
     unsigned options = DNS_MESSAGEPARSE_IGNORETRUNCATION;
     dns_message_parse(out_msg, msg_buf, options);
 }
-
+/*
 // callback function for received fragments
 static void frag_cb(dns_request_t *request, isc_result_t result, dns_message_t *response, void *arg)  {
     REQUIRE(is_fragment(response)); // will set required metadata
@@ -134,9 +145,8 @@ static void frag_cb(dns_request_t *request, isc_result_t result, dns_message_t *
     }
 }
 
-/*
-This function is triggered on the first fragment it receives (resolver)
-*/
+
+//This function is triggered on the first fragment it receives (resolver)
 bool request_fragments(resquery_t *query,) {
     unsigned nr_fragments = get_nr_fragments(frag);
     printf("Adding first fragment to cache...");
@@ -167,3 +177,4 @@ bool request_fragments(resquery_t *query,) {
         dns_request_send(&request);
     }
 }
+*/

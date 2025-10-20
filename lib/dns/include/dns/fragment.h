@@ -15,7 +15,7 @@ unsigned get_nr_fragments(dns_message_t *msg);
 // checks if msg is a fragment
 // expected format: ?fragment_nr?name
 // sets the fragment number for msg if fragment
-bool is_fragment(dns_message_t *msg);
+bool is_fragment(isc_mem_t *mctx, dns_message_t *msg);
 
 // fragments a given message msg
 // first fragment is returned in msg

@@ -114,11 +114,6 @@ ISC_LOOP_TEST_IMPL(basic) {
 	isc_loopmgr_shutdown(loopmgr);
 }
 
-
-static void
-setup_test_run(void *data) {
-}
-
 ISC_LOOP_TEST_IMPL(expire) {
     // isc_loopmgr_run(loopmgr);
 	//isc_loop_setup(mainloop, setup_test_run, NULL);
