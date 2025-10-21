@@ -1,3 +1,4 @@
+#include <isc/util.h>
 #include <dns/fragment.h>
 
 // key = id + client ip:port
@@ -7,16 +8,20 @@ static void fcache_create_key(dns_messageid_t id, char *client_address,unsigned 
     memcpy(buffer + sizeof(id), &client_address, client_address_size);
 }
 
-bool is_fragment(isc_mem_t *mctx, dns_message_t *msg) {
+bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
     // check if already done
-    if (msg->is_fragment) {
+    if (msg->is_fragment && !force) {
         return true;
     }
     // check if it has name in the question section
     if(dns_message_firstname(msg, DNS_SECTION_QUESTION) != ISC_R_SUCCESS) {
         return false;
     }
-    bool success = true;
+    // set default values
+    // will get overwritten if valid fragment
+    bool success = false;
+    msg->fragment_nr = 0;
+    msg->is_fragment = false;
     // names are compressed use dns_name_tostring to get decompressed string
     char *qname = NULL;
     dns_name_tostring(msg->cursors[DNS_SECTION_QUESTION], &qname, mctx);
@@ -48,6 +53,10 @@ bool is_fragment(isc_mem_t *mctx, dns_message_t *msg) {
                 fprintf(stderr, "fragment number could not be parsed for qname %s", qname);
                 success = false;
             }
+            else if (*end != '\0') {
+                fprintf(stderr, "incorrect fragment number ensure format is ?[nr]?[qname]\n");
+                success = false;
+            }
             else {
                 // fragment found, set msg values
                 msg->fragment_nr = nr;
@@ -63,11 +72,43 @@ bool is_fragment(isc_mem_t *mctx, dns_message_t *msg) {
     return success;
 }
 
-unsigned get_nr_fragments(dns_message_t *msg) {
-    unsigned nr_fragments = 1;
-    // TODO: logic
+bool calc_message_size(dns_message_t *msg, unsigned *msg_size, 
+                       unsigned *section_sizes, unsigned nr_sections,
+                       unsigned *answer_sizes, unsigned *authoritative_sizes, unsigned *additional_sizes, 
+                       unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
+                       unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {
+    REQUIRE(nr_sections == DNS_SECTION_MAX);
+    *msg_size = msg->buffer->used;
+    for(unsigned i = 0; i < DNS_SECTION_MAX; i++) {
+        section_sizes[i] = msg->sections
+    }
+
+}
+
+
+unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send) {
+    REQUIRE(total_msg_size > total_sig_pk_bytes); 
+    unsigned num_fixed_bytes = total_msg_size - total_sig_pk_bytes;
+    REQUIRE(max_msg_size > num_fixed_bytes); // fixed bytes should fit in a message
+    *can_send = max_msg_size - num_fixed_bytes;
+    *can_send_first_msg = *can_send;
+
+    int qname_overhead = 4;     // ?fragnum? overhead. Assuming fragnum to be at most 2 digits.
+    unsigned nr_fragments = 0;
+
+    unsigned counter = 0;
+    while (total_sig_pk_bytes > counter) {
+        counter += *can_send;
+        if (nr_fragments == 0) {
+            *can_send += savings;
+            *can_send -= qname_overhead; // nr_fragments / 10
+        }
+        nr_fragments++;
+        REQUIRE(nr_fragments < 100); // just to make sure qname_overhead is correct
+    }
     return nr_fragments;
 }
+
 
 bool fragment(dns_message_t *msg) {
     unsigned nr_fragments = get_nr_fragments(msg);
@@ -90,6 +131,7 @@ bool fragment(dns_message_t *msg) {
     return true;
 
 }
+
 
 // reassembles the complete message from cache
 // assumption: cache contains all fragments
