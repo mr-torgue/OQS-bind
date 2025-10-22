@@ -1,5 +1,7 @@
+#include "include/dns/fragment.h"
 #include <isc/util.h>
 #include <dns/fragment.h>
+#include <dns/types.h>
 
 // key = id + client ip:port
 static void fcache_create_key(dns_messageid_t id, char *client_address,unsigned client_address_size, unsigned char *buffer, unsigned bufsize) {
@@ -119,6 +121,28 @@ bool fragment(dns_message_t *msg) {
 
     // adding fragment to cache
     for (unsigned i = 0; i < nr_fragments; i++) {
+        isc_buffer_t *frag;
+        frag = copy(msg->buffer);
+        for (section) {
+            for (rrset) {
+                for (rr) {
+                    if (rr == DNSKEY) {
+
+                    }
+                    else if (rr == RRSIG) {
+
+                    }
+                    // exclude because these RR's are sent in first fragment
+                    else if (i > 0) {
+
+                    }
+                    else {
+
+                    }
+                }
+            }
+        }
+
         printf("adding fragment %d to the fcache!\n", i);
         dns_message_t *frag;
         unsigned char *key;

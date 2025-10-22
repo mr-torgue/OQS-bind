@@ -38,6 +38,7 @@ bool estimate_message_size(dns_message_t *frag, unsigned *msg_size, unsigned *an
 // first fragment is returned in msg
 // remaining fragments are added to cache
 // returns true if success, false otherwise
+// TODO: currently has to pass through all rr's twice --> reduce to 1 pass
 bool fragment(dns_message_t *msg);
 
 // requests remaining fragments from the name server
