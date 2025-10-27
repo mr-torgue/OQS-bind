@@ -9,6 +9,7 @@
 
 #define RRSIG 46
 #define DNSKEY 48
+#define MAXUDP 1232
 
 
 #define is_fragment(a, b) is__fragment(a, b, true) 
@@ -29,7 +30,12 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
 
 
 // calculates all the sizes needed for fragmentation
-bool calc_message_size(dns_message_t *msg, unsigned *msg_size, unsigned *answer_sizes, unsigned *authoritative_sizes, unsigned *additional_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
+// returns the total message size in bytes 
+// num_sig_rr / num_dnskey_rr contain the number of resource records for signatures and keys
+// total_sig_rr / total_dnskey_rr contains the total size in bytes
+unsigned calc_message_size(isc_mem_t *mctx, dns_message_t *msg,
+                       unsigned ***rr_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
+                       unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
 
 // estimates the size of the complete message based on a fragment
 bool estimate_message_size(dns_message_t *frag, unsigned *msg_size, unsigned *answer_sizes, unsigned *authoritative_sizes, unsigned *additional_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
@@ -39,7 +45,7 @@ bool estimate_message_size(dns_message_t *frag, unsigned *msg_size, unsigned *an
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(dns_message_t *msg);
+bool fragment(isc_mem_t *mctx, dns_message_t *msg);
 
 // requests remaining fragments from the name server
 // determines how many fragments to retrieve based on the provided response

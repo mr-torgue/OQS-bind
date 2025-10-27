@@ -18,6 +18,7 @@
 /*
  * Flags field of the KEY RR rdata
  */
+
 #define DNS_KEYFLAG_TYPEMASK 0xC000 /*%< Mask for "type" bits */
 #define DNS_KEYTYPE_AUTHCONF 0x0000 /*%< Key usable for both */
 #define DNS_KEYTYPE_CONFONLY 0x8000 /*%< Key usable for confidentiality */
@@ -156,3 +157,104 @@
 
 #define DNS_SIG_P256_SNOVA2454SIZE 324 // 248 + 76 
 #define DNS_KEY_P256_SNOVA2454SIZE 1085 // 1016 + 69
+
+
+// returns the signature size for the given algorithm
+// inefficient: should be in a loop
+// requires some changes so leave like this for now
+unsigned get_alg_sig_size(unsigned algorithm) {
+	printf("Algorithm (SIG): %u\n", algorithm);
+	if (algorithm == DNS_KEYALG_FALCON512) {
+		return DNS_SIG_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_FALCON512) {
+		return DNS_SIG_P256_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_FALCON512) {
+		return DNS_SIG_RSA3072_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_DILITHIUM2) {
+		return DNS_SIG_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_DILITHIUM2) {
+		return DNS_SIG_P256_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_DILITHIUM2) {
+		return DNS_SIG_RSA3072_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_SPHINCSSHA256128S) {
+		return DNS_SIG_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_SPHINCSSHA256128S) {
+		return DNS_SIG_P256_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_SPHINCSSHA256128S) {
+		return DNS_SIG_RSA3072_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_MAYO1) {
+		return DNS_SIG_MAYO1SIZE;
+	}  
+	else if (algorithm == DNS_KEYALG_P256_MAYO1) {
+		return DNS_SIG_P256_MAYO1SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_SNOVA2454) {
+		return DNS_SIG_SNOVA2454SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_SNOVA2454) {
+		return DNS_SIG_P256_SNOVA2454SIZE;
+	} 
+	else {
+		printf("Algorithm (SIG) %u not supported!\n", algorithm);
+	}
+    return 0;
+}
+
+// returns the public key size for the given algorithm
+// inefficient: should be in a loop
+// requires some changes so leave like this for now
+unsigned get_alg_pk_size(unsigned algorithm) {
+	printf("Algorithm (PK): %u\n", algorithm);
+	if (algorithm == DNS_KEYALG_FALCON512) {
+		return DNS_KEY_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_FALCON512) {
+		return DNS_KEY_P256_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_FALCON512) {
+		return DNS_KEY_RSA3072_FALCON512SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_DILITHIUM2) {
+		return DNS_KEY_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_DILITHIUM2) {
+		return DNS_KEY_P256_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_DILITHIUM2) {
+		return DNS_KEY_RSA3072_DILITHIUM2SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_SPHINCSSHA256128S) {
+		return DNS_KEY_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_SPHINCSSHA256128S) {
+		return DNS_KEY_P256_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_RSA3072_SPHINCSSHA256128S) {
+		return DNS_KEY_RSA3072_SPHINCSSHA256128SSIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_MAYO1) {
+		return DNS_KEY_MAYO1SIZE;
+	}  
+	else if (algorithm == DNS_KEYALG_P256_MAYO1) {
+		return DNS_KEY_P256_MAYO1SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_SNOVA2454) {
+		return DNS_KEY_SNOVA2454SIZE;
+	} 
+	else if (algorithm == DNS_KEYALG_P256_SNOVA2454) {
+		return DNS_KEY_P256_SNOVA2454SIZE;
+	} 
+	else {
+		printf("Algorithm (PK) %u not supported!\n", algorithm);
+	}
+    return 0;
+}
