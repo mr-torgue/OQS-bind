@@ -6,6 +6,8 @@
 #include <dns/message.h>
 #include <dns/request.h>
 #include <dns/fcache.h>
+#include <dns/fragment_helpers.h>
+#include <dns/keyvalues.h>
 
 #define RRSIG 46
 #define DNSKEY 48
@@ -38,14 +40,14 @@ unsigned calc_message_size(isc_mem_t *mctx, dns_message_t *msg,
                        unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
 
 // estimates the size of the complete message based on a fragment
-bool estimate_message_size(dns_message_t *frag, unsigned *msg_size, unsigned *answer_sizes, unsigned *authoritative_sizes, unsigned *additional_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
+unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings);
 
 // fragments a given message msg
 // first fragment is returned in msg
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(isc_mem_t *mctx, dns_message_t *msg);
+bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address, unsigned client_address_size);
 
 // requests remaining fragments from the name server
 // determines how many fragments to retrieve based on the provided response

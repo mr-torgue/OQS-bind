@@ -12,6 +12,9 @@ Advantages:
 1. No need
 */
 
+unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
+
+
 recombine:
     unsigned offset = 0;
     for(unsigned i = 0; i < entry->nr_fragments; i++) {

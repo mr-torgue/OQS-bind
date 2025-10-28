@@ -162,8 +162,8 @@
 // returns the signature size for the given algorithm
 // inefficient: should be in a loop
 // requires some changes so leave like this for now
-unsigned get_alg_sig_size(unsigned algorithm) {
-	printf("Algorithm (SIG): %u\n", algorithm);
+static unsigned get_alg_sig_size(unsigned algorithm) {
+	//printf("Algorithm (SIG): %u\n", algorithm);
 	if (algorithm == DNS_KEYALG_FALCON512) {
 		return DNS_SIG_FALCON512SIZE;
 	} 
@@ -203,17 +203,14 @@ unsigned get_alg_sig_size(unsigned algorithm) {
 	else if (algorithm == DNS_KEYALG_P256_SNOVA2454) {
 		return DNS_SIG_P256_SNOVA2454SIZE;
 	} 
-	else {
-		printf("Algorithm (SIG) %u not supported!\n", algorithm);
-	}
     return 0;
 }
 
 // returns the public key size for the given algorithm
 // inefficient: should be in a loop
 // requires some changes so leave like this for now
-unsigned get_alg_pk_size(unsigned algorithm) {
-	printf("Algorithm (PK): %u\n", algorithm);
+static unsigned get_alg_pk_size(unsigned algorithm) {
+	//printf("Algorithm (PK): %u\n", algorithm);
 	if (algorithm == DNS_KEYALG_FALCON512) {
 		return DNS_KEY_FALCON512SIZE;
 	} 
@@ -253,8 +250,5 @@ unsigned get_alg_pk_size(unsigned algorithm) {
 	else if (algorithm == DNS_KEYALG_P256_SNOVA2454) {
 		return DNS_KEY_P256_SNOVA2454SIZE;
 	} 
-	else {
-		printf("Algorithm (PK) %u not supported!\n", algorithm);
-	}
     return 0;
 }
