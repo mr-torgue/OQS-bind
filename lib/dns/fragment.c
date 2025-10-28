@@ -477,7 +477,7 @@ bool request_fragments(dns_request_t *query, dns_message_t *response) {
         REQUIRE(result == ISC_R_SUCCESS); // request is created succesfully
 
         // Send the request
-        result = dns_request_send(&request);
+        dns_dispatch_send(request->dispentry);
         REQUIRE(result == ISC_R_SUCCESS); // request is sent succesfuully
     }
 }
