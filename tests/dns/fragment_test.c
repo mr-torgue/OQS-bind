@@ -185,9 +185,10 @@ ISC_RUN_TEST_IMPL(get_nr_fragments_t) {
     
 }
 
-ISC_RUN_TEST_IMPL(fragment_t) {
+ISC_RUN_TEST_IMPL(fragment_and_reassemble) {
     size_t buffer_size;
     const char *filename = "testdata/message/response1-falcon512";
+    const char *src_address = "1.2.3.4";
     unsigned char *buffer = load_binary_file(filename, &buffer_size);
 
     if(buffer != NULL) {
@@ -208,7 +209,7 @@ ISC_RUN_TEST_IMPL(fragment_t) {
         fprintf(stderr, "\n");
         printmessage(msg);
 
-        bool res = fragment(msg);
+        bool res = fragment(mctx, msg, src_address, strlen(src_address));
 
         dns_message_detach(&msg);
         isc_mem_put(mctx, buffer, buffer_size);
@@ -223,7 +224,8 @@ ISC_RUN_TEST_IMPL(fragment_t) {
 ISC_TEST_LIST_START
 ISC_TEST_ENTRY(is_fragment_t)
 ISC_TEST_ENTRY(get_nr_fragments_t)
-ISC_TEST_ENTRY(fragment_t)
+ISC_TEST_ENTRY(fragment_and_reassemble)
+// ISC_TEST_ENTRY(fragment_and_reassemble)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN
