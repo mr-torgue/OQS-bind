@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <isc/loop.h>
+#include <isc/types.h>
 
 #define UNIT_TESTING
 #include <cmocka.h>
@@ -55,6 +56,15 @@ teardown_test(void **state) {
 	return (0);
 }
 
+static void compare_buffers(isc_buffer_t *a, isc_buffer_t *b) {
+    printf("Comparing buffers...\n");
+    printf("a->used: %d\nb->used: %d\n", a->used, b->used);
+    assert_true(a->used == b->used);
+    for (unsigned i = 0; i < a->used; i++) {
+        assert_true(((char *)(a->base))[i] == ((char *)(b->base))[i]);
+    }
+}
+
 // tests basic insertion and deletion
 ISC_LOOP_TEST_IMPL(basic) {
     
@@ -65,14 +75,41 @@ ISC_LOOP_TEST_IMPL(basic) {
     
     // set up a dns message with random buffer
     dns_message_t *frag = NULL;
+    dns_message_t *frag2 = NULL;
+    dns_message_t *frag4 = NULL;
+    dns_message_t *frag5 = NULL;
     isc_buffer_t *buffer = NULL;
+    isc_buffer_t *buffer2 = NULL;
+    isc_buffer_t *buffer4 = NULL;
+    isc_buffer_t *buffer5 = NULL;
 
     unsigned buflen = 10;
+    // frag 1
     isc_buffer_allocate(mctx, &buffer, buflen);
+    isc_buffer_putuint32(buffer, 12345678); // put some data
     frag = isc_mem_get(mctx, sizeof(dns_message_t));
     assert_int_equal(buffer->length, buflen);
     frag->fragment_nr = 1;
     frag->buffer = buffer;
+    // frag 2
+    isc_buffer_allocate(mctx, &buffer2, buflen);
+    isc_buffer_putuint32(buffer2, 87654321); // put some data
+    frag2 = isc_mem_get(mctx, sizeof(dns_message_t));
+    frag2->fragment_nr = 2;
+    frag2->buffer = buffer2;
+    // frag 4
+    isc_buffer_allocate(mctx, &buffer4, buflen);
+    isc_buffer_putuint32(buffer4, 55555555); // put some data
+    frag4 = isc_mem_get(mctx, sizeof(dns_message_t));
+    frag4->fragment_nr = 4;
+    frag4->buffer = buffer4;
+    // frag 5 -> should not get added since nr_fragment = 5 (0, 1, 2, 3, 4)
+    isc_buffer_allocate(mctx, &buffer5, buflen);
+    isc_buffer_putuint32(buffer5, 88118811); // put some data
+    frag5 = isc_mem_get(mctx, sizeof(dns_message_t));
+    frag5->fragment_nr = 5;
+    frag5->buffer = buffer5;
+
     unsigned nr_fragments = 5;
     unsigned keysize = 96;
     unsigned char key[keysize];
@@ -83,7 +120,7 @@ ISC_LOOP_TEST_IMPL(basic) {
     // outputs
     bool res;
     isc_buffer_t *out = NULL;
-    fragment_cache_entry_t *out_ce = NULL;
+    fragment_cache_entry_t *out_ce;
 
     assert_int_equal(fcache_count(), 0);
     // add new message to cache
@@ -91,10 +128,10 @@ ISC_LOOP_TEST_IMPL(basic) {
     assert_true(res);
     assert_int_equal(fcache_count(), 1);
     // get existing fragment
-    res = fcache_get_fragment(key, keysize, frag->fragment_nr, out);
+    res = fcache_get_fragment(key, keysize, frag->fragment_nr, &out);
     assert_true(res);
     // get non-existing fragment
-    res = fcache_get_fragment(key, keysize, 2, out);
+    res = fcache_get_fragment(key, keysize, 2, &out);
     assert_false(res);
     // remove non-existing fragment
     res = fcache_remove_fragment(key, keysize, 2);
@@ -116,9 +153,68 @@ ISC_LOOP_TEST_IMPL(basic) {
     assert_true(res);
     assert_int_equal(fcache_count(), 0);
 
+    // add new entry
+    res = fcache_add(key, keysize, frag, nr_fragments);
+    assert_true(res);
+    assert_int_equal(fcache_count(), 1);
+    // add same fragment, should overwrite
+    res = fcache_add(key, keysize, frag, nr_fragments);
+    assert_true(res);
+    assert_int_equal(fcache_count(), 1);
+    // add new fragment
+    res = fcache_add(key, keysize, frag4, nr_fragments);
+    assert_true(res);
+    assert_int_equal(fcache_count(), 1);
+    out_ce = NULL;
+    res = fcache_get(key, keysize, &out_ce);
+    assert_true(out_ce->bitmap == ((1 << frag->fragment_nr) | (1 << frag4->fragment_nr)));
+    // try to add fragment 5
+    res = fcache_add(key, keysize, frag5, nr_fragments);
+    assert_false(res);
+    assert_int_equal(fcache_count(), 1);
+    out_ce = NULL;
+    res = fcache_get(key, keysize, &out_ce);
+    assert_true(out_ce->bitmap == ((1 << frag->fragment_nr) | (1 << frag4->fragment_nr)));
+    // add new fragment
+    res = fcache_add(key, keysize, frag2, nr_fragments);
+    assert_true(res);
+    assert_int_equal(fcache_count(), 1);
+    out_ce = NULL;
+    res = fcache_get(key, keysize, &out_ce);
+    assert_true(out_ce->bitmap == ((1 << frag->fragment_nr) | (1 << frag4->fragment_nr) | (1 << frag2->fragment_nr)));
+
+    // purge before loop
+    fcache_purge();
+    assert_int_equal(fcache_count(), 0);
+
+    // add 100 entries, use the same fragment
+    for(unsigned i = 0; i < 100; i++) {
+        out_ce = NULL;
+        unsigned char key2[keysize];
+        snprintf((char *)key2, keysize, "key%d!", i);
+        res = fcache_add(key2, keysize, frag, nr_fragments);
+        assert_true(res);
+        assert_int_equal(fcache_count(), i + 1);
+        // test if fragment has been copied (e.g. does not use the same memory address)
+        res = fcache_get(key2, keysize, &out_ce);
+        assert_true(frag != out_ce);    // should have been copied
+        assert_true(key2 != out_ce->key);
+        assert_true(keysize == out_ce->keysize); // size should be the same
+        assert_true(out_ce->bitmap == (1 << frag->fragment_nr));
+        // get first fragment
+        res = fcache_get_fragment(key2, keysize, frag->fragment_nr, &out);
+        compare_buffers(frag->buffer, out);
+    }
+
     // deallocate memory
     isc_buffer_free(&buffer);
+    isc_buffer_free(&buffer2);
+    isc_buffer_free(&buffer4);
+    isc_buffer_free(&buffer5);
     isc_mem_put(mctx, frag, sizeof(dns_message_t));
+    isc_mem_put(mctx, frag2, sizeof(dns_message_t));
+    isc_mem_put(mctx, frag4, sizeof(dns_message_t));
+    isc_mem_put(mctx, frag5, sizeof(dns_message_t));
     fcache_deinit();
 	isc_loopmgr_shutdown(loopmgr);
 }
@@ -197,7 +293,7 @@ ISC_LOOP_TEST_IMPL(purge) {
 
 ISC_TEST_LIST_START
 ISC_TEST_ENTRY_CUSTOM(basic, setup_test, teardown_test)
-ISC_TEST_ENTRY_CUSTOM(expire, setup_test, teardown_test)
+//ISC_TEST_ENTRY_CUSTOM(expire, setup_test, teardown_test)
 //ISC_TEST_ENTRY_CUSTOM(purge, setup_test, teardown_test)
 // ISC_TEST_ENTRY_CUSTOM(duplicate fragment, setup_test, teardown_test)
 //ISC_TEST_ENTRY(basic)

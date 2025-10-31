@@ -65,6 +65,9 @@ bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsig
 // removes a cache entry from cache
 bool fcache_remove(unsigned char *key, unsigned keysize);
 
+// removes a fragment from a cache entry
+bool fcache_remove_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr);
+
 // returns a cache entry
 // returns false if not in cache
 bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry);
@@ -78,3 +81,17 @@ bool fcache_purge(void);
 
 // return the number of elements in the cache
 unsigned fcache_count(void);
+
+// frees a cache entry
+// does not necesarly need to be in the fcache
+static void fcache_free_entry(fragment_cache_entry_t *entry) {
+    ISC_LIST_UNLINK(expiry_list, entry, link);
+    for (unsigned i = 0; i < entry->nr_fragments; i++) {
+        if(entry->bitmap & (1 << i)) {
+            isc_buffer_free(&(entry->fragments[i]));
+        }
+    }
+    isc_mem_put(frag_mctx, entry->fragments, entry->nr_fragments * sizeof(isc_buffer_t *));
+    isc_mem_put(frag_mctx, entry->key, entry->keysize);
+    isc_mem_put(frag_mctx, entry, sizeof(fragment_cache_entry_t));    
+}

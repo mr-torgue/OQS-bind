@@ -1,15 +1,92 @@
 #include "include/dns/fragment.h"
+#include <stdlib.h>
 #include <isc/buffer.h>
 #include <isc/list.h>
 #include <isc/mem.h>
+#include <isc/result.h>
 #include <isc/types.h>
 #include <isc/util.h>
 #include <dns/fragment.h>
 #include <dns/message.h>
+#include <dns/name.h>
 #include <dns/rdatalist.h>
 #include <dns/types.h>
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
+
+
+static isc_result_t
+render_message(isc_mem_t *mctx, dns_message_t **messagep) {
+    printf("Rendering...\n");
+    // dynamic allocation, so we can attach to the message
+	isc_buffer_t *buffer = NULL;
+    isc_buffer_allocate(mctx, &buffer, 64 * 1024 - 1);
+	isc_result_t result;
+	dns_message_t *message = *messagep;
+	dns_compress_t cctx;
+
+	message->from_to_wire = DNS_MESSAGE_INTENTRENDER;
+	for (size_t i = 0; i < DNS_SECTION_MAX; i++) {
+		message->counts[i] = 0;
+	}
+
+	dns_compress_init(&cctx, mctx, 0);
+
+    printf("Render begin\n");
+	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
+
+    printf("Render question\n");
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_QUESTION, 0) == ISC_R_SUCCESS);
+
+    printf("Render answer\n");
+    REQUIRE(dns_message_rendersection(message, DNS_SECTION_ANSWER, 0) == ISC_R_SUCCESS);
+
+    printf("Render authority\n");
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_AUTHORITY, 0) == ISC_R_SUCCESS);
+
+    printf("Render additional\n");
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, 0) == ISC_R_SUCCESS);
+
+    printf("Render end\n");
+	dns_message_renderend(message);
+
+	dns_compress_invalidate(&cctx);
+    printf("Finished rendering...\n");
+    printf("buffer length: %d\n", buffer->length);
+    printf("buffer used: %d\n", buffer->used);
+    message->buffer = buffer;
+	return (result);
+
+cleanup:
+	dns_compress_invalidate(&cctx);
+	return (result);
+}
+
+
+static void printmessage(isc_mem_t *mctx, dns_message_t *msg) {
+	isc_buffer_t b;
+	char *buf = NULL;
+	int len = 1024;
+	isc_result_t result = ISC_R_SUCCESS;
+
+	do {
+		buf = isc_mem_get(mctx, len);
+
+		isc_buffer_init(&b, buf, len);
+		result = dns_message_totext(msg, &dns_master_style_debug, 0,
+					    &b);
+		if (result == ISC_R_NOSPACE) {
+			isc_mem_put(mctx, buf, len);
+			len *= 2;
+		} else if (result == ISC_R_SUCCESS) {
+			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
+		}
+	} while (result == ISC_R_NOSPACE);
+
+	if (buf != NULL) {
+		isc_mem_put(mctx, buf, len);
+	}
+}
 
 
 bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
@@ -80,37 +157,80 @@ bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
 unsigned calc_message_size(isc_mem_t *mctx, dns_message_t *msg,
     unsigned ***rr_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
     unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {
-
+    printf("Calculating message size...\n");
+    REQUIRE(msg != NULL);
+    REQUIRE(msg->saved.base != NULL);
+    REQUIRE(mctx != NULL);
     *rr_sizes = isc_mem_get(mctx, DNS_SECTION_MAX * sizeof(unsigned *));
+    // initalize values
+    *num_sig_rr = 0;
+    *num_dnskey_rr = 0;
+    *total_sig_rr = 0;
+    *total_dnskey_rr = 0;
+    *savings = 0;
+    
+    dns_name_t *name = NULL;
+    dns_rdataset_t *rdataset = NULL;
 
     unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
-    unsigned msgsize = msg->buffer->used;
-    // go through each section
-    for(unsigned section = 0; section < DNS_SECTION_MAX; section++) {
+    unsigned msgsize = msg->saved.length;
+    printf("msgsize: %u\n", msgsize);
+
+    // we already have the total size, now we determine the amount of dnskeys/signatures
+    // skip question section
+    for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
+        printf("Section %u with %u resource records...\n", section, msg->counts[section]);
         unsigned counter = 0;
-        *rr_sizes[section] = isc_mem_get(mctx, msg->counts[section] * sizeof(unsigned));
-        // go through each name, rdataset, and rdata item
-        for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[section]); name != NULL; ISC_LIST_NEXT(name, link)) {
-            rr_header_size += name->length;
-            for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
-                for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
-				    dns_rdata_t rdata = DNS_RDATA_INIT;
-                    dns_rdataset_current(rdataset, &rdata);
-                    unsigned rdata_size = rdata.length;
-                    *rr_sizes[section][counter] = rdata_size;
-                    if (rdata.type == RRSIG) {
-                        *num_sig_rr += 1;
-                        *total_sig_rr += (rdata_size - calc_rrsig_header_size(&rdata)); // exclude RRSIG header
+        // ignore if there are no resource records
+        if(msg->counts[section] > 0) {
+            (*rr_sizes)[section] = isc_mem_get(mctx, msg->counts[section] * sizeof(unsigned));
+            // go through each name, rdataset, and rdata item
+            // for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[section]); name != NULL; ISC_LIST_NEXT(name, link)) {
+            for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section))
+            {
+                name = NULL;
+                dns_message_currentname(msg, section, &name);
+
+                printf("name: %s\n", name->ndata);
+                printf("name length: %d\n", name->length);
+                if (name->length == 1 && dns_name_equal(name, dns_rootname)) {
+                    printf("This is the root domain (.).\n");
+                }
+                rr_header_size += name->length;
+                
+                for (rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+                    printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
+                    printf("rdataset type: %d\n", rdataset->type);
+                    isc_result_t tresult;
+                    for (tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
+                        dns_rdata_t rdata = DNS_RDATA_INIT;
+                        dns_rdataset_current(rdataset, &rdata);
+                        unsigned rdata_size = rdata.length;
+                        (*rr_sizes)[section][counter] = rdata_size;
+                        if (rdata.type == RRSIG) {
+                            *num_sig_rr += 1;
+                            *total_sig_rr += (rdata_size - calc_rrsig_header_size(&rdata)); // exclude RRSIG header
+                        }
+                        else if (rdata.type == DNSKEY) {
+                            *num_dnskey_rr += 1;
+                            *total_dnskey_rr += (rdata_size - calc_dnskey_header_size()); // exclude DNSKEY header
+                        }
+                        counter++;
                     }
-                    else if (rdata.type == DNSKEY) {
-                        *num_dnskey_rr += 1;
-                        *total_dnskey_rr += (rdata_size - calc_dnskey_header_size()); // exclude DNSKEY header
-                    }
-                    counter++;
                 }
             }
+
+            // can be moved outside of this loop 
+            // OPT record found!
+            // only one allowed and can only be in the additional section
+            if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
+                printf("Found an OPT message!\n");
+                REQUIRE(dns_rdataset_count(msg->opt) == 1);
+                counter++;
+            }
+            printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
+            REQUIRE(msg->counts[section] == counter); // sanity check: msg->counts[i] and counter should be the same after this  (NOTE: this goes wrong with TSIG/SIG(0))
         }
-        REQUIRE(msg->counts[section] == counter); // sanity check: msg->counts[i] and counter should be the same after this
     }
     return msgsize;
 }
@@ -179,43 +299,6 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     return nr_fragments;
 }
 
-static void add_rdata_to_name(dns_message_t *msg, dns_name_t *name, dns_rdata_t *rdata,
-		  uint32_t ttl, dns_namelist_t *namelist, unsigned start, unsigned end) {
-	isc_region_t r, newr;
-	dns_rdata_t *newrdata = NULL;
-	dns_name_t *newname = NULL;
-	dns_rdatalist_t *newlist = NULL;
-	dns_rdataset_t *newset = NULL;
-	isc_buffer_t *tmprdatabuf = NULL;
-    unsigned new_rdata_length = end - start;
-
-	dns_message_gettemprdata(msg, &newrdata);
-
-	dns_rdata_toregion(rdata, &r);
-	isc_buffer_allocate(msg->mctx, &tmprdatabuf, new_rdata_length);
-	isc_buffer_availableregion(tmprdatabuf, &newr);
-	memmove(newr.base, r.base + start, new_rdata_length);
-	dns_rdata_fromregion(newrdata, rdata->rdclass, rdata->type, &newr);
-	dns_message_takebuffer(msg, &tmprdatabuf);
-
-	dns_message_gettempname(msg, &newname);
-	dns_name_copy(name, newname);
-
-	dns_message_gettemprdatalist(msg, &newlist);
-	newlist->rdclass = newrdata->rdclass;
-	newlist->type = newrdata->type;
-	newlist->ttl = ttl;
-	ISC_LIST_APPEND(newlist->rdata, newrdata, link);
-
-	dns_message_gettemprdataset(msg, &newset);
-	dns_rdatalist_tordataset(newlist, newset);
-
-	ISC_LIST_INIT(newname->list);
-	ISC_LIST_APPEND(newname->list, newset, link);
-
-	ISC_LIST_APPEND(*namelist, newname, link);
-}
-
 static void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned rr_pk_sig_count, unsigned *start, unsigned *frag_len) {
     REQUIRE(offset < rdata_size);
     unsigned rem_space_per_frag, can_send_additional, rem_space_per_frag_1, can_send_additional_1;                            
@@ -244,9 +327,13 @@ static void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, uns
 }
  
 bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address, unsigned client_address_size) {
+    printf("Fragmenting message...\n");
+    REQUIRE(msg != NULL);
+    REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
+    REQUIRE(mctx != NULL);
     unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
     unsigned **rr_sizes; // contains the size of each resource record
-    
+    printf("printing pointer of msg so it does not get optimized out: %p\n", msg);
     // calculate message size
     msgsize = calc_message_size(mctx, msg, &rr_sizes, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
     // print information
@@ -282,86 +369,198 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address, unsigne
         offsets[section_nr] = isc_mem_get(mctx, msg->counts[section_nr] * sizeof(unsigned));
     }
 
-
+    dns_name_t *name = NULL;
     // adding fragment to cache
     for (unsigned frag_nr = 0; frag_nr < nr_fragments; frag_nr++) {        
         printf("adding fragment %d to the fcache!\n", frag_nr);
-        dns_message_t *frag;
+        dns_message_t *frag = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &frag);
+
+        // set metadata
+        frag->id = msg->id;
+        frag->flags = msg->flags;
+        frag->rcode = msg->rcode;
+        frag->opcode = msg->opcode;
+        frag->rdclass = msg->rdclass;
+        // set fragmentation metadata
+        frag->is_fragment = true;
+        frag->fragment_nr = frag_nr;
     
+        // copy the question section
+        /*
+        REQUIRE(msg->counts[DNS_SECTION_QUESTION == 1]); // too strict?
+        for (isc_result_t result = dns_message_firstname(msg, DNS_SECTION_QUESTION); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, DNS_SECTION_QUESTION)) {
+            printf("Copying question section...\n");
+            name = NULL;
+            dns_message_currentname(msg, DNS_SECTION_QUESTION, &name);
+            dns_name_t *new_name = isc_mem_get(mctx, sizeof(*new_name));
+            dns_name_init(new_name, NULL);
+            dns_name_dup(name, mctx, new_name); 
+            dns_message_addname(frag, new_name, DNS_SECTION_QUESTION);
+            frag->counts[DNS_SECTION_QUESTION] = 1;
+        }*/
+        
+        // go through remaining sections
         for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
+            printf("Section %u with %u resource records...\n", section_nr, msg->counts[section_nr]);
             unsigned new_section_count = 0;
             unsigned counter = 0;
 
-            for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[section_nr]); name != NULL; ISC_LIST_NEXT(name, link)) {
-                
-                dns_name_t new_name;
-                dns_name_init(&new_name, NULL);
-                ISC_LIST_INIT(new_name.list);
+            // ignore if there are no resource records
+            if(msg->counts[section_nr] > 0) {
+                for (isc_result_t result = dns_message_firstname(msg, section_nr); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section_nr))
+                {
+                    name = NULL;
+                    dns_message_currentname(msg, section_nr, &name);
+                    dns_name_t *new_name = isc_mem_get(mctx, sizeof(*new_name));
+                    dns_name_init(new_name, NULL);
+                    dns_name_dup(name, mctx, new_name); // copies name only, not rr/rrset
 
-                for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+                    for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
 
-                    dns_rdataset_t new_rdataset;
-                    dns_rdataset_init(&new_rdataset);
-                    dns_rdatalist_t rdatalist;
+                        dns_rdataset_t *new_rdataset = isc_mem_get(mctx, sizeof(*new_rdataset));
+                        dns_rdataset_init(new_rdataset); 
+                        dns_rdatalist_t *rdatalist = isc_mem_get(mctx, sizeof(*rdatalist));
+                        dns_rdatalist_init(rdatalist);
 
-                    for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
-                        dns_rdata_t rdata = DNS_RDATA_INIT;
-                        dns_rdataset_current(rdataset, &rdata);
+                        // copy values
+                        rdatalist->rdclass = rdataset->rdclass;
+                        rdatalist->type = rdataset->type;
+                        rdatalist->ttl = rdataset->ttl;
 
-                        dns_rdata_t new_rdata;
-                        dns_rdata_clone(&rdata, &new_rdata);
-                        
-                        if (rdata.type == DNSKEY || rdata.type == RRSIG) {
-                            unsigned new_rdata_start, new_rdata_length;
-                            // get start and length
-                            calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rr_sizes[section_nr][counter], can_send_first_fragment, can_send, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
+                        for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
+                            // get current rdata
+                            dns_rdata_t rdata = DNS_RDATA_INIT;
+                            dns_rdataset_current(rdataset, &rdata);
+                            isc_region_t rdata_region;
+		                    dns_rdata_toregion(&rdata, &rdata_region);
 
+                            // prepare new rdata
+                            dns_rdata_t *new_rdata = isc_mem_get(mctx, sizeof(*new_rdata));
+                            //dns_rdata_t new_rdata = DNS_RDATA_INIT;
+	                        dns_rdata_init(new_rdata);
+                            isc_region_t new_rdata_region;
 
-	                        unsigned char *new_data = isc_mem_get(mctx, new_rdata_length * sizeof(unsigned char));
-                            memcpy(new_data, rdata.data + new_rdata_start, new_rdata_length);
-                            new_rdata.data = new_data;
-                            new_rdata.length = new_rdata_length;
-                            ISC_LIST_APPEND(rdatalist.rdata, &new_rdata, link);
-                            new_section_count++;
-                            offsets[section_nr][counter] = new_rdata_start;
+                            // NOTE: each rdataset should only contain one type of record
+                            if (rdata.type == DNSKEY || rdata.type == RRSIG) {
+                                unsigned new_rdata_start, new_rdata_length;
+                                // get start and length
+                                calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rr_sizes[section_nr][counter], can_send_first_fragment, can_send, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
+                                printf("Creating a new rdata record from %u with length %u\n", new_rdata_start, new_rdata_length);
+
+                                REQUIRE(new_rdata_start + new_rdata_length < rdata_region.length);
+                                new_rdata_region.length = new_rdata_length;
+                                new_rdata_region.base = isc_mem_get(mctx, new_rdata_region.length * sizeof(unsigned char)); // allocate
+                                memcpy(new_rdata_region.base, rdata_region.base + new_rdata_start, new_rdata_region.length); // copy
+                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link); // append to list
+                                new_section_count++;
+                                offsets[section_nr][counter] = new_rdata_start;
+                            }
+                            else if (frag_nr == 0) {
+                                // TODO
+                                unsigned char *new_data = isc_mem_get(mctx, rdata.length * sizeof(unsigned char));
+                                memcpy(new_data, rdata.data, rdata.length);
+                                new_rdata->data = new_data;
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+                                new_section_count++;
+                            }
+                            // already added in first fragment
+                            else {
+                                savings += rdata.length; // do we need to include this? And is it with or without header?
+                            }
+                            counter++;
                         }
-                        else if (frag_nr == 0) {
-                            unsigned char *new_data = isc_mem_get(mctx, rdata.length * sizeof(unsigned char));
-                            memcpy(new_data, rdata.data, rdata.length);
-                            new_rdata.data = new_data;
-                            ISC_LIST_APPEND(rdatalist.rdata, &new_rdata, link);
-                            new_section_count++;
-                        }
-                        // already added in first fragment
-                        else {
-                            savings += rdata.length; // do we need to include this? And is it with or without header?
-                        }
-                        counter++;
                         // convert to rdataset and link to new name
-                        dns_rdatalist_tordataset(&rdatalist, &new_rdataset);
-                        ISC_LIST_APPEND(new_name.list, &new_rdataset, link);
+                        dns_rdatalist_tordataset(rdatalist, new_rdataset);
+                        new_rdataset->attributes = rdataset->attributes; 
+                        ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+	                    REQUIRE(DNS_RDATASET_VALID(new_rdataset));
+                    } 
+                    if (section_nr == DNS_SECTION_QUESTION) {
+                        counter++;
+                        new_section_count = 1; // should always be one
+                        REQUIRE(msg->counts[DNS_SECTION_QUESTION == 1]); // too strict?
                     }
-                } 
-                // check if not empty??
-                dns_message_addname(frag, &new_name, section_nr);
+                    // check if not empty??
+                    if (new_section_count > 0) {
+                        printf("Adding new name %s for section %u...\n", new_name->ndata, section_nr);
+                        dns_message_addname(frag, new_name, section_nr);
+                    }
+                }
             }
+            // can be moved, but leads to sanity check issues
+            // OPT record found!
+            // only one allowed and can only be in the additional section
+            if (msg->opt != NULL && section_nr == DNS_SECTION_ADDITIONAL) {
+                printf("Found an OPT message!\n");
+                REQUIRE(dns_rdataset_count(msg->opt) == 1);
+                //dns_rdataset_t *new_opt_rdataset = isc_mem_get(mctx, sizeof(*new_opt_rdataset)); 
+                dns_rdataset_t *new_opt_rdataset = NULL;
+                dns_message_gettemprdataset(frag, &new_opt_rdataset);
+                //dns_rdataset_init(new_opt_rdataset); 
+
+                // get first rdata from msg->opt
+                REQUIRE(dns_rdataset_first(msg->opt) == ISC_R_SUCCESS); // there should be one resource record
+                dns_rdata_t rdata = DNS_RDATA_INIT;
+                dns_rdataset_current(msg->opt, &rdata);
+                isc_region_t rdata_region;
+                dns_rdata_toregion(&rdata, &rdata_region);
+
+                // prepare new rdata
+                //dns_rdata_t *new_opt_rdata = isc_mem_get(mctx, sizeof(*new_opt_rdata));
+                dns_rdata_t *new_opt_rdata = NULL;
+                dns_message_gettemprdata(frag, &new_opt_rdata);
+                //dns_rdata_init(new_opt_rdata);
+                isc_region_t new_opt_rdata_region;
+                dns_rdata_fromregion(new_opt_rdata, rdata.rdclass, rdata.type, &new_opt_rdata_region); 
+
+                // add to new rdataset and fragment
+                //dns_rdatalist_t *rdatalist = isc_mem_get(mctx, sizeof(*rdatalist));
+                dns_rdatalist_t *rdatalist = NULL;
+                dns_message_gettemprdatalist(frag, &rdatalist);
+                ISC_LIST_APPEND(rdatalist->rdata, new_opt_rdata, link);
+                //dns_rdatalist_init(rdatalist);
+                // copy values
+                rdatalist->rdclass = msg->opt->rdclass;
+                rdatalist->type = msg->opt->type;
+                rdatalist->ttl = msg->opt->ttl;
+                dns_rdatalist_tordataset(rdatalist, new_opt_rdataset);
+                REQUIRE(dns_message_setopt(frag, new_opt_rdataset) == ISC_R_SUCCESS);
+                new_section_count++;
+                counter++;
+            }
+            printf("Expected count: %u\nActual count: %u\n", msg->counts[section_nr], counter);
+
             REQUIRE(counter == msg->counts[section_nr]); 
+            printf("New section count: %u\n", new_section_count);
             frag->counts[section_nr] = new_section_count;
         }
         printf("Adding Fragment %d to cache...\n", frag_nr);
+	    REQUIRE(DNS_MESSAGE_VALID(frag));
+        render_message(mctx, &msg);
+        render_message(mctx, &frag);
+        //printmessage(mctx, frag);
         unsigned keysize = sizeof(dns_messageid_t) + client_address_size;
         unsigned char *key = isc_mem_get(mctx, keysize);
         fcache_create_key(msg->id, client_address, client_address_size, key, keysize);
         fcache_add(key, keysize, frag, nr_fragments);
+        // free key and frag, it has been copied into cache
+        isc_mem_put(mctx, key, keysize);
+        dns_message_detach(&frag);
     }
-    
-    // change first fragment so it fits in one packet
+
+    // free memory
+    for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
+        isc_mem_put(mctx, offsets[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+        isc_mem_put(mctx, rr_sizes[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+    }
+    isc_mem_put(mctx, offsets, DNS_SECTION_MAX * sizeof(unsigned *));
+    isc_mem_put(mctx, rr_sizes, DNS_SECTION_MAX * sizeof(unsigned *));
 
     return true;
 
 }
-
 
 // reassembles the complete message from cache
 // assumption: cache contains all fragments
@@ -380,22 +579,28 @@ static bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry,
         for(unsigned section = 0; section < DNS_SECTION_MAX; section++) {
 
             // loop through fragment resource records
-            for (dns_name_t *name_f = ISC_LIST_HEAD(frag->sections[i]); name_f != NULL; ISC_LIST_NEXT(name_f, link)) {
+            for (dns_name_t *name_f = ISC_LIST_HEAD(frag->sections[section]); name_f != NULL; ISC_LIST_NEXT(name_f, link)) {
                 for (dns_rdataset_t *rdataset_f = ISC_LIST_HEAD(name_f->list); rdataset_f != NULL; rdataset_f = ISC_LIST_NEXT(rdataset_f, link)) {
                     for (isc_result_t tresult_f = dns_rdataset_first(rdataset_f); tresult_f == ISC_R_SUCCESS; tresult_f = dns_rdataset_next(rdataset_f)) {
-                        dns_rdata_t rr_f = DNS_RDATA_INIT;
-                        dns_rdataset_current(rdataset_f, &rr_f);
+                        dns_rdata_t rdata_f = DNS_RDATA_INIT;
+                        dns_rdataset_current(rdataset_f, &rdata_f);
 
                         // find matching resource record in current message
-                        for (dns_name_t *name = ISC_LIST_HEAD(frag->sections[i]); name != NULL; ISC_LIST_NEXT(name, link)) {
+                        for (dns_name_t *name = ISC_LIST_HEAD(frag->sections[section]); name != NULL; ISC_LIST_NEXT(name, link)) {
                             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                                 for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
-                                    dns_rdata_t rr = DNS_RDATA_INIT;
-                                    dns_rdataset_current(rdataset, &rr);
+                                    dns_rdata_t rdata = DNS_RDATA_INIT;
+                                    dns_rdataset_current(rdataset, &rdata);
                                     // error prone: assumes message structure is the same for all
                                     // better is to check if it has the same qname/header
-                                    if((rr.type == RRSIG && rr_f.type == RRSIG) || (rr.type == DNSKEY && rr_f.type == DNSKEY)) {
-                                        combine(out_msg, frag); // combine and store in out msg
+                                    if((rdata.type == RRSIG && rdata_f.type == RRSIG) || (rdata.type == DNSKEY && rdata_f.type == DNSKEY)) {
+                                        unsigned new_rdata_length = rdata.length + rdata_f.length;
+                                        unsigned char *new_rdata_data = isc_mem_get(mctx, new_rdata_length * sizeof(unsigned char));
+                                        memcpy(new_rdata_data, rdata.data, rdata.length);
+                                        memcpy(new_rdata_data + rdata.length, rdata_f.data, rdata_f.length);
+                                        isc_mem_free(mctx, rdata.data); // free old
+                                        rdata.data = new_rdata_data; // set new buffer
+                                        rdata.length = new_rdata_length;
                                         goto next_rr;
                                     }
                                 }
@@ -410,9 +615,10 @@ static bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry,
         }
     }
     // would be slightly more efficient to do this in the loop
-    fcache_free_entry(entry);
+    fcache_remove(entry->key, entry->keysize);
 }
 
+/*
 // callback function for received fragments  dns_request_t *request, isc_result_t result, dns_message_t *response, 
 static void frag_cb(void *arg) {
     REQUIRE(is_fragment(response)); // will set required metadata
@@ -481,3 +687,4 @@ bool request_fragments(dns_request_t *query, dns_message_t *response) {
         REQUIRE(result == ISC_R_SUCCESS); // request is sent succesfuully
     }
 }
+*/

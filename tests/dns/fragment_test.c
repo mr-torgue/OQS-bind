@@ -47,6 +47,23 @@
 
 #include <tests/dns.h>
 
+static int
+setup_test(void **state) {
+	setup_loopmgr(state);
+
+	return (0);
+}
+
+static int
+teardown_test(void **state) {
+	teardown_loopmgr(state);
+    if(loopmgr != NULL) {
+        fcache_deinit();
+	    isc_loopmgr_shutdown(loopmgr);
+    }
+	return (0);
+}
+
 static unsigned char* load_binary_file(const char* filename, size_t* out_size) {
     FILE* file = fopen(filename, "rb");
     if (!file) {
@@ -112,7 +129,7 @@ static void printmessage(dns_message_t *msg) {
 }
 
 
-ISC_RUN_TEST_IMPL(is_fragment_t) {
+ISC_RUN_TEST_IMPL(is_fragment_test) {
     dns_message_t *msg = NULL;
     dns_fixedname_t fname;
     dns_name_t *name = NULL;
@@ -176,22 +193,28 @@ ISC_RUN_TEST_IMPL(is_fragment_t) {
 }
 
 
-ISC_RUN_TEST_IMPL(get_nr_fragments_t) {
+ISC_RUN_TEST_IMPL(calculate_start_end_test) {
+    //calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rr_sizes[section_nr][counter], can_send_first_fragment, can_send, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
+    
+
+}
+
+ISC_RUN_TEST_IMPL(get_nr_fragments_test) {
     unsigned max_msg_size, total_msg_size, total_sig_pk_bytes, savings, can_send_first_msg, can_send, result;
     result = get_nr_fragments(1232, 1100, 900, 0, &can_send_first_msg, &can_send);
     assert_int_equal(result, 1);
     result = get_nr_fragments(1232, 1300, 900, 0, &can_send_first_msg, &can_send);
     assert_int_equal(result, 2);
     
-}
 
-ISC_RUN_TEST_IMPL(fragment_and_reassemble) {
+ISC_RUN_TEST_IMPL(calc_message_size_test) {
     size_t buffer_size;
     const char *filename = "testdata/message/response1-falcon512";
     const char *src_address = "1.2.3.4";
     unsigned char *buffer = load_binary_file(filename, &buffer_size);
 
     if(buffer != NULL) {
+        printf("buffer_size: %lu\n", buffer_size);
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
@@ -209,8 +232,25 @@ ISC_RUN_TEST_IMPL(fragment_and_reassemble) {
         fprintf(stderr, "\n");
         printmessage(msg);
 
-        bool res = fragment(mctx, msg, src_address, strlen(src_address));
+        // main test
+        unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
+        unsigned **rr_sizes = NULL; // contains the size of each resource record
+        msgsize = calc_message_size(mctx, msg, &rr_sizes, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
+        assert_int_equal(msgsize, 3244);
+        assert_int_equal(nr_sig_rr, 2);
+        assert_int_equal(nr_dnskey_rr, 2);
+        assert_int_equal(total_size_sig_rr, 1332);
+        assert_int_equal(total_size_dnskey_rr, 1794);
 
+        // clean up
+        if(rr_sizes != NULL) {
+            for (unsigned section_nr = 1; section_nr < DNS_SECTION_MAX; section_nr++) {
+                if(msg->counts[section_nr] > 0) {
+                    isc_mem_put(mctx, rr_sizes[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+                }
+            }
+            isc_mem_put(mctx, rr_sizes, DNS_SECTION_MAX * sizeof(unsigned *));
+        }
         dns_message_detach(&msg);
         isc_mem_put(mctx, buffer, buffer_size);
     }
@@ -221,11 +261,58 @@ ISC_RUN_TEST_IMPL(fragment_and_reassemble) {
 
 
 
+ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
+    assert_true(loopmgr != NULL);
+    size_t buffer_size;
+    const char *filename = "testdata/message/response1-falcon512";
+    const char *src_address = "1.2.3.4";
+    unsigned char *buffer = load_binary_file(filename, &buffer_size);
+
+    if(buffer != NULL) {
+        fcache_init(mainloop);
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        fprintf(stderr, "buf used: %d\n", buf.used);
+        fprintf(stderr, "buf used: %d\n", buf.length);
+        //isc_buffer_printf(&buf, "aa");
+        dns_message_t *msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, 0);
+        fprintf(stderr, "msgid: %d\n", msg->id);
+        fprintf(stderr, "buffer: ");
+        for(int i=0; i < buffer_size; i++) {
+            fprintf(stderr, "%X ", buffer[i]);
+        }
+        fprintf(stderr, "\n");
+        printmessage(msg);
+
+        // main test
+        bool res = fragment(mctx, msg, src_address, strlen(src_address));
+
+        // test number of fragments
+
+        // test fragment numbers
+
+        // raw byte comparison
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+	isc_loopmgr_shutdown(loopmgr);
+}
+
+
+
 ISC_TEST_LIST_START
-ISC_TEST_ENTRY(is_fragment_t)
-ISC_TEST_ENTRY(get_nr_fragments_t)
-ISC_TEST_ENTRY(fragment_and_reassemble)
-// ISC_TEST_ENTRY(fragment_and_reassemble)
+ISC_TEST_ENTRY(is_fragment_test)
+ISC_TEST_ENTRY(get_nr_fragments_test)
+ISC_TEST_ENTRY(calc_message_size_test)
+ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN

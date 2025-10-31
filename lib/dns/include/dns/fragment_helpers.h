@@ -21,5 +21,5 @@ static unsigned calc_rrsig_header_size(dns_rdata_t *rdata) {
     while (rdata->data[header_size] != 0 && header_size < rdata->length) {
         header_size++;
     }
-    return header_size;
+    return ++header_size;
 }

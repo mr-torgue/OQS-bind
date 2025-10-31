@@ -6,17 +6,17 @@
 #include <isc/types.h>
 #include <isc/timer.h>
 #include <dns/fcache.h>
+#include "include/dns/fcache.h"
 
 // schedules a time event after interval seconds
 static void fcache_schedule_timer(isc_time_t *interval) {
-    fprintf(stderr, "Setting timer at %d seconds...\n", isc_time_seconds(interval));
+    printf("Setting timer at %d seconds...\n", isc_time_seconds(interval));
     isc_timer_start(expiry_timer, isc_timertype_ticker, interval);
 }
 
 // callback when a timer goes off
 static void fcache_timer_cb(void *arg) {
-    fprintf(stderr, "Executing callback...\n");
-    REQUIRE(2==3);
+    printf("Executing callback...\n");
     /*
     isc_time_t now = isc_time_now();
     fragment_cache_entry_t *entry, *next;
@@ -48,7 +48,7 @@ static void fcache_timer_cb(void *arg) {
 }
 
 void fcache_init(isc_loop_t *loop) {
-    fprintf(stderr, "Initializing fragment cache...\n");
+    printf("Initializing fragment cache...\n");
     REQUIRE(loop != NULL);
     REQUIRE(frag_mctx == NULL);
     REQUIRE(fragment_cache == NULL);
@@ -68,7 +68,7 @@ void fcache_init(isc_loop_t *loop) {
 }
 
 void fcache_deinit(void) {    
-    fprintf(stderr, "Deinitializing fragment cache...\n");
+    printf("Deinitializing fragment cache...\n");
     isc_timer_destroy(&expiry_timer);
     // empty expiry list
     //while (!ISC_LIST_EMPTY(expiry_list)) {
@@ -80,11 +80,12 @@ void fcache_deinit(void) {
 }
 
 
-static bool fcache__add(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
-    fprintf(stderr, "Adding fragment cache entry with key %s...\n", (char *)key);
+bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
+    printf("Adding fragment cache entry with key %s...\n", (char *)key);
+    REQUIRE(frag->buffer != NULL);
     // lookup in cache
     fragment_cache_entry_t *entry = NULL;
-    isc_result_t result = isc_ht_find(ht, key, keysize, (void **)&entry);
+    isc_result_t result = isc_ht_find(fragment_cache, key, keysize, (void **)&entry);
 
     // first fragment: create fragment in cache
     if (result == ISC_R_NOTFOUND) {    
@@ -102,13 +103,18 @@ static bool fcache__add(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned cha
         entry->keysize = keysize;
 
         isc_time_add(&now, &fragment_ttl, &(entry->expiry)); // set entry expiry time 
-        isc_ht_add(ht, key, keysize, entry);             // add to hashtable
-        ISC_LIST_APPEND(expiry_list_p, entry, link);          // add to linked list
+        isc_ht_add(fragment_cache, key, keysize, entry);             // add to hashtable
+        ISC_LIST_APPEND(expiry_list, entry, link);          // add to linked list
 
         // schedule a timer for this entry if it's the earliest
         //if (ISC_LIST_HEAD(expiry_list_p) == entry) {
         //    fcache_schedule_timer(&fragment_ttl);
         //}
+    }
+
+    if (frag->fragment_nr >= entry->nr_fragments) {
+        fprintf(stderr, "Can only add  where fragment_nr < nr_fragments.\nfragment_nr: %lu, nr_fragments: %u\n", frag->fragment_nr, entry->nr_fragments);
+        return false;
     }
 
     // check if already exists
@@ -126,36 +132,13 @@ static bool fcache__add(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned cha
     return true;
 }
 
-// convencience function, uses the global fragment cache and expiry list
-bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
-    return fcache__add(fragment_cache, expiry_list, key, keysize, frag, nr_fragments);
-}
-
-static void fcache_free_entry(fragment_cache_entry_t *entry) {
-    //ISC_LIST_UNLINK(expiry_list, entry, link);
-    for (unsigned i = 0; i < entry->nr_fragments; i++) {
-        if(entry->bitmap & (1 << i)) {
-            isc_buffer_free(&(entry->fragments[i]));
-        }
-    }
-    isc_mem_put(frag_mctx, entry->fragments, entry->nr_fragments * sizeof(isc_buffer_t *));
-    isc_mem_put(frag_mctx, entry->key, entry->keysize);
-    isc_mem_put(frag_mctx, entry, sizeof(fragment_cache_entry_t));    
-}
-
-static bool fcache__remove(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned char *key, unsigned keysize) {
-    fprintf(stderr, "Removing entry with key %s...\n", (char *)key);
+bool fcache_remove(unsigned char *key, unsigned keysize) {
+    printf("Removing entry with key %s...\n", (char *)key);
     fragment_cache_entry_t *entry = NULL;
-    if (isc_ht_find(ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
+    if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
         // remove from hash table and free memory
         if(isc_ht_delete(fragment_cache, key, keysize) == ISC_R_SUCCESS) {
-            ISC_LIST_UNLINK(expiry_list_p, entry, link);
-            for (unsigned i = 0; i < entry->nr_fragments; i++) {
-                isc_buffer_free(&(entry->fragments[i]));
-            }
-            isc_mem_put(frag_mctx, entry->fragments, entry->nr_fragments * sizeof(isc_buffer_t *));
-            isc_mem_put(frag_mctx, entry->key, entry->keysize);
-            isc_mem_put(frag_mctx, entry, sizeof(fragment_cache_entry_t));
+            fcache_free_entry(entry);
             return true;
         }   
         fprintf(stderr, "Could not delete element with key: %s\n", key);
@@ -166,40 +149,50 @@ static bool fcache__remove(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned 
 }
 
 
-bool fcache_remove(unsigned char *key, unsigned keysize) {
-    return fcache__remove(fragment_cache, expiry_list, key, keysize);
-}
-
-static bool fcache__get(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry) {
-    fprintf(stderr, "Getting fragment cache entry with key %s...\n", (char *)key);
-    return (isc_ht_find(ht, key, keysize, (void **)out_cache_entry) == ISC_R_SUCCESS);
+bool fcache_remove_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr) {
+    printf("Removing fragment %u with key %s...\n", fragment_nr, (char *)key);
+    fragment_cache_entry_t *entry = NULL;
+    if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
+        if(entry->bitmap & (1 << fragment_nr)) {
+            isc_buffer_free(&(entry->fragments[fragment_nr]));
+            entry->bitmap &= ~(1 << fragment_nr);
+            return true;
+        }
+        fprintf(stderr, "Could not find fragment in cache entry: %s\n", key);
+        return false;
+    }
+    fprintf(stderr, "Could not find cache entry!\n");
+    return false;
 }
 
 bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry) {
-    return fcache__get(fragment_cache, expiry_list, key, keysize, out_cache_entry);
-}
-
-static bool fcache__get_fragment(isc_ht_t *ht, fragmentlist_t expiry_list_p, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    fprintf(stderr, "Getting fragment %u with key %s...\n", fragment_nr, (char *)key);
-    fragment_cache_entry_t *entry = NULL;
-    if (isc_ht_find(ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        out_frag = entry->fragments[fragment_nr];
-        return true;
-    }
-    return false; 
+    printf("Getting fragment cache entry with key %s...\n", (char *)key);
+    REQUIRE(*out_cache_entry == NULL);
+    return (isc_ht_find(fragment_cache, key, keysize, (void **)out_cache_entry) == ISC_R_SUCCESS);
 }
 
 bool fcache_get_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    return fcache__get_fragment(fragment_cache, expiry_list, key, keysize, fragment_nr, out_frag);
+    printf("Getting fragment %u with key %s...\n", fragment_nr, (char *)key);
+    fragment_cache_entry_t *entry = NULL;
+    if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
+        if(entry->bitmap & (1 << fragment_nr)) {
+            *out_frag = entry->fragments[fragment_nr];
+            return true;
+        }
+        fprintf(stderr, "Could not find fragment!\n");
+        return false;
+    }
+    fprintf(stderr, "Could not find cache entry!\n");
+    return false; 
 }
 
 bool fcache_purge(void) {
-    fprintf(stderr, "Purging fragment cache...\n");
+    printf("Purging fragment cache...\n");
     isc_ht_iter_t *iterator = NULL;
-    fragment_cache_entry_t *entry = NULL;
     isc_ht_iter_create(fragment_cache, &iterator);
     isc_result_t res = isc_ht_iter_first(iterator);
     while (res == ISC_R_SUCCESS) {
+        fragment_cache_entry_t *entry = NULL;
         isc_ht_iter_current(iterator, (void **)&entry);
         REQUIRE(entry != NULL);
         fcache_free_entry(entry);
