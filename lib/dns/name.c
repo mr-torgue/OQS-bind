@@ -1674,7 +1674,14 @@ dns_name_towire(const dns_name_t *name, dns_compress_t *cctx,
 		if (isc_buffer_availablelength(target) < 2) {
 			return (ISC_R_NOSPACE);
 		}
-		isc_buffer_putuint16(target, *name_coff | 0xc000);
+		// if ends in ?, assume it is a fragment nr
+		// name->ndata[name->length - 2] is the \0 byte
+		if(name->ndata[name->length - 2] == '?') {
+			isc_buffer_putuint8(target, 0x0);
+		}
+		else {
+			isc_buffer_putuint16(target, *name_coff | 0xc000);
+		}
 		return (ISC_R_SUCCESS);
 	}
 
@@ -1720,7 +1727,13 @@ dns_name_towire(const dns_name_t *name, dns_compress_t *cctx,
 		if (isc_buffer_availablelength(target) < 2) {
 			return (ISC_R_NOSPACE);
 		}
-		isc_buffer_putuint16(target, suffix_coff | 0xc000);
+
+		if(name->ndata[name->length - 2] == '?') {
+			isc_buffer_putuint8(target, 0x0);
+		}
+		else {
+			isc_buffer_putuint16(target, suffix_coff | 0xc000);
+		}
 	}
 
 	return (ISC_R_SUCCESS);

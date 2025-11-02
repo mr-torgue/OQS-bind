@@ -81,7 +81,7 @@ void fcache_deinit(void) {
 
 
 bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
-    printf("Adding fragment cache entry with key %s...\n", (char *)key);
+    printf("Adding fragment cache entry with key %s (%u)...\n", (char *)key, keysize);
     REQUIRE(frag->buffer != NULL);
     // lookup in cache
     fragment_cache_entry_t *entry = NULL;
@@ -166,7 +166,7 @@ bool fcache_remove_fragment(unsigned char *key, unsigned keysize, unsigned fragm
 }
 
 bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry) {
-    printf("Getting fragment cache entry with key %s...\n", (char *)key);
+    printf("Getting fragment cache entry with key %s (%u)...\n", (char *)key, keysize);
     REQUIRE(*out_cache_entry == NULL);
     return (isc_ht_find(fragment_cache, key, keysize, (void **)out_cache_entry) == ISC_R_SUCCESS);
 }

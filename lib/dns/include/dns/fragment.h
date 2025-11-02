@@ -35,8 +35,8 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
 // returns the total message size in bytes 
 // num_sig_rr / num_dnskey_rr contain the number of resource records for signatures and keys
 // total_sig_rr / total_dnskey_rr contains the total size in bytes
-unsigned calc_message_size(isc_mem_t *mctx, dns_message_t *msg,
-                       unsigned ***rr_sizes, unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
+unsigned calc_message_size(dns_message_t *msg,
+                       unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
                        unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
 
 // estimates the size of the complete message based on a fragment
@@ -47,7 +47,11 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address, unsigned client_address_size);
+bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address);
+
+// reassembles a given entry into a new dns_message_t
+// checks if all fragments are in the entry --> otherwise returns false
+bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_message_t **out_msg);
 
 // requests remaining fragments from the name server
 // determines how many fragments to retrieve based on the provided response
