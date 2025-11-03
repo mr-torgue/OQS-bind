@@ -6,7 +6,6 @@
 #include <isc/types.h>
 #include <isc/timer.h>
 #include <dns/fcache.h>
-#include "include/dns/fcache.h"
 
 // schedules a time event after interval seconds
 static void fcache_schedule_timer(isc_time_t *interval) {
