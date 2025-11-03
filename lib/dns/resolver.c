@@ -7524,7 +7524,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		inc_stats(fctx->res, dns_resstatscounter_truncated);
 		if ((rctx.retryopts & DNS_FETCHOPT_TCP) != 0) {
 			rctx.broken_server = DNS_R_TRUNCATEDTCP;
-			rctx.next_server = true;
+			rctx.next_server = true; 
 		} else {
 			rctx.retryopts |= DNS_FETCHOPT_TCP;
 			rctx.resend = true;

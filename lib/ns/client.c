@@ -553,11 +553,15 @@ ns_client_send(ns_client_t *client) {
 			compflags = DNS_COMPRESS_DISABLED;
 		}
 	}
+
+	// RENDERING STARTS HERE
+	bool udp_fragmentation_enabled = true;
+
 	dns_compress_init(&cctx, client->manager->mctx, compflags);
 	cleanup_cctx = true;
 
 	result = dns_message_renderbegin(client->message, &cctx, &buffer);
-	if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS) { // && !udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
 		goto cleanup;
 	}
 
@@ -573,23 +577,17 @@ ns_client_send(ns_client_t *client) {
 					   DNS_SECTION_QUESTION, 0);
 	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		
-		// UDP fragmentation
-		if (true) { // replace with a proper guard
-			char src_address[64];
-			isc_sockaddr_format(&client->peeraddr, src_address, 64);
-			fragment(client->manager->mctx, client->message, src_address);
+		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+			goto renderend;
 		}
-
-		goto renderend;
 	}
-	if (result != ISC_R_SUCCESS) {
+	else if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	/*
 	 * Stop after the question if TC was set for rate limiting.
 	 */
-	if ((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
+	if ((client->message->flags & DNS_MESSAGEFLAG_TC) != 0 && !udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
 		goto renderend;
 	}
 	result = dns_message_rendersection(client->message, DNS_SECTION_ANSWER,
@@ -597,30 +595,46 @@ ns_client_send(ns_client_t *client) {
 						   render_opts);
 	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		goto renderend;
+		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+			goto renderend;
+		}
 	}
-	if (result != ISC_R_SUCCESS) {
+	else if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	result = dns_message_rendersection(
 		client->message, DNS_SECTION_AUTHORITY,
 		DNS_MESSAGERENDER_PARTIAL | render_opts);
-	if (result == ISC_R_NOSPACE) {
+	if (result == ISC_R_NOSPACE) { 
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		goto renderend;
+		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+			goto renderend;
+		}
 	}
-	if (result != ISC_R_SUCCESS) {
+	else if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	result = dns_message_rendersection(client->message,
 					   DNS_SECTION_ADDITIONAL,
 					   preferred_glue | render_opts);
-	if (result != ISC_R_SUCCESS && result != ISC_R_NOSPACE) {
+	if (result == ISC_R_NOSPACE) { 
+		client->message->flags |= DNS_MESSAGEFLAG_TC;
+		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+			goto renderend;
+		}
+	}
+	else if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 renderend:
 	result = dns_message_renderend(client->message);
-	if (result != ISC_R_SUCCESS) {
+	if (result == ISC_R_NOSPACE) { 
+		client->message->flags |= DNS_MESSAGEFLAG_TC;
+		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+			goto renderend;
+		}
+	}
+	else if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 
@@ -652,6 +666,15 @@ renderend:
 
 	if (cleanup_cctx) {
 		dns_compress_invalidate(&cctx);
+	}
+
+	// do the fragmentation here
+	if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
+
+		char src_address[64];
+		isc_sockaddr_format(&client->peeraddr, src_address, 64);
+		fragment(client->manager->mctx, client->message, src_address);
+
 	}
 
 	if (client->sendcb != NULL) {
