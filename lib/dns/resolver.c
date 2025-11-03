@@ -7514,9 +7514,11 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	}
 
 
-	// add a clause if (rctx.truncated && UDP_fragmentation) {
-	//		request_fragments(dns_request_t request, dns_message_t *frag, isc_sockaddr_t *peer_address) {
-	// }
+	// UDP fragmentation
+	if (rctx.truncated && true) { // change guard
+		printf("[UDP Fragmentation] received TC response on resolver!\n");
+		//request_fragments(query->rmessage, dns_message_t *frag, isc_sockaddr_t *peer_address);
+	}
 
 	if (rctx.truncated) {
 		inc_stats(fctx->res, dns_resstatscounter_truncated);

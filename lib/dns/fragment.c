@@ -100,6 +100,7 @@ static void printmessage(isc_mem_t *mctx, dns_message_t *msg) {
 }
 
 
+// TODO: remove mctx and use an array for name
 bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
     // check if already done
     if (msg->is_fragment && !force) {

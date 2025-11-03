@@ -29,6 +29,7 @@
 #include <isc/safe.h>
 #include <isc/serial.h>
 #include <isc/siphash.h>
+#include <isc/sockaddr.h>
 #include <isc/stats.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
@@ -572,6 +573,14 @@ ns_client_send(ns_client_t *client) {
 					   DNS_SECTION_QUESTION, 0);
 	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
+		
+		// UDP fragmentation
+		if (true) { // replace with a proper guard
+			char src_address[64];
+			isc_sockaddr_format(&client->peeraddr, src_address, 64);
+			fragment(client->manager->mctx, client->message, src_address);
+		}
+
 		goto renderend;
 	}
 	if (result != ISC_R_SUCCESS) {
