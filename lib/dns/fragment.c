@@ -527,6 +527,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
                         // convert to rdataset and link to new name
                         dns_rdatalist_tordataset(rdatalist, new_rdataset);
                         new_rdataset->attributes = rdataset->attributes; 
+                        new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED; // reset this flag to render
                         ISC_LIST_APPEND(new_name->list, new_rdataset, link);
 	                    REQUIRE(DNS_RDATASET_VALID(new_rdataset));
                     } 
