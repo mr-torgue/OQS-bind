@@ -5615,10 +5615,10 @@ ns__query_start(query_ctx_t *qctx) {
 	qctx->need_wildcardproof = false;
 	qctx->rpz = false;
 
-	
-	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
-		printf("NS received a fragment query...\n");
-	}
+	// NOT HERE. MAYBE USE FOR OUTGOING QUERIES!
+	//if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
+	//	printf("NS received a fragment query...\n");
+	//}
 
 	CALL_HOOK(NS_QUERY_START_BEGIN, qctx);
 

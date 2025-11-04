@@ -1785,6 +1785,7 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		return;
 	}
 
+
 	client = isc_nmhandle_getdata(handle);
 	if (client == NULL) {
 		ns_interface_t *ifp = (ns_interface_t *)arg;
@@ -1968,6 +1969,11 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		}
 		ns_client_error(client, result);
 		return;
+	}
+
+	// UDP Fragmentation
+	if (is_fragment(client->manager->mctx, client->message)) {
+		printf("NS received a fragment query...\n");
 	}
 
 	dns_opcodestats_increment(client->manager->sctx->opcodestats,
