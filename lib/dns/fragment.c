@@ -205,11 +205,7 @@ unsigned calc_message_size(dns_message_t *msg,
             name = NULL;
             dns_message_currentname(msg, section, &name);
 
-            printf("name: %s\n", name->ndata);
-            printf("name length: %d\n", name->length);
-            if (name->length == 1 && dns_name_equal(name, dns_rootname)) {
-                printf("This is the root domain (.).\n");
-            }
+            printf("name: %s (%u)\n", name->ndata, name->length);
             rr_header_size += name->length;
             
             for (rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
@@ -249,23 +245,41 @@ unsigned calc_message_size(dns_message_t *msg,
 
 unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings) {
     printf("Estimating message size...\n");
+    REQUIRE(msg != NULL);
+    // initialize return values
+    *total_sig_bytes = 0;
+    *total_dnskey_bytes = 0;
+    *savings = 0;
+
+    dns_name_t *name = NULL;
+    dns_rdataset_t *rdataset = NULL;
+
     unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
-    unsigned msgsize = 0;
+    unsigned msgsize = 12; // ID (2B) + Flags (2B) + Counts (4x2B)
+
+    // count question
+    isc_result_t result = dns_message_firstname(msg, DNS_SECTION_QUESTION);
+    REQUIRE(result == ISC_R_SUCCESS);
+    dns_message_currentname(msg, DNS_SECTION_QUESTION, &name);
+    msgsize += name->length + 4; // 4: type (2B) + class (2B)
+    
     // go through each section
-    for(unsigned i = 0; i < DNS_SECTION_MAX; i++) {
-        printf("Section %u\n", i);
-	    unsigned rr_count = msg->counts[i];
+    for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
+        printf("Section %u with %u resource records...\n", section, msg->counts[section]);
         unsigned counter = 0;
         // go through each name, rdataset, and rdata item
-        for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[i]); name != NULL; ISC_LIST_NEXT(name, link)) {
-            printf("Name %s\n", name->ndata);
+        for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
+            name = NULL;
+            dns_message_currentname(msg, section, &name);
+            
+            printf("name: %s (%u)\n", name->ndata, name->length);
             rr_header_size += name->length;
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
                 printf("rdataset type: %d\n", rdataset->type);
-                for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
-                    printf("Counter increased!\n");
-				    dns_rdata_t rdata = DNS_RDATA_INIT;
+                isc_result_t tresult;
+                for (tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
+                    dns_rdata_t rdata = DNS_RDATA_INIT;
                     dns_rdataset_current(rdataset, &rdata);
                     unsigned rdata_length = rdata.length; // might be incorrect because it is a fragment
                     unsigned rr_size_frag = rdata_length + rr_header_size; // size of complete resource record
@@ -288,7 +302,25 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
                 }
             }
         }
-        REQUIRE(rr_count == counter); // rr_count and counter should be the same after this
+        // can be moved outside of this loop 
+        // OPT record found!
+        // only one allowed and can only be in the additional section
+        if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
+            printf("Found an OPT message!\n");
+            REQUIRE(dns_rdataset_count(msg->opt) == 1);
+            msgsize += 11; // OPT header size
+            isc_result_t tresult;
+            // iterate through this (i think there only should be one)
+            for (tresult = dns_rdataset_first(msg->opt); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(msg->opt)) {
+                dns_rdata_t rdata = DNS_RDATA_INIT;
+                dns_rdataset_current(msg->opt, &rdata);
+                msgsize += rdata.length;
+            }
+
+            counter++;
+        }
+        printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
+        REQUIRE(msg->counts[section] == counter); // rr_count and counter should be the same after this
     }
     return msgsize;
 }

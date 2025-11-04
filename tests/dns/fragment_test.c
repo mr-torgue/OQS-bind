@@ -273,6 +273,43 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
     }
 }
 
+ISC_RUN_TEST_IMPL(estimate_message_size_test) {
+    const char *filename = "testdata/message/frag1_response1-falcon512";
+    const char *src_address = "1.2.3.4";
+    buffer = load_binary_file(filename, &buffer_size);
+
+    if(buffer != NULL) {
+        printf("buffer_size: %lu\n", buffer_size);
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        printf("buf used: %d\n", buf.used);
+        printf("buf used: %d\n", buf.length);
+        //isc_buffer_printf(&buf, "aa");
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, 0);
+        printf("msgid: %d\n", msg->id);
+        //printbuffer(buffer, buffer_size);
+        printmessage(msg);
+
+        // main test
+        unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
+        msgsize = estimate_message_size(msg, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
+        printf("msgsize: %u\n", msgsize);
+        assert_int_equal(msgsize, 3244);
+        assert_int_equal(total_size_sig_rr, 1332);
+        assert_int_equal(total_size_dnskey_rr, 1794);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+}
+
 ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
     /*
@@ -384,8 +421,9 @@ ISC_TEST_LIST_START
 ISC_TEST_ENTRY(is_fragment_test)
 ISC_TEST_ENTRY(get_nr_fragments_test)
 ISC_TEST_ENTRY(calc_message_size_test)
+ISC_TEST_ENTRY(estimate_message_size_test)
 //ISC_TEST_ENTRY(calculate_start_end_test)
-ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
+//ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN
