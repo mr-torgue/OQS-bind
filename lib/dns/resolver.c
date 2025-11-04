@@ -7530,12 +7530,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		    //  isc_result_totext(resp->result));
 			printf("[UDP Fragmentation] received fragment response on resolver!\n");
 
-			// create a key
-			unsigned char key[64];
-			unsigned keysize = 64;
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-    		isc_sockaddr_format(&(copy->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
-			fcache_create_key(copy->rmessage->id, addr_buf, key, keysize);
+			// create cache key
+			unsigned char key[69];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			fcache_create_key(copy->rmessage->id, &(copy->addrinfo->sockaddr), key, &keysize);
 			printf("[UDP Fragmentation] using key %s...\n", key);
 
 			// determine the amount of fragments

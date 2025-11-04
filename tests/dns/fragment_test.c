@@ -23,6 +23,7 @@
 #include <sys/param.h>
 #include <unistd.h>
 #include <time.h>
+#include <isc/sockaddr.h>
 #include <isc/types.h>
 #include <dns/types.h>
 
@@ -307,8 +308,8 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         //printbuffer(buffer, buffer_size);
         printmessage(msg);
         // create key
-        unsigned keysize = 4 + strlen(src_address) + 2;
-        unsigned char *key = isc_mem_get(mctx, keysize); 
+        unsigned char key[70];
+        unsigned keysize = sizeof(key) / sizeof(key[0]);
         fcache_create_key(msg->id, src_address, key, keysize);
 
         // main test
@@ -364,7 +365,6 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         }
 
         // clean up
-        isc_mem_put(mctx, key, keysize);
         dns_message_detach(&msg);
         dns_message_detach(&out_msg);
         isc_mem_put(mctx, buffer, buffer_size);

@@ -14,6 +14,7 @@
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
 
+
 // renders a fragment: meaning turning it from
 // allocates MAXUDP bytes (usually 1232) 
 static isc_result_t render_fragment(isc_mem_t *mctx, dns_message_t **messagep) {
@@ -348,7 +349,7 @@ static void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, uns
     REQUIRE(fragment_nr != nr_fragments - 1 || *frag_len + *start == rdata_size);
 }
  
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
+bool fragment(isc_mem_t *mctx, dns_message_t *msg, isc_sockaddr_t *client_address) {
     printf("Fragmenting message...\n");
     REQUIRE(msg != NULL);
     REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
@@ -391,6 +392,11 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         offsets[section_nr] = isc_mem_get(mctx, msg->counts[section_nr] * sizeof(unsigned));
         memset(offsets[section_nr], 0, msg->counts[section_nr] * sizeof(unsigned));
     }
+
+    // create cache key
+    unsigned char key[69];
+    unsigned keysize = sizeof(key) / sizeof(key[0]);
+    fcache_create_key(msg->id, client_address, key, &keysize);
 
     dns_name_t *name = NULL;
     // adding fragment to cache
@@ -582,13 +588,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         //render_message(mctx, &msg);
         render_fragment(mctx, &frag);
         //printmessage(mctx, frag);
-        unsigned keysize = 4 + strlen(client_address) + 2;
-        unsigned char *key = isc_mem_get(mctx, keysize);
-        fcache_create_key(msg->id, client_address, key, keysize);
         fcache_add(key, keysize, frag, nr_fragments);
-        // free key and frag, it has been copied into cache
-        isc_mem_put(mctx, key, keysize);
-        //isc_buffer_free(&(frag->buffer));
         dns_message_detach(&frag);
     }
 
@@ -729,74 +729,3 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     render_fragment(mctx, out_msg);
     return true;
 }
-
-/*
-// callback function for received fragments  dns_request_t *request, isc_result_t result, dns_message_t *response, 
-static void frag_cb(void *arg) {
-    REQUIRE(is_fragment(response)); // will set required metadata
-    isc_sockaddr_t *peer_address = (isc_sockaddr_t *)arg;
-    char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-    isc_sockaddr_format(peer_address, addr_buf, sizeof(addr_buf));
-
-    // check if successful
-    if (result == ISC_R_SUCCESS && response != NULL) {
-        // create a new key and lookup in cache
-        unsigned keysize = sizeof(response->id) + sizeof(addr_buf);
-        char key[keysize];
-        fcache_create_key(response->id, addr_buf, key, keysize);
-        fragment_cache_entry_t entry;
-
-        // check if in cache
-        if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {   
-            // check if bitmap is all 1's
-            if (entry.bitmap == ~0) {
-                dns_message_t *complete_msg;
-                reassemble_fragments(complete_msg);
-                // go to???
-                // trigger original 
-            }
-        }
-        else {
-            printf("No entry for key %s in fragment cache!\n", key);
-        }
-    }
-    else {
-        printf("Request failed: %s\n", isc_result_totext(result));
-    }
-}
-*/
-/*
-//This function is triggered on the first fragment it receives (resolver)
-bool request_fragments(dns_request_t *query, dns_message_t *response) {
-    REQUIRE(response.is_fragment && response.fragment_nr == 1); // should be the first fragment
-
-    // estimate the number of fragments based on the amount of signature/pk bytes
-    unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
-    unsigned msg_size = estimate_message_size(response, &total_sig_bytes, &total_dnskey_bytes, &savings);
-    unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
-    unsigned nr_fragments = get_nr_fragments(MAXUDP, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
-
-    printf("Adding first fragment to cache...\n");
-    add_to_cache(dns_message_t *msg, dns_cache_t *cache);
-    printf("Requesting %d additional fragments...\n", nr_fragments - 1);
-    for (int i = 2; i <= nr_fragments; i++) {
-        dns_request_t *request = NULL;
-        dns_message_t request_msg = NULL;
-        dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &request_msg);
-        
-
-        result = dns_request_create(query->requestmgr, request_msg,
-		   const isc_sockaddr_t *srcaddr, query->destaddr, dns_transport_t *transport,
-		   isc_tlsctx_cache_t *tlsctx_cache, unsigned int options,
-		   dns_tsigkey_t *key, unsigned int timeout,
-		   unsigned int udptimeout, unsigned int udpretries,
-		   isc_loop_t *loop, frag_cb, message, 
-           &request); 
-        REQUIRE(result == ISC_R_SUCCESS); // request is created succesfully
-
-        // Send the request
-        dns_dispatch_send(request->dispentry);
-        REQUIRE(result == ISC_R_SUCCESS); // request is sent succesfuully
-    }
-}
-*/
