@@ -689,7 +689,8 @@ renderend:
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			buffer = *out_frag;
 			dns_message_parse(msg, out_frag, 0);
-			client->message = msg;		
+			client->message = msg;	
+			client->message->from_to_wire = 2;
 			printf("Fragment %lu is sent!\n", client->message->fragment_nr);
 		}
 		else {
