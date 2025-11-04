@@ -7585,7 +7585,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			}
 			// the complete response has not been received 
 			// make sure that the resolver does not return the data but waits for all the fragments
-			rctx_done(&rctx, DNS_R_DROP); // maybe DNS_R_CONTINUE
+			//rctx_done(&rctx, DNS_R_DROP); // maybe DNS_R_CONTINUE
+			return;
 		}
 	}
 	
