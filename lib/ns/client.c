@@ -673,8 +673,13 @@ renderend:
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
 	}
 
+
+	if(client->message->is_fragment) {
+		printf("Sending fragment %lu...\n", client->message->fragment_nr);
+	}
 	// do the fragmentation here
-	if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
+	// triggers when the response is too large and udp fragmenation is enabled
+	else if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
 		// create a key
 		unsigned char key[64];
 		unsigned keysize = sizeof(key) / sizeof(key[0]);
@@ -1972,6 +1977,7 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	}
 
 	// UDP Fragmentation
+	// redirect to cache
 	if (is_fragment(client->manager->mctx, client->message)) {
 		printf("NS received a fragment query...\n");
 	}
