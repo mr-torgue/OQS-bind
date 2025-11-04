@@ -680,7 +680,7 @@ renderend:
 		unsigned keysize = sizeof(key) / sizeof(key[0]);
 		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-        fcache_create_key(client->message->id, &(client->peeraddr), key, &keysize);
+        fcache_create_key(client->message->id, addr_buf, key, &keysize);
 		printf("[UDP Fragmentation] fragmenting message %s (flags: %x)!\n", key, client->message->flags);
 		client->message->buffer = &buffer; // not associated by default
 		fragment(client->manager->mctx, client->message, addr_buf);
