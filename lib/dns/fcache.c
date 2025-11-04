@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <isc/buffer.h>
 #include <isc/mem.h>
 #include <isc/util.h>
 #include <isc/atomic.h>
@@ -81,7 +82,7 @@ void fcache_deinit(void) {
 
 bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
     printf("Adding fragment cache entry with key %s (%u)...\n", (char *)key, keysize);
-    REQUIRE(frag->buffer != NULL);
+    REQUIRE(frag->buffer != NULL || frag->saved.base != NULL);
     // lookup in cache
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fragment_cache, key, keysize, (void **)&entry);
@@ -123,7 +124,14 @@ bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsig
     
     // copy into a new buffer
     isc_buffer_t *frag_buf = NULL;
-    isc_buffer_dup(frag_mctx, &frag_buf, frag->buffer);
+    if (frag->buffer != NULL) {
+        isc_buffer_dup(frag_mctx, &frag_buf, frag->buffer);
+    }
+    else {
+        isc_buffer_t tmp_buf;
+        isc_buffer_init(&tmp_buf, frag->saved.base, frag->saved.length);
+        isc_buffer_dup(frag_mctx, &frag_buf, &tmp_buf);
+    }
 
     // Store the fragment
     entry->fragments[frag->fragment_nr] = frag_buf;
