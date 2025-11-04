@@ -696,6 +696,7 @@ renderend:
 			dns_message_detach(&(client->message));
 			client->message = msg;		
 			//dns_message_takebuffer(msg, &out_frag);
+			printf("First fragment is sent!\n");
 		}
 		else {
 			printf("Could not find fragment 0!\n");

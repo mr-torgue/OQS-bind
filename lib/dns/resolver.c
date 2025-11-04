@@ -7567,8 +7567,6 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			// otherwise, it is the first fragment
 			// so, send out the remaining requests
 			else {
-
-
 				printf("Requesting %d additional fragments...\n", nr_fragments - 1);
 				char name_str[128];
 				dns_name_format(copy->fctx->name, name_str, 128);
@@ -7581,6 +7579,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					printf("Sending query for: %s\n", new_name_str);
 					copy->fctx->name = new_name;
 					resquery_send(copy); // seems to do the trick
+					dns_message_puttempname(copy->rmessage, &new_name);
 				}
 			}
 			// the complete response has not been received 
