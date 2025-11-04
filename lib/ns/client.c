@@ -695,7 +695,7 @@ renderend:
 			dns_message_parse(msg, out_frag, 0);
 			dns_message_detach(&(client->message));
 			client->message = msg;		
-			dns_message_takebuffer(msg, &out_frag);
+			//dns_message_takebuffer(msg, &out_frag);
 		}
 		else {
 			printf("Could not find fragment 0!\n");
