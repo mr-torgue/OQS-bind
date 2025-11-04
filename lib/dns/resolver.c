@@ -7553,7 +7553,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			// check if a fragment
 			if(is_fragment(copy->fctx->mctx, copy->rmessage)) {
 				printf("[UDP Fragmentation] response to fragment query %lu!\n", copy->rmessage->fragment_nr);		
-				REQUIRE(fcache_add(key, keysize, copy->rmessage - 1, nr_fragments)); // adding should never fail
+				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
 				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
 
 				if (out_ce->bitmap == (1 << out_ce->nr_fragments) - 1) {
@@ -7570,7 +7570,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			// so, send out the remaining requests
 			else {
 				printf("Requesting %d additional fragments...\n", nr_fragments - 1);
-				REQUIRE(fcache_add(key, keysize, 0, nr_fragments)); // adding should never fail
+				copy->rmessage->fragment_nr = 0; // just to be sure
+				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
 				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
 
 				char name_str[128];
