@@ -166,6 +166,7 @@ bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
 }
 
 
+// TODO: don't rely on the buffers to calculate size
 unsigned calc_message_size(dns_message_t *msg,
     unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
     unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {

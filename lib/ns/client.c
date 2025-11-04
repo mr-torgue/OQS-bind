@@ -677,6 +677,7 @@ renderend:
 		printf("[UDP Fragmentation] fragmenting a message (flags: %x)!\n", client->message->flags);
 		char src_address[64];
 		isc_sockaddr_format(&client->peeraddr, src_address, 64);
+		client->message->buffer = &buffer; // not associated by default
 		fragment(client->manager->mctx, client->message, src_address);
 
 	}

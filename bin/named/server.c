@@ -9938,6 +9938,9 @@ run_server(void *arg) {
 				 &server->interface_timer);
 	}
 
+	// start fcache for UDP fragmentation
+	fcache_init(named_g_mainloop);
+
 	isc_timer_create(named_g_mainloop, heartbeat_timer_tick, server,
 			 &server->heartbeat_timer);
 
@@ -9979,6 +9982,8 @@ shutdown_server(void *arg) {
 	bool flush = server->flushonshutdown;
 	named_cache_t *nsc = NULL;
 
+	// empty fragment cache
+	fcache_deinit();
 #if HAVE_LIBSYSTEMD
 	sd_notify(0, "STOPPING=1\n");
 #endif /* HAVE_LIBSYSTEMD */

@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dns/fcache.h>
 
 #ifdef HAVE_DNSTAP
 #include <protobuf-c/protobuf-c.h>
