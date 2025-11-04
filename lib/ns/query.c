@@ -5618,24 +5618,7 @@ ns__query_start(query_ctx_t *qctx) {
 	// UDP Fragmentation
 	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
 		printf("[NS] received a fragment query...\n");
-		ns_client_send(qctx->client); // skip everything ns_client_send will take care of this....
-		/*
-		unsigned char key[64];
-		unsigned keysize = sizeof(key) / sizeof(key[0]);
-		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-		isc_sockaddr_format(&(qctx->client->peeraddr), addr_buf, sizeof(addr_buf));
-		fcache_create_key(qctx->client->message->id, addr_buf, key, &keysize);
-		fragment_cache_entry_t *out_ce = NULL;
-		printf("[NS] getting %s from cache...\n", key);
-		if(fcache_get(key, keysize, &out_ce)) {
-			//dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-			query_gotanswer(qctx, ISC_R_SUCCESS);
-		}
-		else {
-			printf("[NS] key not found!\n");
-			query_gotanswer(qctx, ISC_R_NOTFOUND);
-		}
-			*/
+		ns_client_send(qctx->client); 
 	}
 
 	CALL_HOOK(NS_QUERY_START_BEGIN, qctx);

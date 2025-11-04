@@ -673,9 +673,29 @@ renderend:
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
 	}
 
-
+	// send a cached fragment
 	if(client->message->is_fragment) {
 		printf("Sending fragment %lu...\n", client->message->fragment_nr);
+		unsigned char key[64];
+		unsigned keysize = sizeof(key) / sizeof(key[0]);
+		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+		fcache_create_key(client->message->id, addr_buf, key, &keysize);
+
+		isc_buffer_t *out_frag = NULL;
+		dns_message_t *msg = NULL;
+		printf("[NS] getting %s from cache...\n", key);
+		if(fcache_get_fragment(key, keysize, client->message->fragment_nr, &out_frag)) {
+        	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+			buffer = *out_frag;
+			dns_message_parse(msg, out_frag, 0);
+			client->message = msg;		
+			printf("Fragment %lu is sent!\n", client->message->fragment_nr);
+		}
+		else {
+			printf("[NS] key not found!\n");
+			goto cleanup;
+		}
 	}
 	// do the fragmentation here
 	// triggers when the response is too large and udp fragmenation is enabled
