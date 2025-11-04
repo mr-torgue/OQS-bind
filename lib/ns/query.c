@@ -5618,6 +5618,8 @@ ns__query_start(query_ctx_t *qctx) {
 	// UDP Fragmentation
 	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
 		printf("[NS] received a fragment query...\n");
+		ns_client_send(qctx->client); // skip everything ns_client_send will take care of this....
+		/*
 		unsigned char key[64];
 		unsigned keysize = sizeof(key) / sizeof(key[0]);
 		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
@@ -5633,6 +5635,7 @@ ns__query_start(query_ctx_t *qctx) {
 			printf("[NS] key not found!\n");
 			query_gotanswer(qctx, ISC_R_NOTFOUND);
 		}
+			*/
 	}
 
 	CALL_HOOK(NS_QUERY_START_BEGIN, qctx);
