@@ -47,7 +47,7 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, isc_sockaddr_t *client_address);
+bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address);
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false

@@ -308,9 +308,11 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         //printbuffer(buffer, buffer_size);
         printmessage(msg);
         // create key
-        unsigned char key[70];
+        unsigned char key[64];
         unsigned keysize = sizeof(key) / sizeof(key[0]);
-        fcache_create_key(msg->id, src_address, key, keysize);
+        printf("here");
+        fcache_create_key(msg->id, src_address, key, &keysize);
+        printf("key: %s\n", key);
 
         // main test
         assert_int_equal(fcache_count(), 0);

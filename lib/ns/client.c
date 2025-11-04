@@ -675,16 +675,16 @@ renderend:
 
 	// do the fragmentation here
 	if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
-		// convert source address to string
-		char src_address[64];
-		isc_sockaddr_format(&client->peeraddr, src_address, 64);
 		// create a key
-        unsigned char key[64];
-		unsigned keysize = 64;
-        fcache_create_key(client->message->id, src_address, key, keysize);
+		unsigned char key[64];
+		unsigned keysize = sizeof(key) / sizeof(key[0]);
+		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+        fcache_create_key(client->message->id, &(client->peeraddr), key, &keysize);
 		printf("[UDP Fragmentation] fragmenting message %s (flags: %x)!\n", key, client->message->flags);
 		client->message->buffer = &buffer; // not associated by default
-		fragment(client->manager->mctx, client->message, src_address);
+		fragment(client->manager->mctx, client->message, addr_buf);
+
 		// get first fragment from cache and set it as client->message
 		isc_buffer_t *out_frag = NULL;
 		dns_message_t *msg = NULL;

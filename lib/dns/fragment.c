@@ -349,7 +349,7 @@ static void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, uns
     REQUIRE(fragment_nr != nr_fragments - 1 || *frag_len + *start == rdata_size);
 }
  
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, isc_sockaddr_t *client_address) {
+bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
     printf("Fragmenting message...\n");
     REQUIRE(msg != NULL);
     REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
