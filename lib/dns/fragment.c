@@ -171,7 +171,7 @@ unsigned calc_message_size(dns_message_t *msg,
     unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {
     printf("Calculating message size...\n");
     REQUIRE(msg != NULL);
-    REQUIRE(msg->saved.base != NULL);
+    REQUIRE(msg->saved.base != NULL || msg->buffer != NULL); // message size is based on either one of these fields
     // initalize values
     *num_sig_rr = 0;
     *num_dnskey_rr = 0;
@@ -183,7 +183,13 @@ unsigned calc_message_size(dns_message_t *msg,
     dns_rdataset_t *rdataset = NULL;
 
     unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
-    unsigned msgsize = msg->saved.length;
+    unsigned msgsize;
+    if (msg->saved.base != NULL) {
+        msgsize = msg->saved.length;
+    }
+    else {
+        msgsize = msg->buffer->used; // used instead of length
+    }
     printf("msgsize: %u\n", msgsize);
 
     // we already have the total size, now we determine the amount of dnskeys/signatures

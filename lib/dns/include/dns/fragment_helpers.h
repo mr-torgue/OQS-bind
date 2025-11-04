@@ -1,3 +1,5 @@
+#pragma once 
+
 #include <string.h>
 #include <isc/util.h>
 #include <dns/rdata.h>

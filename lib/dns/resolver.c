@@ -47,6 +47,7 @@
 #include <dns/dnstap.h>
 #include <dns/ds.h>
 #include <dns/edns.h>
+#include <dns/fcache.h>
 #include <dns/forward.h>
 #include <dns/keytable.h>
 #include <dns/log.h>
@@ -7515,23 +7516,77 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 
 
 	// UDP fragmentation
+	// TODO:
+	// 1. create a global setting for this
+	// 2. use log instead of printf
 	bool udp_fragmentation_enabled = true;
-	if (rctx.truncated && udp_fragmentation_enabled) { 
-		printf("[UDP Fragmentation] received TC response on resolver!\n");
+	if(udp_fragmentation_enabled) {
 		resquery_t *copy = query;
-		dns_name_t *new_name = NULL;
-		char name_str[128];
-		dns_name_format(copy->fctx->name, name_str, 128);
-		char new_name_str[128];
-		snprintf(new_name_str, 128, "?%u?%s", 1, name_str);
-		dns_name_fromstring(new_name, new_name_str, copy->fctx->name, 0, copy->fctx->mctx);
-		printf("new name: %s\n", new_name_str);
-		printf("%s\n", new_name->ndata);
+		// check if truncated, otherwise just keep going
+		if (rctx.truncated) { 
+			//isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER,
+		    //  DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(1),
+		    //  "resolver priming query complete: %s",
+		    //  isc_result_totext(resp->result));
+			printf("[UDP Fragmentation] received fragment response on resolver!\n");
 
-		copy->fctx->name = new_name;
-		
-		resquery_send(copy);
+			// create a key
+			unsigned char key[64];
+			unsigned keysize = 64;
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+    		isc_sockaddr_format(&(copy->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
+			fcache_create_key(copy->rmessage->id, addr_buf, key, keysize);
+			printf("[UDP Fragmentation] using key %s...\n", key);
+
+			// determine the amount of fragments
+			unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
+			unsigned msg_size = estimate_message_size(copy->rmessage, &total_sig_bytes, &total_dnskey_bytes, &savings);
+			unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
+			unsigned nr_fragments = get_nr_fragments(copy->udpsize, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
+			printf("[UDP Fragmentation] need %u fragments...\n", nr_fragments);
+
+			// add to cache and get cache entry
+			fragment_cache_entry_t *out_ce = NULL;
+			REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+			// check if a fragment
+			if(is_fragment(copy->fctx->mctx, copy->rmessage)) {
+				if (out_ce->bitmap == (1 << out_ce->nr_fragments) - 1) {
+					printf("[UDP Fragmentation] all fragments received!\n");
+					dns_message_t *out_msg = NULL;
+					reassemble_fragments(copy->fctx->mctx, out_ce, &out_msg);
+					// complete, now make sure that the result is returned
+					//rctx_done(&rctx, result);
+					copy->rmessage = out_msg; // copy
+					goto continue_UDP; // continue
+				}
+			}
+			// otherwise, it is the first fragment
+			// so, send out the remaining requests
+			else {
+
+
+				printf("Requesting %d additional fragments...\n", nr_fragments - 1);
+				char name_str[128];
+				dns_name_format(copy->fctx->name, name_str, 128);
+				for (unsigned i = 2; i <= nr_fragments; i++) {
+					dns_name_t *new_name = NULL;
+					dns_message_gettempname(copy->rmessage, &new_name);
+					char new_name_str[128];
+					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
+					dns_name_fromstring(new_name, new_name_str, copy->fctx->name, 0, copy->fctx->mctx);
+					printf("Sending query for: %s\n", new_name_str);
+					copy->fctx->name = new_name;
+					resquery_send(copy); // seems to do the trick
+				}
+			}
+			// the complete response has not been received 
+			// make sure that the resolver does not return the data but waits for all the fragments
+			rctx_done(&rctx, DNS_R_DROP); // maybe DNS_R_CONTINUE
+		}
 	}
+	
 	// check if response to fragment
 	// check if
 
@@ -7549,6 +7604,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		return;
 	}
 
+continue_UDP:
 	/*
 	 * Is it a query response?
 	 */

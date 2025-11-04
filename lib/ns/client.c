@@ -634,13 +634,7 @@ ns_client_send(ns_client_t *client) {
 	}
 renderend:
 	result = dns_message_renderend(client->message);
-	if (result == ISC_R_NOSPACE) { 
-		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
-			goto renderend;
-		}
-	}
-	else if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 
@@ -680,7 +674,7 @@ renderend:
 
 	// do the fragmentation here
 	if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
-		printf("[UDP Fragmentation] fragmenting a message!\n");
+		printf("[UDP Fragmentation] fragmenting a message (flags: %x)!\n", client->message->flags);
 		char src_address[64];
 		isc_sockaddr_format(&client->peeraddr, src_address, 64);
 		fragment(client->manager->mctx, client->message, src_address);
