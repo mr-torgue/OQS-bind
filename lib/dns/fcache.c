@@ -171,7 +171,7 @@ bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **o
 }
 
 bool fcache_get_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    printf("Getting fragment %u with key %s...\n", fragment_nr, (char *)key);
+    printf("Getting fragment %u with key %s... (%u)\n", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
         if(entry->bitmap & (1 << fragment_nr)) {
