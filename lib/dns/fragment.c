@@ -248,16 +248,21 @@ unsigned calc_message_size(dns_message_t *msg,
 }
 
 unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings) {
+    printf("Estimating message size...\n");
     unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
     unsigned msgsize = 0;
     // go through each section
     for(unsigned i = 0; i < DNS_SECTION_MAX; i++) {
+        printf("Section %u\n", i);
 	    unsigned rr_count = msg->counts[i];
         unsigned counter = 0;
         // go through each name, rdataset, and rdata item
         for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[i]); name != NULL; ISC_LIST_NEXT(name, link)) {
+            printf("Name %s\n", name->ndata);
             rr_header_size += name->length;
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+                printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
+                printf("rdataset type: %d\n", rdataset->type);
                 for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
                     printf("Counter increased!\n");
 				    dns_rdata_t rdata = DNS_RDATA_INIT;
