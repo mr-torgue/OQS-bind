@@ -7528,7 +7528,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		    //  DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(1),
 		    //  "resolver priming query complete: %s",
 		    //  isc_result_totext(resp->result));
-			printf("[UDP Fragmentation] received fragment response on resolver!\n");
+			printf("[UDP Fragmentation] received fragment response on resolver: %s!\n", copy->fctx->name->ndata);
 
 			// create cache key
 			unsigned char key[64];
@@ -7583,7 +7583,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
 					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
 					new_name->attributes.absolute = true; // needed
-					printf("Sending query for: %s\n", new_name_str);
+					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
 					copy->fctx->name = new_name;
 					resquery_send(copy); // seems to do the trick
 					dns_message_puttempname(copy->rmessage, &new_name);
