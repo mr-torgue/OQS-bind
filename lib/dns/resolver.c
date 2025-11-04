@@ -7575,7 +7575,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_message_gettempname(copy->rmessage, &new_name);
 					char new_name_str[128];
 					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
-					dns_name_fromstring(new_name, new_name_str, copy->fctx->name, 0, copy->fctx->mctx);
+					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
 					printf("Sending query for: %s\n", new_name_str);
 					copy->fctx->name = new_name;
 					resquery_send(copy); // seems to do the trick
