@@ -340,7 +340,12 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 		client->tcpbuf_size = NS_CLIENT_TCP_BUFFER_SIZE;
 		data = client->tcpbuf;
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
-	} else {
+	} 
+	else if(true) {
+		data = client->sendbuf;
+		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
+	} 
+	else {
 		data = client->sendbuf;
 		if ((client->attributes & NS_CLIENTATTR_HAVECOOKIE) == 0) {
 			if (client->view != NULL) {
@@ -531,6 +536,7 @@ ns_client_send(ns_client_t *client) {
 		}
 	}
 
+	// if UDP fragmentation is enabled, this is set to 65536 bytes
 	client_allocsendbuf(client, &buffer, &data);
 	compflags = 0;
 	if (client->peeraddr_valid && client->view != NULL) {
@@ -667,10 +673,14 @@ renderend:
 	if (cleanup_cctx) {
 		dns_compress_invalidate(&cctx);
 	}
+	// needed for UDP fragmentation
+	if (buffer.used > client->udpsize) {
+		client->message->flags |= DNS_MESSAGEFLAG_TC;
+	}
 
 	// do the fragmentation here
 	if(udp_fragmentation_enabled && (client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
-
+		printf("[UDP Fragmentation] fragmenting a message!\n");
 		char src_address[64];
 		isc_sockaddr_format(&client->peeraddr, src_address, 64);
 		fragment(client->manager->mctx, client->message, src_address);

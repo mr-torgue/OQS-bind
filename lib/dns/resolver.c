@@ -7515,10 +7515,25 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 
 
 	// UDP fragmentation
-	if (rctx.truncated && true) { // change guard
+	bool udp_fragmentation_enabled = true;
+	if (rctx.truncated && udp_fragmentation_enabled) { 
 		printf("[UDP Fragmentation] received TC response on resolver!\n");
-		//request_fragments(query->rmessage, dns_message_t *frag, isc_sockaddr_t *peer_address);
+		resquery_t *copy = query;
+		dns_name_t *new_name = NULL;
+		char name_str[128];
+		dns_name_format(copy->fctx->name, name_str, 128);
+		char new_name_str[128];
+		snprintf(new_name_str, 128, "?%u?%s", 1, name_str);
+		dns_name_fromstring(new_name, new_name_str, copy->fctx->name, 0, copy->fctx->mctx);
+		printf("new name: %s\n", new_name_str);
+		printf("%s\n", new_name->ndata);
+
+		copy->fctx->name = new_name;
+		
+		resquery_send(copy);
 	}
+	// check if response to fragment
+	// check if
 
 	if (rctx.truncated) {
 		inc_stats(fctx->res, dns_resstatscounter_truncated);

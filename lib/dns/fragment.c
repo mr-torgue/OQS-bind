@@ -757,8 +757,8 @@ static void frag_cb(void *arg) {
         printf("Request failed: %s\n", isc_result_totext(result));
     }
 }
-
-
+*/
+/*
 //This function is triggered on the first fragment it receives (resolver)
 bool request_fragments(dns_request_t *query, dns_message_t *response) {
     REQUIRE(response.is_fragment && response.fragment_nr == 1); // should be the first fragment
