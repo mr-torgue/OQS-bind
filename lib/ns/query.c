@@ -5619,7 +5619,7 @@ ns__query_start(query_ctx_t *qctx) {
 	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
 		printf("[NS] received a fragment query...\n");
 		ns_client_send(qctx->client); 
-		return (ns_query_done(qctx)); 
+		return ISC_R_SUCCESS; 
 	}
 
 	CALL_HOOK(NS_QUERY_START_BEGIN, qctx);
