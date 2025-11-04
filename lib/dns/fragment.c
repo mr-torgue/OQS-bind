@@ -259,6 +259,7 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
             rr_header_size += name->length;
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
+                    printf("Counter increased!\n");
 				    dns_rdata_t rdata = DNS_RDATA_INIT;
                     dns_rdataset_current(rdataset, &rdata);
                     unsigned rdata_length = rdata.length; // might be incorrect because it is a fragment

@@ -7540,8 +7540,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 
 			// determine the amount of fragments
 			unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
+			printf("[UDP Fragmentation] Estimating Message size\n");
 			unsigned msg_size = estimate_message_size(copy->rmessage, &total_sig_bytes, &total_dnskey_bytes, &savings);
 			unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
+			printf("[UDP Fragmentation] Calculating Number of Fragments\n");
 			unsigned nr_fragments = get_nr_fragments(copy->udpsize, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
 			printf("[UDP Fragmentation] need %u fragments...\n", nr_fragments);
 
