@@ -395,7 +395,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
     dns_name_t *name = NULL;
     // adding fragment to cache
     for (unsigned frag_nr = 0; frag_nr < nr_fragments; frag_nr++) {        
-        printf("adding fragment %d to the fcache!\n", frag_nr);
+        printf("adding fragment %d to the fcache!\n", frag_nr + 1);
         //can_send = frag_nr == 0 ? can_send_first_fragment : can_send_other_fragments;
         //printf("Space for %u bytes!\n", can_send);
         dns_message_t *frag = NULL;
