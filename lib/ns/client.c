@@ -684,14 +684,15 @@ renderend:
 
 		isc_buffer_t *out_frag = NULL;
 		dns_message_t *msg = NULL;
+		unsigned long frag_nr = client->message->fragment_nr;
 		printf("[NS] getting %s from cache...\n", key);
-		if(fcache_get_fragment(key, keysize, client->message->fragment_nr, &out_frag)) {
+		if(fcache_get_fragment(key, keysize, frag_nr - 1, &out_frag)) {
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			buffer = *out_frag;
 			dns_message_parse(msg, out_frag, 0);
 			client->message = msg;	
 			client->message->from_to_wire = 2;
-			printf("Fragment %lu is sent!\n", client->message->fragment_nr);
+			printf("Fragment %lu is sent!\n", frag_nr);
 		}
 		else {
 			printf("[NS] key not found!\n");

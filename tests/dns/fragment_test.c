@@ -423,7 +423,7 @@ ISC_TEST_ENTRY(get_nr_fragments_test)
 ISC_TEST_ENTRY(calc_message_size_test)
 ISC_TEST_ENTRY(estimate_message_size_test)
 //ISC_TEST_ENTRY(calculate_start_end_test)
-//ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
+ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN
