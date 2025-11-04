@@ -691,11 +691,11 @@ renderend:
 		if(fcache_get_fragment(key, keysize, 0, &out_frag)) {
 			printf("Returning the first fragment...\n");
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-			dns_message_takebuffer(msg, &out_frag);
 			buffer = *out_frag;
 			dns_message_parse(msg, out_frag, 0);
 			dns_message_detach(&(client->message));
-			client->message = msg;
+			client->message = msg;		
+			dns_message_takebuffer(msg, &out_frag);
 		}
 		else {
 			printf("Could not find fragment 0!\n");
