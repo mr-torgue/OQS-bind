@@ -696,7 +696,7 @@ renderend:
 		}
 		else {
 			printf("[NS] key not found!\n");
-			goto cleanup;
+			return;
 		}
 	}
 	// do the fragmentation here
