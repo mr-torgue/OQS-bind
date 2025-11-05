@@ -1998,11 +1998,7 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		return;
 	}
 
-	// UDP Fragmentation
-	// redirect to cache
-	if (is_fragment(client->manager->mctx, client->message)) {
-		printf("NS received a fragment query...\n");
-	}
+	// UDP Fragmentation: possible insertion point 
 
 	dns_opcodestats_increment(client->manager->sctx->opcodestats,
 				  client->message->opcode);

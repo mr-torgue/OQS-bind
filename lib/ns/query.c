@@ -5617,7 +5617,9 @@ ns__query_start(query_ctx_t *qctx) {
 
 	// UDP Fragmentation
 	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
-		printf("[NS] received a fragment query...\n");
+		ns_client_log(qctx->client, NS_LOGCATEGORY_CLIENT,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
+				      "[NS] received a fragment query...");
 		ns_client_send(qctx->client); 
 		return (ns_query_done(qctx)); 
 	}
