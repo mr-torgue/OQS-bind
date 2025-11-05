@@ -7607,8 +7607,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_message_gettempname(copy->rmessage, &new_name);
 					char new_name_str[128];
 
-					//snprintf(new_name_str, 128, "?%u?%s", i, name_str);
-					snprintf(new_name_str, 128, "test2.example.");
+					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
+					//snprintf(new_name_str, 128, "test2.example.");
 
 					printf("new_name string (%lu): \n", strlen(new_name_str));
 					for (unsigned i = 0; i < strlen(new_name_str); i++) {
