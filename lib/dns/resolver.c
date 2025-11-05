@@ -7524,17 +7524,16 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		resquery_t *copy = query;
 		// check if truncated, otherwise just keep going
 		if (rctx.truncated) { 
-			//isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER,
-		    //  DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(1),
-		    //  "resolver priming query complete: %s",
-		    //  isc_result_totext(resp->result));
-			printf("[UDP Fragmentation] received fragment response on resolver: %s!\n", copy->fctx->name->ndata);
+			// get source address
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+    		isc_sockaddr_format(&(copy->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
+
+			isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+		      "[UDP FRAG] received fragment (%s) from %s", copy->fctx->name->ndata, addr_buf);
 
 			// create cache key
 			unsigned char key[64];
 			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-    		isc_sockaddr_format(&(copy->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
 			fcache_create_key(copy->rmessage->id, addr_buf, key, &keysize);
 			printf("[UDP Fragmentation] using key %s...\n", key);
 
@@ -7556,7 +7555,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
 				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
 
-				if (out_ce->bitmap == (1 << out_ce->nr_fragments) - 1) {
+				if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
 					printf("[UDP Fragmentation] all fragments received!\n");
 					dns_message_t *out_msg = NULL;
 					reassemble_fragments(copy->fctx->mctx, out_ce, &out_msg);
