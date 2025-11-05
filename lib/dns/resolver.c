@@ -2711,6 +2711,13 @@ resquery_send(resquery_t *query) {
 
 	isc_buffer_usedregion(&buffer, &r);
 
+	// 
+	printf("sending query with length %u: ", buffer.used);
+    for(unsigned i = 0; i < buffer.used; i++) {
+        printf("%X ", ((char *)(buffer.base))[i]);
+    }
+    printf("\n");
+
 	resquery_ref(query);
 	dns_dispatch_send(query->dispentry, &r);
 
