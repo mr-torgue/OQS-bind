@@ -7526,7 +7526,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	if ((query->rmessage->flags & DNS_MESSAGEFLAG_TC) != 0) {
 		rctx.truncated = true;
 	}
-	printf("query->fctx->name buffer: \n");
+	printf("query->fctx->name buffer (%u): \n", query->fctx->name->length);
 	for (unsigned i = 0; i < query->fctx->name->length; i++) {
 		printf("%x ", query->fctx->name->ndata[i]);
 	}
@@ -7601,6 +7601,11 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
 					new_name->attributes.absolute = true; // needed
 					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
+					printf("new_name buffer (%u): \n", new_name->length);
+					for (unsigned i = 0; i < new_name->length; i++) {
+						printf("%x ", new_name->ndata[i]);
+					}
+					printf("\n");
 					//copy->fctx->name = new_name;
 					dns_name_copy(new_name, copy->fctx->name);
 					resquery_send(copy); // seems to do the trick
