@@ -2354,7 +2354,7 @@ resquery_send(resquery_t *query) {
 	 * Set up question.
 	 */
 	dns_name_clone(fctx->name, qname);
-	printf("qname: %s (%u) offsets: %s\n", qname->ndata, qname->labels, qname->offsets);
+	printf("qname: %s (%u) offsets: %s\n", qname->ndata, qname->length, qname->offsets);
 	printf("attributes\nabsolute: %u\nanswer: %u\ndynamic: %u\n", qname->attributes.absolute, qname->attributes.answer, qname->attributes.dynamic);
 	dns_rdataset_makequestion(qrdataset, res->rdclass, fctx->type);
 	ISC_LIST_APPEND(qname->list, qrdataset, link);
@@ -7588,7 +7588,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_name_t *new_name = NULL;
 					dns_message_gettempname(copy->rmessage, &new_name);
 					char new_name_str[128];
-					snprintf(new_name_str, 128, "?%u?%s\0", i, name_str); // 0-byte needs to be included in length
+					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
 					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
 					new_name->attributes.absolute = true; // needed
 					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
