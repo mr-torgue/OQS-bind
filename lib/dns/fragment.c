@@ -574,11 +574,8 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
                         new_section_count = 1; // should always be one
                         REQUIRE(msg->counts[DNS_SECTION_QUESTION == 1]); // too strict?
                     }
-                    // check if not empty??
-                    if (new_section_count > 0) {
-                        printf("Adding new name %s for section %u...\n", new_name->ndata, section_nr);
-                        dns_message_addname(frag, new_name, section_nr);
-                    }
+                    printf("Adding new name %s for section %u...\n", new_name->ndata, section_nr);
+                    dns_message_addname(frag, new_name, section_nr);
                 }
             }
             // can be moved, but leads to sanity check issues
