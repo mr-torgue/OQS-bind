@@ -7279,6 +7279,14 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	REQUIRE(VALID_FCTX(fctx));
 	REQUIRE(fctx->tid == isc_tid());
 
+	// get source address
+	char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+	isc_sockaddr_format(&(query->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
+
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+		"Incoming response %s from %s", query->fctx->name->ndata, addr_buf);
+
+
 	QTRACE("response");
 
 	if (eresult == ISC_R_TIMEDOUT) {
