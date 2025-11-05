@@ -7628,12 +7628,28 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_name_copy(new_name, copy->fctx->name);
 					resquery_send(copy); // seems to do the trick
 					dns_message_puttempname(copy->rmessage, &new_name);
+/*
+dns_requestmgr_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr,
+		      dns_dispatchmgr_t *dispatchmgr,
+		      dns_dispatch_t *dispatchv4, dns_dispatch_t *dispatchv6,
+		      dns_requestmgr_t **requestmgrp) 
+
+
+dns_request_create(dns_requestmgr_t *requestmgr, copy->rmessage,
+		   const isc_sockaddr_t *srcaddr,
+		   const isc_sockaddr_t *destaddr, dns_transport_t *transport,
+		   isc_tlsctx_cache_t *tlsctx_cache, unsigned int options,
+		   dns_tsigkey_t *key, unsigned int timeout,
+		   unsigned int udptimeout, unsigned int udpretries,
+		   isc_loop_t *loop, isc_job_cb cb, void *arg,
+		   dns_request_t **requestp);
+*/
 				}
 			}
 			// the complete response has not been received 
 			// make sure that the resolver does not return the data but waits for all the fragments
 			//rctx.no_response = true; // so, it does not use this answer
-			rctx_done(&rctx, DNS_R_WAIT); // maybe DNS_R_DROP
+			//rctx_done(&rctx, DNS_R_WAIT); // maybe DNS_R_DROP
 			return;
 		}
 	}
