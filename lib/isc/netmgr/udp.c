@@ -479,13 +479,7 @@ isc__nm_udp_read_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 
 	REQUIRE(VALID_NMSOCK(sock));
 	REQUIRE(sock->tid == isc_tid());
-
-	printf("raw buffer print (%lu): \n", buf->len);
-	for (unsigned i = 0; i < buf->len; i++) {
-		printf("%x ", buf->base[i]);
-	}
-	printf("\n");
-
+	
 	/*
 	 * When using recvmmsg(2), if no errors occur, there will be a final
 	 * callback with nrecv set to 0, addr set to NULL and the buffer
