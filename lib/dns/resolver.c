@@ -7579,7 +7579,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_name_t *new_name = NULL;
 					dns_message_gettempname(copy->rmessage, &new_name);
 					char new_name_str[128];
-					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
+					snprintf(new_name_str, 128, "?%u?%s\0", i, name_str); // 0-byte needs to be included in length
 					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
 					new_name->attributes.absolute = true; // needed
 					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
