@@ -192,12 +192,11 @@ unsigned calc_message_size(dns_message_t *msg,
     else {
         msgsize = msg->buffer->used; // used instead of length
     }
-    printf("msgsize: %u\n", msgsize);
 
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
     for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
-        printf("Section %u with %u resource records...\n", section, msg->counts[section]);
+        //printf("Section %u with %u resource records...\n", section, msg->counts[section]);
         unsigned counter = 0;
         // go through each name, rdataset, and rdata item
         // for (dns_name_t *name = ISC_LIST_HEAD(msg->sections[section]); name != NULL; ISC_LIST_NEXT(name, link)) {
@@ -205,12 +204,11 @@ unsigned calc_message_size(dns_message_t *msg,
             name = NULL;
             dns_message_currentname(msg, section, &name);
 
-            printf("name: %s (%u)\n", name->ndata, name->length);
+            //printf("name: %s (%u)\n", name->ndata, name->length);
             rr_header_size += name->length;
             
             for (rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
-                printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
-                printf("rdataset type: %d\n", rdataset->type);
+                //printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
                 isc_result_t tresult;
                 for (tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
                     dns_rdata_t rdata = DNS_RDATA_INIT;
@@ -233,11 +231,11 @@ unsigned calc_message_size(dns_message_t *msg,
         // OPT record found!
         // only one allowed and can only be in the additional section
         if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
-            printf("Found an OPT message!\n");
+            //printf("Found an OPT message!\n");
             REQUIRE(dns_rdataset_count(msg->opt) == 1);
             counter++;
         }
-        printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
+        //printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
         REQUIRE(msg->counts[section] == counter); // sanity check: msg->counts[i] and counter should be the same after this  (NOTE: this goes wrong with TSIG/SIG(0))
     }
     return msgsize;
@@ -265,18 +263,17 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
     
     // go through each section
     for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
-        printf("Section %u with %u resource records...\n", section, msg->counts[section]);
+        //printf("Section %u with %u resource records...\n", section, msg->counts[section]);
         unsigned counter = 0;
         // go through each name, rdataset, and rdata item
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
             
-            printf("name: %s (%u)\n", name->ndata, name->length);
+            //printf("name: %s (%u)\n", name->ndata, name->length);
             rr_header_size += name->length;
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
-                printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
-                printf("rdataset type: %d\n", rdataset->type);
+                //printf("Number of elements in rdataset: %u\n", dns_rdataset_count(rdataset));
                 isc_result_t tresult;
                 for (tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
                     dns_rdata_t rdata = DNS_RDATA_INIT;
@@ -306,7 +303,7 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
         // OPT record found!
         // only one allowed and can only be in the additional section
         if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
-            printf("Found an OPT message!\n");
+            //printf("Found an OPT message!\n");
             REQUIRE(dns_rdataset_count(msg->opt) == 1);
             msgsize += 11; // OPT header size
             isc_result_t tresult;
@@ -319,7 +316,7 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
 
             counter++;
         }
-        printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
+        //printf("Expected count: %u\nActual count: %u\n", msg->counts[section], counter);
         REQUIRE(msg->counts[section] == counter); // rr_count and counter should be the same after this
     }
     return msgsize;

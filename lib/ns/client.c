@@ -297,7 +297,9 @@ client_senddone(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	REQUIRE(client->sendhandle == handle);
 
 	CTRACE("senddone");
-
+	ns_client_log(client, DNS_LOGCATEGORY_NOTIFY,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
+				      "successfully responded to query for %s", client->message->sections[0]->head->ndata);
 	/*
 	 * Set sendhandle to NULL, but don't detach it immediately, in
 	 * case we need to retry the send. If we do resend, then
