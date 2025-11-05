@@ -7526,7 +7526,11 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	if ((query->rmessage->flags & DNS_MESSAGEFLAG_TC) != 0) {
 		rctx.truncated = true;
 	}
-
+	printf("query->fctx->name buffer: \n");
+	for (unsigned i = 0; i < query->fctx->name->length; i++) {
+		printf("%x ", query->fctx->name->ndata[i]);
+	}
+	printf("\n");
 
 	// UDP fragmentation
 	// TODO:
@@ -7588,6 +7592,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 
 				char name_str[128];
 				dns_name_format(copy->fctx->name, name_str, 128);
+				
 				for (unsigned i = 2; i <= nr_fragments; i++) {
 					dns_name_t *new_name = NULL;
 					dns_message_gettempname(copy->rmessage, &new_name);
