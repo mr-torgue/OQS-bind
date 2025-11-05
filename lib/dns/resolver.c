@@ -49,6 +49,7 @@
 #include <dns/edns.h>
 #include <dns/fcache.h>
 #include <dns/forward.h>
+#include <dns/fragment.h>
 #include <dns/keytable.h>
 #include <dns/log.h>
 #include <dns/message.h>
@@ -7284,7 +7285,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	isc_sockaddr_format(&(query->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
 
 	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
-		"Incoming response %s from %s", query->fctx->name->ndata, addr_buf);
+		"Incoming response %s (%u) from %s\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, is_fragment(fctx->mctx, query->rmessage));
 
 
 	QTRACE("response");
