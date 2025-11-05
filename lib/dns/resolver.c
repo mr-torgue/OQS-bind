@@ -7590,9 +7590,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
 				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
 
-				char name_str[128];
-				dns_name_format(copy->fctx->name, name_str, 128);
-				
+				char *name_str = NULL;
+				//dns_name_format(copy->fctx->name, name_str, 128);
+				dns_name_tostring(copy->fctx->name, &name_str, copy->fctx->mctx);
+
 				for (unsigned i = 2; i <= nr_fragments; i++) {
 					dns_name_t *new_name = NULL;
 					dns_message_gettempname(copy->rmessage, &new_name);
