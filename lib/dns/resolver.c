@@ -7649,7 +7649,8 @@ dns_request_create(dns_requestmgr_t *requestmgr, copy->rmessage,
 			// the complete response has not been received 
 			// make sure that the resolver does not return the data but waits for all the fragments
 			//rctx.no_response = true; // so, it does not use this answer
-			//rctx_done(&rctx, DNS_R_WAIT); // maybe DNS_R_DROP
+			rctx.nextitem = true;
+			rctx_done(&rctx, ISC_R_SUCCESS); // maybe DNS_R_DROP
 			return;
 		}
 	}
