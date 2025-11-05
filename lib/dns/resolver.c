@@ -2354,6 +2354,8 @@ resquery_send(resquery_t *query) {
 	 * Set up question.
 	 */
 	dns_name_clone(fctx->name, qname);
+	printf("qname: %s (%u) offsets: %s\n", qname->ndata, qname->labels, qname->offsets);
+	printf("attributes\nabsolute: %u\nanswer: %u\ndynamic: %u\n", qname->attributes.absolute, qname->attributes.answer, qname->attributes.dynamic);
 	dns_rdataset_makequestion(qrdataset, res->rdclass, fctx->type);
 	ISC_LIST_APPEND(qname->list, qrdataset, link);
 	dns_message_addname(fctx->qmessage, qname, DNS_SECTION_QUESTION);
