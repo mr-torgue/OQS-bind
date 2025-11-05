@@ -1,3 +1,3 @@
-git clone
+git pull
 make
 make install
