@@ -7336,9 +7336,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		"7329!!!!!!!!!");
 
 	result = rctx_timedout(&rctx);
-	//if (result == ISC_R_COMPLETE) {
-	//		return;
-	//}
+	if (result == ISC_R_COMPLETE) {
+		//return;
+		result = ISC_R_SUCCESS; // dont do this kids!!
+	}
 
 	fctx->addrinfo = query->addrinfo;
 	fctx->timeout = false;
