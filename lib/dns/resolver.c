@@ -7305,6 +7305,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			return;
 		}
 	}
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"7309!!!!!!!!!");
 
 	if (isc_sockaddr_pf(&query->addrinfo->sockaddr) == PF_INET) {
 		inc_stats(fctx->res, dns_resstatscounter_responsev4);
@@ -7323,6 +7325,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		rctx_done(&rctx, result);
 		return;
 	}
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+		"7329!!!!!!!!!");
 
 	result = rctx_timedout(&rctx);
 	if (result == ISC_R_COMPLETE) {
@@ -7385,7 +7389,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		rctx_done(&rctx, result);
 		return;
 	}
-
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"7393!!!!!!!!!");
 	/*
 	 * Process receive opt record.
 	 */
@@ -7412,6 +7417,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		rctx_done(&rctx, result);
 		return;
 	}
+	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"7421!!!!!!!!!");
 
 	/*
 	 * Is the question the same as the one we asked?
