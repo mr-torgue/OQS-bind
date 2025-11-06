@@ -72,6 +72,7 @@
 #include <dns/rootns.h>
 #include <dns/stats.h>
 #include <dns/tsig.h>
+#include <dns/types.h>
 #include <dns/validator.h>
 #include <dns/zone.h>
 
@@ -7284,9 +7285,17 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 	isc_sockaddr_format(&(query->addrinfo->sockaddr), addr_buf, sizeof(addr_buf));
 
-	isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
-		"Incoming response %s (%u) from %s\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, is_fragment(fctx->mctx, query->rmessage));
-
+	isc_result_t result_tmp = dns_message_firstname(query->rmessage, DNS_SECTION_QUESTION); 
+    dns_name_t *name = NULL;
+	if( result_tmp == ISC_R_SUCCESS) {
+		dns_message_currentname(query->rmessage, DNS_SECTION_QUESTION, &name);
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"Incoming response %s (%u) from %s\nquestion name: %s (%u)\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, name->ndata, name->length, is_fragment(fctx->mctx, query->rmessage));
+	}
+	else {
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"[NO NAME!] Incoming response %s (%u) from %s\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, is_fragment(fctx->mctx, query->rmessage));
+	}
 
 	QTRACE("response");
 
