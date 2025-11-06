@@ -7655,7 +7655,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					printf("\n");
 					//copy->fctx->name = new_name;
 					dns_name_copy(new_name, copy->fctx->name);
-					resquery_send(copy); // seems to do the trick
+					
+					isc_result_t qresult = resquery_send(copy); // seems to do the trick
+					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
+					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
 					dns_message_puttempname(copy->rmessage, &new_name);
 /*
 dns_requestmgr_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr,
