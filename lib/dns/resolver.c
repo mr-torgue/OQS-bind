@@ -7664,8 +7664,13 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					dns_name_copy(new_name, copy->fctx->name);
 					
 					copy->start = isc_time_now(); // set new start time
-					//isc_result_t qresult = resquery_send(copy); // seems to do the trick
-					isc_result_t qresult = fctx__query(fctx, query->addrinfo, 0, DNS_DISPATCHOPT_FIXEDID);
+					copy->fctx->now = isc_stdtime_now(); 
+					fctx_setretryinterval(copy->fctx, US_PER_SEC * 2);
+					//copy->fctx->next_timeout
+					//copy->fctx->now = isc_time_now(); 
+					//isc_time_nowplusinterval(&fctx->next_timeout, &fctx->interval);
+					isc_result_t qresult = resquery_send(copy); // seems to do the trick
+					//isc_result_t qresult = fctx__query(fctx, query->addrinfo, 0, DNS_DISPATCHOPT_FIXEDID);
 					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
 					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
 					dns_message_puttempname(copy->rmessage, &new_name);
