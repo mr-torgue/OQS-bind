@@ -7656,6 +7656,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					//copy->fctx->name = new_name;
 					dns_name_copy(new_name, copy->fctx->name);
 					
+					copy->start = isc_time_now(); // set new start time
 					isc_result_t qresult = resquery_send(copy); // seems to do the trick
 					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
 					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
