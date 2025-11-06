@@ -7550,6 +7550,18 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	}
 	printf("\n");
 
+	result_tmp = dns_message_firstname(query->rmessage, DNS_SECTION_QUESTION); 
+    name = NULL;
+	if( result_tmp == ISC_R_SUCCESS) {
+		dns_message_currentname(query->rmessage, DNS_SECTION_QUESTION, &name);
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"Incoming response %s (%u) from %s\nquestion name: %s (%u)\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, name->ndata, name->length, is_fragment(fctx->mctx, query->rmessage));
+	}
+	else {
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"[NO NAME!] Incoming response %s (%u) from %s\nfragment: %u\n", query->fctx->name->ndata, query->fctx->name->length, addr_buf, is_fragment(fctx->mctx, query->rmessage));
+	}
+
 	// UDP fragmentation
 	// TODO:
 	// 1. create a global setting for this
