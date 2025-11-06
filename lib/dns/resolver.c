@@ -2321,6 +2321,151 @@ issecuredomain(dns_view_t *view, const dns_name_t *name, dns_rdatatype_t type,
 }
 
 static isc_result_t
+resquery_send_fragment(resquery_t *query) {
+	isc_result_t result;
+	fetchctx_t *fctx = query->fctx;
+	dns_resolver_t *res = fctx->res;
+	isc_buffer_t buffer;
+	dns_name_t *qname = NULL;
+	dns_rdataset_t *qrdataset = NULL;
+	isc_region_t r;
+	isc_netaddr_t ipaddr;
+	dns_tsigkey_t *tsigkey = NULL;
+	dns_peer_t *peer = NULL;
+	dns_compress_t cctx;
+	bool useedns;
+	bool secure_domain;
+	bool tcp = ((query->options & DNS_FETCHOPT_TCP) != 0);
+	dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS];
+	unsigned int ednsopt = 0;
+	uint16_t hint = 0, udpsize = 0; /* No EDNS */
+#ifdef HAVE_DNSTAP
+	isc_sockaddr_t localaddr, *la = NULL;
+	unsigned char zone[DNS_NAME_MAXWIRE];
+	dns_dtmsgtype_t dtmsgtype;
+	isc_region_t zr;
+	isc_buffer_t zb;
+#endif /* HAVE_DNSTAP */
+
+	QTRACE("send");
+
+	if (atomic_load_acquire(&res->exiting)) {
+		FCTXTRACE("resquery_send: resolver shutting down");
+		return (ISC_R_SHUTTINGDOWN);
+	}
+
+	dns_message_gettempname(fctx->qmessage, &qname);
+	dns_message_gettemprdataset(fctx->qmessage, &qrdataset);
+
+	fctx->qmessage->opcode = dns_opcode_query;
+
+	/*
+	 * Set up question.
+	 */
+	dns_name_clone(fctx->name, qname);
+	printf("qname: %s (%u) offsets: %s\n", qname->ndata, qname->length, qname->offsets);
+	printf("qname buffer: \n");
+	for (unsigned i = 0; i < qname->length; i++) {
+		printf("%x ", qname->ndata[i]);
+	}
+	printf("\nattributes\nabsolute: %u\nanswer: %u\ndynamic: %u\n", qname->attributes.absolute, qname->attributes.answer, qname->attributes.dynamic);
+	dns_rdataset_makequestion(qrdataset, res->rdclass, fctx->type);
+	ISC_LIST_APPEND(qname->list, qrdataset, link);
+	dns_message_addname(fctx->qmessage, qname, DNS_SECTION_QUESTION);
+
+	/*
+	 * Set RD if the client has requested that we do a recursive
+	 * query, or if we're sending to a forwarder.
+	 */
+	if ((query->options & DNS_FETCHOPT_RECURSIVE) != 0 ||
+	    ISFORWARDER(query->addrinfo))
+	{
+		fctx->qmessage->flags |= DNS_MESSAGEFLAG_RD;
+	}
+
+	/*
+	 * We don't have to set opcode because it defaults to query.
+	 */
+	fctx->qmessage->id = query->id;
+
+	/*
+	 * Convert the question to wire format.
+	 */
+	dns_compress_init(&cctx, fctx->mctx, 0);
+
+	isc_buffer_init(&buffer, query->data, sizeof(query->data));
+	result = dns_message_renderbegin(fctx->qmessage, &cctx, &buffer);
+	if (result != ISC_R_SUCCESS) {
+		goto cleanup_message;
+	}
+
+	result = dns_message_rendersection(fctx->qmessage, DNS_SECTION_QUESTION,
+					   0);
+	if (result != ISC_R_SUCCESS) {
+		goto cleanup_message;
+	}
+
+	isc_netaddr_fromsockaddr(&ipaddr, &query->addrinfo->sockaddr);
+	(void)dns_peerlist_peerbyaddr(fctx->res->view->peers, &ipaddr, &peer);
+
+
+	fctx->timeout = false;
+
+	result = dns_message_rendersection(fctx->qmessage,
+					   DNS_SECTION_ADDITIONAL, 0);
+	if (result != ISC_R_SUCCESS) {
+		goto cleanup_message;
+	}
+
+	result = dns_message_renderend(fctx->qmessage);
+	if (result != ISC_R_SUCCESS) {
+		goto cleanup_message;
+	}
+
+	/*
+	 * Log the outgoing packet.
+	 */
+	dns_message_logfmtpacket(
+		fctx->qmessage, "sending packet to", &query->addrinfo->sockaddr,
+		DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_PACKETS,
+		&dns_master_style_comment, ISC_LOG_DEBUG(11), fctx->mctx);
+
+	/*
+	 * We're now done with the query message.
+	 */
+	dns_compress_invalidate(&cctx);
+	dns_message_reset(fctx->qmessage, DNS_MESSAGE_INTENTRENDER);
+
+	isc_buffer_usedregion(&buffer, &r);
+
+	// 
+	printf("sending query with length %u: ", buffer.used);
+    for(unsigned i = 0; i < buffer.used; i++) {
+        printf("%X ", ((char *)(buffer.base))[i]);
+    }
+    printf("\n");
+
+	resquery_ref(query);
+	dns_dispatch_send(query->dispentry, &r);
+
+	QTRACE("sent");
+
+	return (ISC_R_SUCCESS);
+
+cleanup_message:
+	dns_compress_invalidate(&cctx);
+
+	dns_message_reset(fctx->qmessage, DNS_MESSAGE_INTENTRENDER);
+
+	/*
+	 * Stop the dispatcher from listening.
+	 */
+	dns_dispatch_done(&query->dispentry);
+
+	return (result);
+}
+
+static isc_result_t
 resquery_send(resquery_t *query) {
 	isc_result_t result;
 	fetchctx_t *fctx = query->fctx;
@@ -7670,13 +7815,13 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					//copy->fctx->next_timeout
 					//copy->fctx->now = isc_time_now(); 
 					//isc_time_nowplusinterval(&fctx->next_timeout, &fctx->interval);
-					isc_region_t r;
-					isc_buffer_usedregion(&query->buffer, &r);
-					dns_dispatch_send(query->dispentry, &r);
-					//isc_result_t qresult = resquery_send(copy); // seems to do the trick
+					//isc_region_t r;
+					//isc_buffer_usedregion(&query->buffer, &r);
+					//dns_dispatch_send(query->dispentry, &r);
+					isc_result_t qresult = resquery_send_fragment(copy); // seems to do the trick
 					//isc_result_t qresult = fctx__query(fctx, query->addrinfo, 0, DNS_DISPATCHOPT_FIXEDID);
-					//printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
-					//printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
+					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
+					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
 					dns_message_puttempname(copy->rmessage, &new_name);
 /*
 dns_requestmgr_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr,
