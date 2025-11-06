@@ -1937,9 +1937,10 @@ resquery_timeout(resquery_t *query) {
 	return (ISC_R_SUCCESS);
 }
 
+
 static isc_result_t
-fctx_query(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo,
-	   unsigned int options) {
+fctx__query(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo,
+	   unsigned int options, unsigned int dipatch_options) {
 	isc_result_t result;
 	dns_resolver_t *res = NULL;
 	resquery_t *query = NULL;
@@ -2129,7 +2130,7 @@ fctx_query(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo,
 
 	/* Set up the dispatch and set the query ID */
 	result = dns_dispatch_add(
-		query->dispatch, fctx->loop, 0,
+		query->dispatch, fctx->loop, dipatch_options,
 		isc_interval_ms(&fctx->interval), &query->addrinfo->sockaddr,
 		addrinfo->transport, tlsctx_cache, resquery_connected,
 		resquery_senddone, resquery_response, query, &query->id,
@@ -2174,6 +2175,12 @@ cleanup_query:
 	isc_mem_put(fctx->mctx, query, sizeof(*query));
 
 	return (result);
+}
+
+static isc_result_t
+fctx_query(fetchctx_t *fctx, dns_adbaddrinfo_t *addrinfo,
+	   unsigned int options) {
+	return fctx__query(fctx, addrinfo, options, 0);
 }
 
 static bool
@@ -7658,7 +7665,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					
 					copy->start = isc_time_now(); // set new start time
 					//isc_result_t qresult = resquery_send(copy); // seems to do the trick
-					isc_result_t qresult = fctx_query(fctx, query->addrinfo, 0);
+					isc_result_t qresult = fctx__query(fctx, query->addrinfo, 0, DNS_DISPATCHOPT_FIXEDID);
 					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
 					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
 					dns_message_puttempname(copy->rmessage, &new_name);
