@@ -81,11 +81,11 @@ static bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint f
             ISC_LIST_APPEND(qname->list, qrdataset, link); 
 
             // add name and set id
-            dns_messageid_t id;
-            unsigned flags;
+            //dns_messageid_t id;
+            // unsigned flags;
             dns_message_addname(*question, qname, DNS_SECTION_QUESTION);
-            dns_message_peekheader(buffer, &id, &flags);
-            (*question)->id = id;
+            //dns_message_peekheader(buffer, &id, &flags);
+            (*question)->id = msg->id;
             
             // set opt
             if (msg->opt != NULL) {
