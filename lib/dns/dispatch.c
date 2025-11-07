@@ -700,8 +700,23 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				isc_region_t query_region;
 				if (get_fragment_query_raw(disp->mgr->mctx, &buf, frag_nr, &query, &query_buffer)) {
 					isc_buffer_usedregion(query_buffer, &query_region);
-					dns_dispentry_ref(resp); // add a reference
-					dns_dispatch_send(resp, &query_region); // dispatch new request
+					//dns_dispentry_ref(resp); // add a reference
+					dns_dispatch_ref(resp->disp);
+					//dns_dispatch_send(resp, &query_region); // dispatch new request
+					dns_dispentry_t *new_resp = NULL;
+					dns_dispatch_add(resp->disp, resp->loop, 0, 
+									 resp->timeout, &(resp->peer), resp->transport, 
+									 resp->tlsctx_cache, resp->connected,
+									 resp->sent, resp->response, resp->arg, &(resp->id), &new_resp);
+
+/*
+	result = dns_dispatch_add(
+		query->dispatch, fctx->loop, 0,
+		isc_interval_ms(&fctx->interval), &query->addrinfo->sockaddr,
+		addrinfo->transport, tlsctx_cache, resquery_connected,
+		resquery_senddone, resquery_response, query, &query->id,
+		&query->dispentry);*/
+
 				}
 				else {
 					perror("Could not parse a query from the response!\n");
