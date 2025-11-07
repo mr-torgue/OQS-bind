@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include <isc/atomic.h>
+#include <isc/buffer.h>
 #include <isc/loop.h>
 #include <isc/mem.h>
 #include <isc/mutex.h>
@@ -32,10 +33,14 @@
 #include <isc/tid.h>
 #include <isc/time.h>
 #include <isc/tls.h>
+#include <isc/types.h>
 #include <isc/util.h>
 
 #include <dns/acl.h>
 #include <dns/dispatch.h>
+#include <dns/fragment.h>
+#include <dns/fcache.h>
+#include <dns/fragment_helpers.h>
 #include <dns/log.h>
 #include <dns/message.h>
 #include <dns/stats.h>
@@ -620,6 +625,85 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		dispentry_log(resp, LVL(90), "response doesn't match");
 		inc_stats(disp->mgr, dns_resstatscounter_mismatch);
 		goto next;
+	}
+
+	bool udp_fragmentation_enabled = true;
+	bool is_any_fragment = (flags & DNS_MESSAGEFLAG_TC) != 0;
+	if(udp_fragmentation_enabled && is_any_fragment) {
+
+		// get source address
+		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+		isc_sockaddr_format(&peer, addr_buf, sizeof(addr_buf));
+
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"[UDP FRAG] received fragment from %s", addr_buf); // try to add domain name
+
+		// convert region to buffer
+		isc_buffer_t *buf;
+		isc_buffer_allocate(disp->mgr->mctx, &buf, region->length);
+		isc_buffer_region(buf, region); // use init or source
+		//REQUIRE(region != NULL);
+		//isc_buffer_init(&rctx->buffer, region->base, region->length);
+		//isc_buffer_add(&rctx->buffer, region->length);
+    
+		// create and parse a dns message
+		// NOTE: do we need to do this
+		dns_message_t *msg = NULL;
+    	dns_message_create(disp->mgr->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+		isc_result_t result = dns_message_parse(msg, buf, 0);
+
+		// booleans for detecting if it is a fragment
+		bool is_first_fragment = flags & DNS_MESSAGEFLAG_TC;
+		bool is_fragment_resp = is_fragment(disp->mgr->mctx, msg);
+
+		// create cache key
+		unsigned char key[64];
+		unsigned keysize = sizeof(key) / sizeof(key[0]);
+		fcache_create_key(id, addr_buf, key, &keysize);
+
+		// determine the amount of fragments
+		unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
+		unsigned msg_size = estimate_message_size(msg, &total_sig_bytes, &total_dnskey_bytes, &savings);
+		unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
+		unsigned nr_fragments = get_nr_fragments(1232, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
+		printf("[UDP Fragmentation] %s has total message size %u and needs %u fragments...\n", key, msg_size, nr_fragments);
+
+		fragment_cache_entry_t *out_ce = NULL;
+	
+		// process incoming fragment
+		if (is_fragment_resp) {
+			printf("[UDP Fragmentation] response to fragment query %lu!\n", msg->fragment_nr);		
+			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+			if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
+				printf("[UDP Fragmentation] all fragments received!\n");
+				dns_message_t *out_msg = NULL;
+				reassemble_fragments(disp->mgr->mctx, out_ce, &out_msg);
+
+				goto done;
+			}
+
+			goto next; // still waiting for other fragments
+		}
+		// if it is not a fragment response, we assume it is a first fragment
+		// note that this is currently not well-defined
+		else {
+
+			// change this to a raw add (region)
+			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(key, keysize, &out_ce)); // get
+
+			for (unsigned frag_nr = 2; frag_nr <= nr_fragments; frag_nr++) { 
+				dns_message_t *query = NULL; 
+				isc_buffer_t *query_buffer = NULL;
+				isc_region_t *query_region = NULL;
+				get_fragment_query_raw(disp->mgr->mctx, buf, frag_nr, &query, &query_buffer); 
+				isc_buffer_region(query_buffer, query_region);
+				dns_dispatch_send(resp, query_region); // dispatch new request
+			}
+			goto next; // still waiting for other fragments
+		} 
 	}
 
 	/*
