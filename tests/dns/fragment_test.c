@@ -453,7 +453,7 @@ ISC_RUN_TEST_IMPL(test_query_creation) {
         assert_true(expected_buffer != NULL);
         if (expected_buffer != NULL) {
             assert_int_equal(exp_buffer_size, query_buffer->used);
-            for (unsigned i = 3; i < exp_buffer_size; i++) {
+            for (unsigned i = 0; i < exp_buffer_size; i++) {
                 assert_true(((char *)(expected_buffer))[i] == ((char *)(query_buffer->base))[i]);
             }
             isc_mem_put(mctx, expected_buffer, exp_buffer_size);

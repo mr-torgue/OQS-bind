@@ -38,6 +38,11 @@ static unsigned calc_rrsig_header_size(dns_rdata_t *rdata) {
 
 // create a query from a given buffer that represents a dns message
 // returns true if a query was created
+// NOTE: can be optimized (e.g. remove parsing):
+// 1. peek at header to determine flags and id
+// 2. peek at query/question to get name
+// 3. construct question section 
+// 4. construct OPT --> use default values
 static bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, dns_message_t **question, isc_buffer_t **question_buffer) {
     REQUIRE(question != NULL && *question == NULL);
     REQUIRE(question_buffer != NULL && *question_buffer == NULL);
@@ -75,8 +80,12 @@ static bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint f
             dns_rdataset_makequestion(qrdataset, rdataset->rdclass, rdataset->type);
             ISC_LIST_APPEND(qname->list, qrdataset, link); 
 
-            // create message and add name
+            // add name and set id
+            dns_messageid_t id;
+            unsigned flags;
             dns_message_addname(*question, qname, DNS_SECTION_QUESTION);
+            dns_message_peekheader(buffer, &id, &flags);
+            (*question)->id = id;
             
             // set opt
             if (msg->opt != NULL) {
