@@ -47,6 +47,7 @@ static bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint f
     // parse buffer into dns_message_t
     dns_message_t *msg = NULL;
     dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+    isc_buffer_first(buffer); // start from 0
     isc_result_t result = dns_message_parse(msg, buffer, 0);
     if(result == ISC_R_SUCCESS) {
         // get question
