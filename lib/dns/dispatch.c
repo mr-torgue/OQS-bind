@@ -740,7 +740,9 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 
 
 					dns_dispentry_t *new_resp = NULL;
-					isc_result_t dp_add_result = dns_dispatch_add(resp->disp, resp->loop, 0, 
+					dns_dispatch_t *new_disp = NULL;
+					dns_dispatch_createudp(disp->mgr, &resp->local, &new_disp);
+					isc_result_t dp_add_result = dns_dispatch_add(new_disp, resp->loop, 0, 
 									 resp->timeout, &(resp->peer), resp->transport, 
 									 resp->tlsctx_cache, resp->connected,
 									 resp->sent, resp->response, resp->arg, &(resp->id), &new_resp);
