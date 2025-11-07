@@ -703,7 +703,8 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					//dns_dispentry_ref(resp); // add a reference
 					//dns_dispatch_ref(resp->disp);
 
-					dns_dispentry_t *new_resp = isc_mem_get(disp->mgr->mctx, sizeof(*new_resp));
+					dns_dispentry_t *new_resp = NULL;
+					new_resp = isc_mem_get(disp->mgr->mctx, sizeof(*new_resp));
 					*resp = (dns_dispentry_t){
 						.id = resp->id,
 						.port = resp->port,
