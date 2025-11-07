@@ -731,7 +731,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					dns_dispatch_attach(disp, &new_resp->disp); 
 					disp->requests++;
 					inc_stats(disp->mgr, dns_resstatscounter_disprequdp);
-					dns_dispatch_send(resp, &query_region); // dispatch new request
+					dns_dispatch_send(new_resp, &query_region); // dispatch new request
 
 
 /*
