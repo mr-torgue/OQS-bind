@@ -639,18 +639,18 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 			"[UDP FRAG] received fragment from %s", addr_buf); // try to add domain name
 
 		// convert region to buffer
-		isc_buffer_t *buf = NULL;
-		isc_buffer_allocate(disp->mgr->mctx, &buf, region->length);
-		isc_buffer_region(buf, region); // use init or source
-		//REQUIRE(region != NULL);
-		//isc_buffer_init(&rctx->buffer, region->base, region->length);
-		//isc_buffer_add(&rctx->buffer, region->length);
+		isc_buffer_t buf;
+		//isc_buffer_allocate(disp->mgr->mctx, &buf, region->length);
+		//isc_buffer_region(buf, region); // use init or source
+		REQUIRE(region != NULL);
+		isc_buffer_init(&buf, region->base, region->length);
+		isc_buffer_add(&buf, region->length);
     
 		// create and parse a dns message
 		// NOTE: do we need to do this
 		dns_message_t *msg = NULL;
     	dns_message_create(disp->mgr->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-		isc_result_t result = dns_message_parse(msg, buf, 0);
+		isc_result_t result = dns_message_parse(msg, &buf, 0);
 
 		// booleans for detecting if it is a fragment
 		bool is_first_fragment = flags & DNS_MESSAGEFLAG_TC;
@@ -698,7 +698,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				dns_message_t *query = NULL; 
 				isc_buffer_t *query_buffer = NULL;
 				isc_region_t *query_region = NULL;
-				get_fragment_query_raw(disp->mgr->mctx, buf, frag_nr, &query, &query_buffer); 
+				get_fragment_query_raw(disp->mgr->mctx, &buf, frag_nr, &query, &query_buffer); 
 				isc_buffer_region(query_buffer, query_region);
 				dns_dispatch_send(resp, query_region); // dispatch new request
 			}
