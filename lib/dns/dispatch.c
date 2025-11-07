@@ -702,9 +702,11 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					isc_buffer_usedregion(query_buffer, &query_region);
 					//dns_dispentry_ref(resp); // add a reference
 					//dns_dispatch_ref(resp->disp);
-					//dns_dispatch_send(resp, &query_region); // dispatch new request
+					resp->disp->requests++;
+					dns_dispatch_send(resp, &query_region); // dispatch new request
 
 
+/*
 					dns_dispentry_t *new_resp = NULL;
 					isc_result_t dp_add_result = dns_dispatch_add(resp->disp, resp->loop, 0, 
 									 resp->timeout, &(resp->peer), resp->transport, 
@@ -716,14 +718,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					else {
 						perror("Could not create new dispentry!\n");
 					}
-
-/*
-	result = dns_dispatch_add(
-		query->dispatch, fctx->loop, 0,
-		isc_interval_ms(&fctx->interval), &query->addrinfo->sockaddr,
-		addrinfo->transport, tlsctx_cache, resquery_connected,
-		resquery_senddone, resquery_response, query, &query->id,
-		&query->dispentry);*/
+*/
 
 				}
 				else {
