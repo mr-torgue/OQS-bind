@@ -639,7 +639,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 			"[UDP FRAG] received fragment from %s", addr_buf); // try to add domain name
 
 		// convert region to buffer
-		isc_buffer_t *buf;
+		isc_buffer_t *buf = NULL;
 		isc_buffer_allocate(disp->mgr->mctx, &buf, region->length);
 		isc_buffer_region(buf, region); // use init or source
 		//REQUIRE(region != NULL);
