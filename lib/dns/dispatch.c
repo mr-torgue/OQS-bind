@@ -704,10 +704,16 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					dns_dispatch_ref(resp->disp);
 					//dns_dispatch_send(resp, &query_region); // dispatch new request
 					dns_dispentry_t *new_resp = NULL;
-					dns_dispatch_add(resp->disp, resp->loop, 0, 
+					isc_result_t dp_add_result = dns_dispatch_add(resp->disp, resp->loop, 0, 
 									 resp->timeout, &(resp->peer), resp->transport, 
 									 resp->tlsctx_cache, resp->connected,
 									 resp->sent, resp->response, resp->arg, &(resp->id), &new_resp);
+					if (dp_add_result == ISC_R_SUCCESS) {
+						dns_dispatch_send(new_resp);
+					}
+					else {
+						perror("Could not create new dispentry!\n");
+					}
 
 /*
 	result = dns_dispatch_add(
