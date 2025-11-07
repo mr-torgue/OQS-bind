@@ -709,7 +709,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 									 resp->tlsctx_cache, resp->connected,
 									 resp->sent, resp->response, resp->arg, &(resp->id), &new_resp);
 					if (dp_add_result == ISC_R_SUCCESS) {
-						dns_dispatch_send(new_resp);
+						dns_dispatch_send(new_resp, &query_region);
 					}
 					else {
 						perror("Could not create new dispentry!\n");
