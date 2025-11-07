@@ -699,7 +699,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				isc_buffer_t *query_buffer = NULL;
 				isc_region_t query_region;
 				if (get_fragment_query_raw(disp->mgr->mctx, &buf, frag_nr, &query, &query_buffer)) {
-					isc_buffer_region(query_buffer, &query_region);
+					isc_buffer_usedregion(query_buffer, &query_region);
 					dns_dispatch_send(resp, &query_region); // dispatch new request
 				}
 				else {
