@@ -727,9 +727,9 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					if (resp->tlsctx_cache != NULL) {
 						isc_tlsctx_cache_attach(resp->tlsctx_cache, &new_resp->tlsctx_cache);
 					}
-					dns_dispatch_attach(resp->disp, &new_resp->disp); 
-					resp->disp->requests++;
-					inc_stats(resp->disp->mgr, dns_resstatscounter_disprequdp);
+					dns_dispatch_attach(disp, &new_resp->disp); 
+					disp->requests++;
+					inc_stats(disp->mgr, dns_resstatscounter_disprequdp);
 					dns_dispatch_send(resp, &query_region); // dispatch new request
 
 
