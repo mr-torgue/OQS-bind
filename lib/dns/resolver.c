@@ -266,6 +266,11 @@ typedef struct query {
 	unsigned char data[512];
 } resquery_t;
 
+void inc_resquery(void *arg) {
+	resquery_t *query = (resquery_t *)arg;
+	query->references++;
+}
+
 #if DNS_RESOLVER_TRACE
 #define resquery_ref(ptr)   resquery__ref(ptr, __func__, __FILE__, __LINE__)
 #define resquery_unref(ptr) resquery__unref(ptr, __func__, __FILE__, __LINE__)
@@ -7242,6 +7247,25 @@ betterreferral(respctx_t *rctx) {
 		}
 	}
 	return (false);
+}
+
+/*
+ * resquery_fragment_response():
+ * Handles fragments received in response to iterative queries sent by tesquery_send(). 
+ *
+ */
+static void
+resquery_fragment_response(isc_result_t eresult, isc_region_t *region, void *arg) {
+	isc_result_t result;
+	resquery_t *query = (resquery_t *)arg;
+	fetchctx_t *fctx = NULL;
+	respctx_t rctx;
+
+	if (eresult == ISC_R_CANCELED) {
+		return;
+	}
+
+	REQUIRE(VALID_QUERY(query));
 }
 
 /*

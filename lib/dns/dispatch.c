@@ -47,6 +47,8 @@
 #include <dns/transport.h>
 #include <dns/types.h>
 
+#include <dns/resolver.h>
+
 typedef ISC_LIST(dns_dispentry_t) dns_displist_t;
 
 typedef struct dns_qid {
@@ -722,6 +724,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 						.rlink = ISC_LINK_INITIALIZER,
 						.magic = RESPONSE_MAGIC,
 					};
+					inc_resquery(new_resp->arg);
 					isc_refcount_init(&new_resp->references, 1);
 					if (resp->transport != NULL) {
 						dns_transport_attach(resp->transport, &new_resp->transport);
