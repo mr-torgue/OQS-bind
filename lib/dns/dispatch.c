@@ -560,8 +560,14 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		eresult = ISC_R_CANCELED;
 	}
 
-	dispentry_log(resp, LVL(90), "read callback:%s, requests %d",
-		      isc_result_totext(eresult), disp->requests);
+	char addr_buf_peer[ISC_SOCKADDR_FORMATSIZE];
+	isc_sockaddr_format(&resp->peer, addr_buf_peer, sizeof(addr_buf_peer));
+
+	char addr_buf_local[ISC_SOCKADDR_FORMATSIZE];
+	isc_sockaddr_format(&resp->local, addr_buf_local, sizeof(addr_buf_local));
+
+	dispentry_log(resp, LVL(90), "read callback: %s, requests %d\nFrom %s to %s",
+		      isc_result_totext(eresult), disp->requests, addr_buf_peer, addr_buf_local);
 
 	if (eresult != ISC_R_SUCCESS) {
 		/*

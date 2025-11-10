@@ -7552,6 +7552,12 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			REQUIRE(region != NULL);
 			isc_buffer_init(&buf, region->base, region->length);
 			isc_buffer_add(&buf, region->length);
+
+			printf("buffer: ");
+			for (unsigned i = 0; i < region->length; i++) {
+				printf("%X ", region->base[i]);
+			}
+			printf("\n");
 		
 			// create and parse a dns message
 			// NOTE: do we need to do this
