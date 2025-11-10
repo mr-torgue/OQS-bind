@@ -7545,7 +7545,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			isc_sockaddr_format(&query->addrinfo->sockaddr, addr_buf, sizeof(addr_buf));
 
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
-				"[UDP FRAG] received fragment from %s", addr_buf); // try to add domain name
+				"[UDP FRAG] received fragment from %s for %s", addr_buf, copy->fctx->name->ndata); // try to add domain name
 
 			// convert region to buffer
 			isc_buffer_t buf;
@@ -7559,6 +7559,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			dns_message_create(fctx->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			isc_result_t result = dns_message_parse(msg, &buf, 0);
 
+			
 			// booleans for detecting if it is a fragment
 			bool is_first_fragment = query->rmessage->flags & DNS_MESSAGEFLAG_TC;
 			bool is_fragment_resp = is_fragment(fctx->mctx, msg);
@@ -7592,7 +7593,6 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			// if it is not a fragment response, we assume it is a first fragment
 			// note that this is currently not well-defined
 			else {
-				printf("Requesting %d additional fragments...\n", nr_fragments - 1);
 				copy->rmessage->fragment_nr = 0; // just to be sure
 
 				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
@@ -7601,6 +7601,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 				char *name_str = NULL;
 				//dns_name_format(copy->fctx->name, name_str, 128);
 				dns_name_tostring(copy->fctx->name, &name_str, copy->fctx->mctx);
+				printf("Requesting %d additional fragments for %s...\n", nr_fragments - 1, name_str);
 
 				for (unsigned i = 2; i <= nr_fragments; i++) {
 					/*
