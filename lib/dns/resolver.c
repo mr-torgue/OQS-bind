@@ -7603,6 +7603,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 				dns_name_tostring(copy->fctx->name, &name_str, copy->fctx->mctx);
 
 				for (unsigned i = 2; i <= nr_fragments; i++) {
+					/*
 					dns_name_t *new_name = NULL;
 					dns_message_gettempname(copy->rmessage, &new_name);
 					char new_name_str[128];
@@ -7630,6 +7631,21 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
 					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
 					dns_message_puttempname(copy->rmessage, &new_name);
+					resquery_ref(query);
+					*/
+					isc_buffer_t buf;
+					REQUIRE(region != NULL);
+					isc_buffer_init(&buf, region->base, region->length);
+					isc_buffer_add(&buf, region->length);
+					dns_message_t *new_query = NULL; 
+					isc_buffer_t *new_query_buffer = NULL;
+					isc_region_t new_query_region;
+		
+					get_fragment_query_raw(copy->fctx->mctx, &buf, i, &new_query, &new_query_buffer);
+					isc_buffer_usedregion(new_query_buffer, &new_query_region);
+					dns_dispatch_send(query->dispentry, &new_query_region);
+					//query->dispentry->handle;
+					//isc_nm_send(isc_nmhandle_t *handle, isc_region_t *region, isc_nm_cb_t cb, void *cbarg)
 				}
 			}
 			// the complete response has not been received 
