@@ -7623,6 +7623,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 						printf("%x ", new_name->ndata[i]);
 					}
 					printf("\n");
+					fctx->name = new_name;
 
 
 					isc_result_t qresult = fctx_query(fctx, query->addrinfo, 0);
