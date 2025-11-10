@@ -7534,7 +7534,114 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	 * Deal with truncated responses by retrying using TCP.
 	 */
 	if ((query->rmessage->flags & DNS_MESSAGEFLAG_TC) != 0) {
-		rctx.truncated = true;
+		bool udp_fragmentation_enabled = true;
+		if (udp_fragmentation_enabled) {
+
+
+			resquery_t *copy = query;
+
+			// get source address
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+			isc_sockaddr_format(&query->addrinfo->sockaddr, addr_buf, sizeof(addr_buf));
+
+			isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+				"[UDP FRAG] received fragment from %s", addr_buf); // try to add domain name
+
+			// convert region to buffer
+			isc_buffer_t buf;
+			REQUIRE(region != NULL);
+			isc_buffer_init(&buf, region->base, region->length);
+			isc_buffer_add(&buf, region->length);
+		
+			// create and parse a dns message
+			// NOTE: do we need to do this
+			dns_message_t *msg = NULL;
+			dns_message_create(fctx->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+			isc_result_t result = dns_message_parse(msg, &buf, 0);
+
+			// booleans for detecting if it is a fragment
+			bool is_first_fragment = query->rmessage->flags & DNS_MESSAGEFLAG_TC;
+			bool is_fragment_resp = is_fragment(fctx->mctx, msg);
+
+			// create cache key
+			unsigned char key[64];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			fcache_create_key(query->id, addr_buf, key, &keysize);
+
+			// determine the amount of fragments
+			unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
+			unsigned msg_size = estimate_message_size(msg, &total_sig_bytes, &total_dnskey_bytes, &savings);
+			unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
+			unsigned nr_fragments = get_nr_fragments(1232, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
+			printf("[UDP Fragmentation] %s has total message size %u and needs %u fragments...\n", key, msg_size, nr_fragments);
+
+			fragment_cache_entry_t *out_ce = NULL;
+			// process incoming fragment
+			if (is_fragment_resp) {
+				printf("[UDP Fragmentation] response to fragment query %lu!\n", msg->fragment_nr);		
+				REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
+				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+				if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
+					printf("[UDP Fragmentation] all fragments received!\n");
+					dns_message_t *out_msg = NULL;
+					reassemble_fragments(fctx->mctx, out_ce, &out_msg);
+					//rctx_answer(respctx_t *rctx);
+				}
+			}
+			// if it is not a fragment response, we assume it is a first fragment
+			// note that this is currently not well-defined
+			else {
+				printf("Requesting %d additional fragments...\n", nr_fragments - 1);
+				copy->rmessage->fragment_nr = 0; // just to be sure
+
+				REQUIRE(fcache_add(key, keysize, copy->rmessage, nr_fragments)); // adding should never fail
+				REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+				char *name_str = NULL;
+				//dns_name_format(copy->fctx->name, name_str, 128);
+				dns_name_tostring(copy->fctx->name, &name_str, copy->fctx->mctx);
+
+				for (unsigned i = 2; i <= nr_fragments; i++) {
+					dns_name_t *new_name = NULL;
+					dns_message_gettempname(copy->rmessage, &new_name);
+					char new_name_str[128];
+					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
+					//snprintf(new_name_str, 128, "test2.example.");
+
+					printf("new_name string (%lu): \n", strlen(new_name_str));
+					for (unsigned i = 0; i < strlen(new_name_str); i++) {
+						printf("%x ", new_name_str[i]);
+					}
+					printf("\n");
+
+					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
+					new_name->attributes.absolute = true; // needed
+					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
+					printf("new_name buffer (%u): \n", new_name->length);
+					for (unsigned i = 0; i < new_name->length; i++) {
+						printf("%x ", new_name->ndata[i]);
+					}
+					printf("\n");
+
+
+					isc_result_t qresult = fctx_query(fctx, query->addrinfo, 0);
+					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
+					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
+					dns_message_puttempname(copy->rmessage, &new_name);
+				}
+			}
+			// the complete response has not been received 
+			// make sure that the resolver does not return the data but waits for all the fragments
+			//rctx.no_response = true; // so, it does not use this answer
+			//rctx.nextitem = true;
+
+			rctx_done(&rctx, DNS_R_WAIT); // maybe DNS_R_DROP
+			return;
+		}
+		else {
+			rctx.truncated = true;
+		}
 	}
 
 	if (rctx.truncated) {
