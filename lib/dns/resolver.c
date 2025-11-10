@@ -7643,7 +7643,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		
 					get_fragment_query_raw(copy->fctx->mctx, &buf, i, &new_query, &new_query_buffer);
 					isc_buffer_usedregion(new_query_buffer, &new_query_region);
-					dns_dispatch_send(query->dispentry, &new_query_region);
+					dns_dispatch_send_fragment(query->dispentry, &new_query_region);
 					//query->dispentry->handle;
 					//isc_nm_send(isc_nmhandle_t *handle, isc_region_t *region, isc_nm_cb_t cb, void *cbarg)
 				}

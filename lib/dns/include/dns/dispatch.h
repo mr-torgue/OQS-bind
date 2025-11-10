@@ -232,6 +232,16 @@ dns_dispatch_connect(dns_dispentry_t *resp);
  *\li	'resp' is valid.
  */
 
+ void
+dns_dispatch_send_fragment(dns_dispentry_t *resp, isc_region_t *r);
+/*%<
+ * Send region 'r' using the socket in 'resp', then run the specified
+ * callback. For fragments, so final callback is not executed.
+ *
+ * Requires:
+ *\li	'resp' is valid.
+ */
+
 void
 dns_dispatch_send(dns_dispentry_t *resp, isc_region_t *r);
 /*%<

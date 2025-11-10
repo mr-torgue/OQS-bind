@@ -2116,6 +2116,26 @@ dns_dispatch_connect(dns_dispentry_t *resp) {
 }
 
 static void
+send_done_fragment(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
+	dns_dispentry_t *resp = (dns_dispentry_t *)cbarg;
+
+	REQUIRE(VALID_RESPONSE(resp));
+
+	dns_dispatch_t *disp = resp->disp;
+
+	REQUIRE(VALID_DISPATCH(disp));
+
+	dispentry_log(resp, LVL(90), "sent fragment: %s", isc_result_totext(result));
+
+	if (result != ISC_R_SUCCESS) {
+		dispentry_cancel(resp, result);
+	}
+
+	dns_dispentry_detach(&resp); /* DISPENTRY007 */
+	isc_nmhandle_detach(&handle);
+}
+
+static void
 send_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	dns_dispentry_t *resp = (dns_dispentry_t *)cbarg;
 
@@ -2206,6 +2226,29 @@ dns_dispatch_resume(dns_dispentry_t *resp, uint16_t timeout) {
 	}
 
 	UNLOCK(&disp->lock);
+}
+
+void 
+dns_dispatch_send_fragment(dns_dispentry_t *resp, isc_region_t *r) {
+	REQUIRE(VALID_RESPONSE(resp));
+	REQUIRE(VALID_DISPATCH(resp->disp));
+
+	dns_dispatch_t *disp = resp->disp;
+	isc_nmhandle_t *sendhandle = NULL;
+
+	dispentry_log(resp, LVL(90), "sending fragment");
+	switch (disp->socktype) {
+	case isc_socktype_udp:
+		isc_nmhandle_attach(resp->handle, &sendhandle);
+		break;
+	case isc_socktype_tcp:
+		isc_nmhandle_attach(disp->handle, &sendhandle);
+		break;
+	default:
+		UNREACHABLE();
+	}
+	dns_dispentry_ref(resp); /* DISPENTRY007 */
+	isc_nm_send(sendhandle, r, send_done_fragment, resp);
 }
 
 void
