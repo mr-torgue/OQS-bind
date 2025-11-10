@@ -7553,7 +7553,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 			isc_buffer_init(&buf, region->base, region->length);
 			isc_buffer_add(&buf, region->length);
 
-			printf("buffer: ");
+			printf("buffer (%u): ", region->length);
 			for (unsigned i = 0; i < region->length; i++) {
 				printf("%X ", region->base[i]);
 			}
