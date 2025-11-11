@@ -65,6 +65,44 @@ static void compare_buffers(isc_buffer_t *a, isc_buffer_t *b) {
     }
 }
 
+static unsigned char* load_binary_file(const char* filename, size_t* out_size) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        perror("Failed to open file");
+        return NULL;
+    }
+
+    // get file size
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    if (file_size < 0) {
+        perror("Failed to get file size");
+        fclose(file);
+        return NULL;
+    }
+
+    fprintf(stderr, "file_size: %ld\n", file_size);
+    unsigned char* buffer = (unsigned char*)isc_mem_get(mctx, file_size);
+    if (!buffer) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return NULL;
+    }
+    size_t bytes_read = fread(buffer, 1, file_size, file);
+    if (bytes_read != (size_t)file_size) {
+        perror("Failed to read file");
+        isc_mem_put(mctx, buffer, file_size);
+        fclose(file);
+        return NULL;
+    }
+
+    fclose(file);
+    *out_size = file_size;
+    return buffer;
+}
+
 // tests basic insertion and deletion
 ISC_LOOP_TEST_IMPL(basic) {
     
@@ -221,7 +259,67 @@ ISC_LOOP_TEST_IMPL(basic) {
 
 // tests the fragmentation cache with real dns messages
 ISC_LOOP_TEST_IMPL(real_dns_messages) {
+    // initialize
+    assert_true(loopmgr != NULL);
+    assert_true(mctx != NULL);
+    fcache_init(mainloop);
+    
+    // set up a dns message with random buffer
+    dns_message_t *msg = NULL;
+    isc_buffer_t *buffer = NULL;
 
+    const char *filename = "testdata/message/response1-falcon512";
+    const char *src_address = "1.2.3.4";
+    unsigned buffer_size;
+    buffer = load_binary_file(filename, &buffer_size);
+
+    if(buffer != NULL) {
+        printf("buffer_size: %lu\n", buffer_size);
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        printf("buf used: %d\n", buf.used);
+        printf("buf used: %d\n", buf.length);
+        //isc_buffer_printf(&buf, "aa");
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, 0);
+        printf("msgid: %d\n", msg->id);
+
+        unsigned nr_fragments = 5;
+        unsigned keysize = 96;
+        unsigned char key[keysize];
+        unsigned char key_non_exist[keysize];
+        strcpy((char *)key, "thisisakey!");
+        strcpy((char *)key_non_exist, "thisisalsoakey!");
+        
+        // outputs
+        bool res;
+        isc_buffer_t *out = NULL;
+        fragment_cache_entry_t *out_ce;
+
+        assert_int_equal(fcache_count(), 0);
+        // add new message to cache
+        res = fcache_add(key, keysize, msg, nr_fragments);
+        assert_true(res);
+        assert_int_equal(fcache_count(), 1);
+        out_ce = NULL;
+        res = fcache_get(key, keysize, &out_ce);
+        assert_true(res);
+        assert_int_equal(out_ce->nr_fragments, nr_fragments);
+        assert_int_equal(out_ce->bitmap, 1); // 000001
+        printf("fragment size: %u, expected: %u\n", out_ce->fragments[0]->used, msg->saved.length);
+        //assert_int_equal(msg->saved.length, out_ce->fragments[0]->used);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+    fcache_deinit();
+	isc_loopmgr_shutdown(loopmgr);
 }
 
 ISC_LOOP_TEST_IMPL(expire) {
@@ -293,6 +391,7 @@ ISC_LOOP_TEST_IMPL(purge) {
 
 ISC_TEST_LIST_START
 ISC_TEST_ENTRY_CUSTOM(basic, setup_test, teardown_test)
+ISC_TEST_ENTRY_CUSTOM(real_dns_messages, setup_test, teardown_test)
 //ISC_TEST_ENTRY_CUSTOM(expire, setup_test, teardown_test)
 //ISC_TEST_ENTRY_CUSTOM(purge, setup_test, teardown_test)
 // ISC_TEST_ENTRY_CUSTOM(duplicate fragment, setup_test, teardown_test)

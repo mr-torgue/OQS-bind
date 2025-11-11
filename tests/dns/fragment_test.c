@@ -83,8 +83,6 @@ static void compare_buffers(isc_buffer_t *a, isc_buffer_t *b) {
     }
 }
 
-
-
 static unsigned char* load_binary_file(const char* filename, size_t* out_size) {
     FILE* file = fopen(filename, "rb");
     if (!file) {

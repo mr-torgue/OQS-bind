@@ -130,6 +130,7 @@ bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsig
     else {
         isc_buffer_t tmp_buf;
         isc_buffer_init(&tmp_buf, frag->saved.base, frag->saved.length);
+        isc_buffer_add(&tmp_buf, frag->saved.length);
         isc_buffer_dup(frag_mctx, &frag_buf, &tmp_buf);
     }
 
