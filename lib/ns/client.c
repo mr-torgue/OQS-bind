@@ -686,7 +686,7 @@ renderend:
 		dns_message_t *msg = NULL;
 		unsigned long frag_nr = client->message->fragment_nr;
 		printf("[NS] getting %s from cache...\n", key);
-		if(fcache_get_fragment(key, keysize, frag_nr - 1, &out_frag)) {
+		if(fcache_get_fragment(key, keysize, frag_nr, &out_frag)) {
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			buffer = *out_frag;
 			dns_message_parse(msg, out_frag, 0);

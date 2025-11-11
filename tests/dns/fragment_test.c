@@ -173,13 +173,13 @@ ISC_RUN_TEST_IMPL(is_fragment_test) {
     } FragmentTestcase;
 
     FragmentTestcase testcases[] = {
-        {"?1?test.com", true, 1, true},
-        {"?12?.somethingsomething.com.com.com", true, 12, true},
+        {"?1?test.com", true, 0, true},
+        {"?12?.somethingsomething.com.com.com", true, 11, true},
         {"example.ca", false, 0, true},
         {"?some.xyz", false, 0, true},
         {"?12af?.example.com", false, 0, true}, // not a number between ??
         {"something.?12?example.com", false, 0, true}, // should start with fragment
-        {"?1243?.dfhhdjjhhd.com", true, 1243, true},
+        {"?1243?.dfhhdjjhhd.com", true, 1242, true},
         {"a?1243?.com", false, 0, true},
         {"?1243?..com", false, 0, false}, // invalid qname
     };

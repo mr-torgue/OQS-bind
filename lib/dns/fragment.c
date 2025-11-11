@@ -152,7 +152,7 @@ bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
             }
             else {
                 // fragment found, set msg values
-                msg->fragment_nr = nr;
+                msg->fragment_nr = nr - 1;
                 msg->is_fragment = true;
                 // TODO: parse qname
                 success = true;
