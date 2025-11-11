@@ -2254,11 +2254,6 @@ dns_dispatch_send_fragment(dns_dispentry_t *resp, isc_region_t *r) {
 		UNREACHABLE();
 	}
 
-	if (!resp->reading) {
-		udp_startrecv(sendhandle, resp);
-		resp->reading = true;
-	}
-
 	dns_dispentry_ref(resp); /* DISPENTRY007 */
 	isc_nm_send(sendhandle, r, send_done_fragment, resp);
 }
