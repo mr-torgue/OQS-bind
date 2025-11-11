@@ -567,18 +567,19 @@ isc__nm_udp_read_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 	req->uvbuf.base = buf->base;
 	req->uvbuf.len = nrecv;
 
-	sock->reading = false;
+
+	//sock->reading = false;
 
 	/*
 	 * The client isc_nm_read() expects just a single message, so we need to
 	 * stop reading now.  The reading could be restarted in the read
 	 * callback with another isc_nm_read() call.
 	 */
-	if (sock->client) {
-		isc__nmsocket_timer_stop(sock);
-		isc__nm_stop_reading(sock);
-		isc__nmsocket_clearcb(sock);
-	}
+	//if (sock->client) {
+	//	isc__nmsocket_timer_stop(sock);
+//		isc__nm_stop_reading(sock);
+//		isc__nmsocket_clearcb(sock);
+//	}
 
 	REQUIRE(!sock->processing);
 	sock->processing = true;
