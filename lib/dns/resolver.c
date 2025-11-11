@@ -4903,8 +4903,8 @@ same_question(fetchctx_t *fctx, dns_message_t *message) {
 	INSIST(ISC_LIST_NEXT(rdataset, link) == NULL);
 
 	if (fctx->type != rdataset->type ||
-	    fctx->res->rdclass != rdataset->rdclass ||
-	    !dns_name_equal(fctx->name, name))
+	    fctx->res->rdclass != rdataset->rdclass) // ||
+	    //!dns_name_equal(fctx->name, name))
 	{
 		char namebuf[DNS_NAME_FORMATSIZE];
 		char classbuf[DNS_RDATACLASS_FORMATSIZE];
@@ -7247,25 +7247,6 @@ betterreferral(respctx_t *rctx) {
 		}
 	}
 	return (false);
-}
-
-/*
- * resquery_fragment_response():
- * Handles fragments received in response to iterative queries sent by tesquery_send(). 
- *
- */
-static void
-resquery_fragment_response(isc_result_t eresult, isc_region_t *region, void *arg) {
-	isc_result_t result;
-	resquery_t *query = (resquery_t *)arg;
-	fetchctx_t *fctx = NULL;
-	respctx_t rctx;
-
-	if (eresult == ISC_R_CANCELED) {
-		return;
-	}
-
-	REQUIRE(VALID_QUERY(query));
 }
 
 /*

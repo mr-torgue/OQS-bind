@@ -41,6 +41,7 @@
 
 #include "../loop_p.h"
 
+
 #define ISC_NETMGR_TID_UNKNOWN -1
 
 /*

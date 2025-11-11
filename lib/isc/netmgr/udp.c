@@ -31,6 +31,8 @@
 #include <isc/util.h>
 #include <isc/uv.h>
 
+
+
 #include "../loop_p.h"
 #include "netmgr-int.h"
 
@@ -566,6 +568,7 @@ isc__nm_udp_read_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 	 */
 	req->uvbuf.base = buf->base;
 	req->uvbuf.len = nrecv;
+
 
 
 	//sock->reading = false;
