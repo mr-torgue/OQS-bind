@@ -309,7 +309,7 @@ ISC_LOOP_TEST_IMPL(real_dns_messages) {
         assert_int_equal(out_ce->nr_fragments, nr_fragments);
         assert_int_equal(out_ce->bitmap, 1); // 000001
         printf("fragment size: %u, expected: %u\n", out_ce->fragments[0]->used, msg->saved.length);
-        //assert_int_equal(msg->saved.length, out_ce->fragments[0]->used);
+        assert_int_equal(msg->saved.length, out_ce->fragments[0]->used);
 
         // clean up
         dns_message_detach(&msg);

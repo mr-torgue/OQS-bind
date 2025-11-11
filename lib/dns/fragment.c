@@ -739,11 +739,15 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
                                         }
                                     }
                                     rdataset_msg = ISC_LIST_NEXT(rdataset_msg, link);
-                                    tresult_msg = dns_rdataset_first(rdataset_msg); // reset to first rdata
+                                    if(rdataset_msg != NULL) {
+                                        tresult_msg = dns_rdataset_first(rdataset_msg); // reset to first rdata
+                                    }
                                 }
                                 result_msg = dns_message_nextname(*out_msg, section); 
-                                rdataset_msg = ISC_LIST_HEAD(name_msg->list); // reset to first rdataset 
-                                tresult_msg = dns_rdataset_first(rdataset_msg); // reset to first rdata
+                                if (result_msg == ISC_R_SUCCESS) {
+                                    rdataset_msg = ISC_LIST_HEAD(name_msg->list); // reset to first rdataset 
+                                    tresult_msg = dns_rdataset_first(rdataset_msg); // reset to first rdata
+                                }
                             }
                             //REQUIRE(false); // there should always be a match
                             next_rr:
