@@ -16,8 +16,10 @@
 
 
 // renders a fragment: meaning turning it from
-// allocates MAXUDP bytes (usually 1232) 
-static isc_result_t render_fragment(isc_mem_t *mctx, dns_message_t **messagep) {
+// allocates msg_size bytes 
+// for fragments usually 1232
+// for complete messages number of fragments * 1232
+static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep) {
     printf("Rendering...\n");
     REQUIRE((*messagep)->buffer == NULL); // otherwise it is already rendered
 	REQUIRE((*messagep)->from_to_wire == DNS_MESSAGE_INTENTRENDER);
@@ -25,7 +27,7 @@ static isc_result_t render_fragment(isc_mem_t *mctx, dns_message_t **messagep) {
     // REQUIRE(..) // check if ready for rendering (do not know how...) 
     // dynamic allocation, so we can attach to the message
 	isc_buffer_t *buffer = NULL;
-    isc_buffer_allocate(mctx, &buffer, 4096);
+    isc_buffer_allocate(mctx, &buffer, msg_size);
 	isc_result_t result;
 	dns_message_t *message = *messagep;
 	dns_compress_t cctx;
@@ -618,7 +620,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         printf("Adding Fragment %d to cache...\n", frag_nr);
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
         //render_message(mctx, &msg);
-        render_fragment(mctx, &frag);
+        render_fragment(mctx, 1232, &frag);
         //printmessage(mctx, frag);
         fcache_add(key, keysize, frag, nr_fragments);
         dns_message_detach(&frag);
@@ -762,6 +764,6 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     // would be slightly more efficient to do this in the loop
     fcache_remove(entry->key, entry->keysize);
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-    render_fragment(mctx, out_msg);
+    render_fragment(mctx,  entry->nr_fragments * 1232, out_msg);
     return true;
 }
