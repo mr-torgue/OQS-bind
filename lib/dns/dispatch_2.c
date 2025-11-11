@@ -724,7 +724,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	
 				get_fragment_query_raw(disp->mgr->mctx, &buf, i, &new_query, &new_query_buffer);
 				isc_buffer_usedregion(new_query_buffer, &new_query_region);
-				dns_dispatch_send_fragment(resp, &new_query_region);
+				dns_dispatch_send_fragment(disp, &new_query_region);
 			}
 		}
 		// the complete response has not been received 
