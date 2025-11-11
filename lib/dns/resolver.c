@@ -7574,6 +7574,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 					printf("[UDP Fragmentation] all fragments received!\n");
 					dns_message_t *out_msg = NULL;
 					reassemble_fragments(fctx->mctx, out_ce, &out_msg);
+					query->rmessage = out_msg;
+					region->base = out_msg->buffer->base;
+					region->length = out_msg->buffer->used;
+					goto continue_frag;
 					//rctx_answer(respctx_t *rctx);
 				}
 			}
@@ -7591,36 +7595,7 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 				printf("Requesting %d additional fragments for %s...\n", nr_fragments - 1, name_str);
 
 				for (unsigned i = 2; i <= nr_fragments; i++) {
-					/*
-					dns_name_t *new_name = NULL;
-					dns_message_gettempname(copy->rmessage, &new_name);
-					char new_name_str[128];
-					snprintf(new_name_str, 128, "?%u?%s", i, name_str);
-					//snprintf(new_name_str, 128, "test2.example.");
 
-					printf("new_name string (%lu): \n", strlen(new_name_str));
-					for (unsigned i = 0; i < strlen(new_name_str); i++) {
-						printf("%x ", new_name_str[i]);
-					}
-					printf("\n");
-
-					dns_name_fromstring(new_name, new_name_str, NULL, 0, copy->fctx->mctx);
-					new_name->attributes.absolute = true; // needed
-					printf("Sending query for: %s (%u)\n", new_name->ndata, new_name->length);
-					printf("new_name buffer (%u): \n", new_name->length);
-					for (unsigned i = 0; i < new_name->length; i++) {
-						printf("%x ", new_name->ndata[i]);
-					}
-					printf("\n");
-					dns_name_copy(new_name, fctx->name);
-
-
-					isc_result_t qresult = fctx_query(fctx, query->addrinfo, 0);
-					printf("qresult==ISC_R_SUCCESS: %u\n", qresult == ISC_R_SUCCESS);
-					printf("qresult==ISC_R_TIMEDOUT: %u\n", qresult == ISC_R_TIMEDOUT);
-					dns_message_puttempname(copy->rmessage, &new_name);
-					resquery_ref(query);
-					*/
 					isc_buffer_t buf;
 					REQUIRE(region != NULL);
 					isc_buffer_init(&buf, region->base, region->length);
@@ -7662,6 +7637,8 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 		rctx_done(&rctx, result);
 		return;
 	}
+
+continue_frag:
 
 	/*
 	 * Is it a query response?
