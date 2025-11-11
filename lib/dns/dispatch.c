@@ -636,6 +636,103 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	}
 
 	/*
+	 * Handle UDP fragmentation here
+	 */
+	bool udp_fragmentation_enabled = true;
+	bool is_any_fragment = (flags & DNS_MESSAGEFLAG_TC) != 0;
+	if(udp_fragmentation_enabled && is_any_fragment) {
+
+		// get source address
+		char from_addr_buf[ISC_SOCKADDR_FORMATSIZE];
+		char to_addr_buf[ISC_SOCKADDR_FORMATSIZE];
+		isc_sockaddr_format(&resp->peer, from_addr_buf, sizeof(from_addr_buf));
+		isc_sockaddr_format(&resp->local, to_addr_buf, sizeof(to_addr_buf));
+
+		isc_log_write(dns_lctx, DNS_LOGCATEGORY_RESOLVER, DNS_LOGMODULE_RESOLVER, ISC_LOG_DEBUG(3),
+			"[UDP FRAG] received fragment from %s to %s", from_addr_buf, to_addr_buf); // try to add domain name
+
+		// convert region to buffer
+		isc_buffer_t buf;
+		REQUIRE(region != NULL);
+		isc_buffer_init(&buf, region->base, region->length);
+		isc_buffer_add(&buf, region->length);
+	
+		// create and parse a dns message
+		// NOTE: do we need to do this
+		dns_message_t *msg = NULL;
+		dns_message_create(disp->mgr->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+		isc_result_t result = dns_message_parse(msg, &buf, 0);
+		if (msg->counts[DNS_SECTION_QUESTION] > 0) {
+			printf("[UDP FRAG] Parse msg with name %s...\n", msg->sections[0].head->ndata);
+		}
+		else {
+			printf("[UDP FRAG] No name ofund in question\n");
+		}
+
+		// booleans for detecting if it is a fragment
+		bool is_fragment_resp = is_fragment(disp->mgr->mctx, msg);
+		bool is_first_fragment = is_any_fragment && !is_fragment_resp; // is_fragment_resp is false for the first fragment
+
+		// create cache key
+		unsigned char key[64];
+		unsigned keysize = sizeof(key) / sizeof(key[0]);
+		fcache_create_key(id, to_addr_buf, key, &keysize);
+
+		// determine the amount of fragments
+		unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
+		unsigned msg_size = estimate_message_size(msg, &total_sig_bytes, &total_dnskey_bytes, &savings);
+		unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
+		unsigned nr_fragments = get_nr_fragments(1232, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
+		printf("[UDP Fragmentation] %s has total message size %u and needs %u fragments...\n", key, msg_size, nr_fragments);
+
+		fragment_cache_entry_t *out_ce = NULL;
+		// process incoming fragment
+		if (is_fragment_resp) {
+			printf("[UDP Fragmentation] response to fragment query %lu!\n", msg->fragment_nr);		
+			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+			if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
+				printf("[UDP Fragmentation] all fragments received!\n");
+				dns_message_t *out_msg = NULL;
+				reassemble_fragments(disp->mgr->mctx, out_ce, &out_msg);
+				printf("[UDP FRAG] Final buffer length: %u\n", out_msg->buffer->used);
+				region->base = out_msg->buffer->base;
+				region->length = out_msg->buffer->used;
+				
+				goto done;
+			}
+		}
+		// if it is not a fragment response, we assume it is a first fragment
+		// note that this is currently not well-defined
+		else {
+			
+			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+
+			printf("Requesting %d additional fragments...\n", nr_fragments - 1);
+
+			for (unsigned i = 2; i <= nr_fragments; i++) {
+
+				isc_buffer_t buf;
+				REQUIRE(region != NULL);
+				isc_buffer_init(&buf, region->base, region->length);
+				isc_buffer_add(&buf, region->length);
+				dns_message_t *new_query = NULL; 
+				isc_buffer_t *new_query_buffer = NULL;
+				isc_region_t new_query_region;
+	
+				get_fragment_query_raw(disp->mgr->mctx, &buf, i, &new_query, &new_query_buffer);
+				isc_buffer_usedregion(new_query_buffer, &new_query_region);
+				dns_dispatch_send_fragment(disp, &new_query_region);
+			}
+		}
+		// the complete response has not been received 
+		// make sure that the resolver does not return the data but waits for all the fragments
+		goto next;
+	}
+
+	/*
 	 * We have the right resp, so call the caller back.
 	 */
 	goto done;
