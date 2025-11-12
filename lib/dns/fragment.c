@@ -19,8 +19,14 @@
 // allocates msg_size bytes 
 // for fragments usually 1232
 // for complete messages number of fragments * 1232
+// TODO:
+// 1. Better error handling
+// 2. Return proper result
+// 3. Fix issue with TC flag
 static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep) {
     printf("Rendering...\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+        "Rendering message %u with buffer size %u", (*messagep)->id, msg_size); 
     REQUIRE((*messagep)->buffer == NULL); // otherwise it is already rendered
 	REQUIRE((*messagep)->from_to_wire == DNS_MESSAGE_INTENTRENDER);
 
@@ -39,67 +45,26 @@ static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_mess
 
 	dns_compress_init(&cctx, mctx, 0);
 
-    printf("Render begin\n");
 	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
 
     // always the same order
-    unsigned options = DNS_MESSAGERENDER_ORDERED; // | DNS_MESSAGERENDER_PARTIAL;
-    printf("Render question\n");
+    //unsigned options = DNS_MESSAGERENDER_ORDERED; 
 	REQUIRE(dns_message_rendersection(message, DNS_SECTION_QUESTION, 0) == ISC_R_SUCCESS);
-
-    printf("Render answer\n");
     REQUIRE(dns_message_rendersection(message, DNS_SECTION_ANSWER, 0) == ISC_R_SUCCESS);
-
-    printf("Render authority\n");
 	REQUIRE(dns_message_rendersection(message, DNS_SECTION_AUTHORITY, 0) == ISC_R_SUCCESS);
-
-    printf("Render additional\n");
 	REQUIRE(dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, 0) == ISC_R_SUCCESS);
-
-    printf("Render end\n");
     message->flags &= ~DNS_MESSAGEFLAG_TC; // disable TC to trick renderend to render complete message
-	dns_message_renderend(message);
+	REQUIRE(dns_message_renderend(message) == ISC_R_SUCCESS);
 
 	dns_compress_invalidate(&cctx);
-    printf("Finished rendering...\n");
-    printf("buffer length: %d\n", buffer->length);
-    printf("buffer used: %d\n", buffer->used);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+        "Finished rendering, stored %u bytes in msg->buffer", buffer->used); 
     message->buffer = buffer;
     dns_message_takebuffer(message, &buffer); // use buffer, the pointer will be set to NULL (message->buffer should still work)
 
     message->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
     *(unsigned short *)(message->buffer->base + 1) |=  DNS_MESSAGEFLAG_TC; // buffer was not updated, so do it here
     return (result);
-
-cleanup:
-	dns_compress_invalidate(&cctx);
-	return (result);
-}
-
-
-static void printmessage(isc_mem_t *mctx, dns_message_t *msg) {
-	isc_buffer_t b;
-	char *buf = NULL;
-	int len = 1024;
-	isc_result_t result = ISC_R_SUCCESS;
-
-	do {
-		buf = isc_mem_get(mctx, len);
-
-		isc_buffer_init(&b, buf, len);
-		result = dns_message_totext(msg, &dns_master_style_debug, 0,
-					    &b);
-		if (result == ISC_R_NOSPACE) {
-			isc_mem_put(mctx, buf, len);
-			len *= 2;
-		} else if (result == ISC_R_SUCCESS) {
-			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
-		}
-	} while (result == ISC_R_NOSPACE);
-
-	if (buf != NULL) {
-		isc_mem_put(mctx, buf, len);
-	}
 }
 
 // TODO: remove mctx and use an array for name

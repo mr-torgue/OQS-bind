@@ -31,7 +31,8 @@ isc_logcategory_t dns_categories[] = {
 	{ "rate-limit", 0 },	{ "cname", 0 },
 	{ "spill", 0 },		{ "dnstap", 0 },
 	{ "zoneload", 0 },	{ "nsid", 0 },
-	{ "rpz-passthru", 0 },	{ NULL, 0 }
+	{ "rpz-passthru", 0 }, { "UDP-fragmentation", 0 },
+	{ NULL, 0 }
 };
 
 /*%
@@ -50,7 +51,7 @@ isc_logmodule_t dns_modules[] = {
 	{ "dns/unused1", 0 },	 { "dns/dlz", 0 },	{ "dns/dnssec", 0 },
 	{ "dns/crypto", 0 },	 { "dns/packets", 0 },	{ "dns/nta", 0 },
 	{ "dns/dyndb", 0 },	 { "dns/dnstap", 0 },	{ "dns/ssu", 0 },
-	{ "dns/qp", 0 },	 { NULL, 0 },
+	{ "dns/qp", 0 },	 { "dns/fragment", 0 }, { "dns/fcache", 0 }, { NULL, 0 },
 };
 
 isc_log_t *dns_lctx = NULL;

@@ -43,6 +43,7 @@ extern isc_logmodule_t	 dns_modules[];
 #define DNS_LOGCATEGORY_ZONELOAD      (&dns_categories[16])
 #define DNS_LOGCATEGORY_NSID	      (&dns_categories[17])
 #define DNS_LOGCATEGORY_RPZ_PASSTHRU  (&dns_categories[18])
+#define DNS_LOGCATEGORY_FRAGMENTATION  (&dns_categories[19])
 
 /* Backwards compatibility. */
 #define DNS_LOGCATEGORY_GENERAL ISC_LOGCATEGORY_GENERAL
@@ -81,6 +82,8 @@ extern isc_logmodule_t	 dns_modules[];
 #define DNS_LOGMODULE_DNSTAP	 (&dns_modules[31])
 #define DNS_LOGMODULE_SSU	 (&dns_modules[32])
 #define DNS_LOGMODULE_QP	 (&dns_modules[33])
+#define DNS_LOGMODULE_FRAGMENT	 (&dns_modules[34])
+#define DNS_LOGMODULE_FCACHE	 (&dns_modules[35])
 
 ISC_LANG_BEGINDECLS
 

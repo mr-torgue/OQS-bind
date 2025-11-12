@@ -19,6 +19,32 @@ unsigned calc_rrsig_header_size(dns_rdata_t *rdata) {
     return ++header_size;
 }
 
+void printmessage(isc_mem_t *mctx, dns_message_t *msg) {
+	isc_buffer_t b;
+	char *buf = NULL;
+	int len = 1024;
+	isc_result_t result = ISC_R_SUCCESS;
+
+	do {
+		buf = isc_mem_get(mctx, len);
+
+		isc_buffer_init(&b, buf, len);
+		result = dns_message_totext(msg, &dns_master_style_debug, 0,
+					    &b);
+		if (result == ISC_R_NOSPACE) {
+			isc_mem_put(mctx, buf, len);
+			len *= 2;
+		} else if (result == ISC_R_SUCCESS) {
+			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
+		}
+	} while (result == ISC_R_NOSPACE);
+
+	if (buf != NULL) {
+		isc_mem_put(mctx, buf, len);
+	}
+}
+
+
 bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, dns_message_t **question, isc_buffer_t **question_buffer) {
     REQUIRE(question != NULL && *question == NULL);
     REQUIRE(question_buffer != NULL && *question_buffer == NULL);
