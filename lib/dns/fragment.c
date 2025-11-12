@@ -765,5 +765,8 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     fcache_remove(entry->key, entry->keysize);
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
     render_fragment(mctx,  entry->nr_fragments * 1232, out_msg);
+    // unset the TC flag
+    (*out_msg)->flags &= ~DNS_MESSAGEFLAG_TC;
+    *(unsigned short *)((*out_msg)->buffer->base + 1) &= ~DNS_MESSAGEFLAG_TC;
     return true;
 }
