@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <isc/buffer.h>
+#include <isc/log.h>
 #include <isc/mem.h>
 #include <isc/util.h>
 #include <isc/atomic.h>
@@ -10,13 +11,15 @@
 
 // schedules a time event after interval seconds
 static void fcache_schedule_timer(isc_time_t *interval) {
-    printf("Setting timer at %d seconds...\n", isc_time_seconds(interval));
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Setting timer at %d seconds...", isc_time_seconds(interval)); 
     isc_timer_start(expiry_timer, isc_timertype_ticker, interval);
 }
 
 // callback when a timer goes off
 static void fcache_timer_cb(void *arg) {
-    printf("Executing callback...\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Executing callback..."); 
     /*
     isc_time_t now = isc_time_now();
     fragment_cache_entry_t *entry, *next;
@@ -48,7 +51,8 @@ static void fcache_timer_cb(void *arg) {
 }
 
 void fcache_init(isc_loop_t *loop) {
-    printf("Initializing fragment cache...\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Initializing fragment cache..."); 
     REQUIRE(loop != NULL);
     REQUIRE(frag_mctx == NULL);
     REQUIRE(fragment_cache == NULL);
@@ -68,7 +72,8 @@ void fcache_init(isc_loop_t *loop) {
 }
 
 void fcache_deinit(void) {    
-    printf("Deinitializing fragment cache...\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Deinitializing fragment cache..."); 
     isc_timer_destroy(&expiry_timer);
     // empty expiry list
     //while (!ISC_LIST_EMPTY(expiry_list)) {
@@ -81,7 +86,8 @@ void fcache_deinit(void) {
 
 
 bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
-    printf("Adding fragment cache entry with key %s (%u)...\n", (char *)key, keysize);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Adding fragment cache entry with key %s (%u)...", (char *)key, keysize); 
     REQUIRE(frag->buffer != NULL || frag->saved.base != NULL);
     // lookup in cache
     fragment_cache_entry_t *entry = NULL;
@@ -113,7 +119,8 @@ bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsig
     }
 
     if (frag->fragment_nr >= entry->nr_fragments) {
-        fprintf(stderr, "Can only add  where fragment_nr < nr_fragments.\nfragment_nr: %lu, nr_fragments: %u\n", frag->fragment_nr, entry->nr_fragments);
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+            "Can only add  where fragment_nr < nr_fragments: fragment_nr: %lu, nr_fragments: %u", frag->fragment_nr, entry->nr_fragments); 
         return false;
     }
 
@@ -141,7 +148,8 @@ bool fcache_add(unsigned char *key, unsigned keysize, dns_message_t *frag, unsig
 }
 
 bool fcache_remove(unsigned char *key, unsigned keysize) {
-    printf("Removing entry with key %s...\n", (char *)key);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Removing entry with key %s...", (char *)key); 
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
         // remove from hash table and free memory
@@ -149,16 +157,19 @@ bool fcache_remove(unsigned char *key, unsigned keysize) {
             fcache_free_entry(entry);
             return true;
         }   
-        fprintf(stderr, "Could not delete element with key: %s\n", key);
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+            "Could not delete element with key: %s", key); 
         return false;
     }
-    fprintf(stderr, "could not find element with key: %s\n", key);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "could not find element with key: %s", key); 
     return false;
 }
 
 
 bool fcache_remove_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr) {
-    printf("Removing fragment %u with key %s...\n", fragment_nr, (char *)key);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Removing fragment %u with key %s...", fragment_nr, (char *)key); 
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
         if(entry->bitmap & (1 << fragment_nr)) {
@@ -166,36 +177,43 @@ bool fcache_remove_fragment(unsigned char *key, unsigned keysize, unsigned fragm
             entry->bitmap &= ~(1 << fragment_nr);
             return true;
         }
-        fprintf(stderr, "Could not find fragment in cache entry: %s\n", key);
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+            "Could not find fragment in cache entry: %s", key); 
         return false;
     }
-    fprintf(stderr, "Could not find cache entry!\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Could not find cache entry!"); 
     return false;
 }
 
 bool fcache_get(unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry) {
-    printf("Getting fragment cache entry with key %s (%u)...\n", (char *)key, keysize);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Getting fragment cache entry with key %s (%u)...", (char *)key, keysize); 
     REQUIRE(*out_cache_entry == NULL);
     return (isc_ht_find(fragment_cache, key, keysize, (void **)out_cache_entry) == ISC_R_SUCCESS);
 }
 
 bool fcache_get_fragment(unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    printf("Getting fragment %u with key %s... (%u)\n", fragment_nr, (char *)key, keysize);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fragment_cache, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
         if(entry->bitmap & (1 << fragment_nr)) {
             *out_frag = entry->fragments[fragment_nr];
             return true;
         }
-        fprintf(stderr, "Could not find fragment!\n");
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+            "Could not find fragment %u!", fragment_nr);
         return false;
     }
-    fprintf(stderr, "Could not find cache entry!\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Could not find cache entry!");
     return false; 
 }
 
 bool fcache_purge(void) {
-    printf("Purging fragment cache...\n");
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Purging fragment cache...");
     isc_ht_iter_t *iterator = NULL;
     isc_ht_iter_create(fragment_cache, &iterator);
     isc_result_t res = isc_ht_iter_first(iterator);
@@ -211,6 +229,5 @@ bool fcache_purge(void) {
 }
 
 unsigned fcache_count(void) {
-    // check with expiry_list?
     return isc_ht_count(fragment_cache);
 }

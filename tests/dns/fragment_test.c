@@ -130,33 +130,6 @@ static void printbuffer(unsigned char *buffer, size_t buffer_size) {
     printf("\n");
 }
 
-// prints a DNS message properly
-// copied from somewhere else
-static void printmessage(dns_message_t *msg) {
-	isc_buffer_t b;
-	char *buf = NULL;
-	int len = 1024;
-	isc_result_t result = ISC_R_SUCCESS;
-
-	do {
-		buf = isc_mem_get(mctx, len);
-
-		isc_buffer_init(&b, buf, len);
-		result = dns_message_totext(msg, &dns_master_style_debug, 0,
-					    &b);
-		if (result == ISC_R_NOSPACE) {
-			isc_mem_put(mctx, buf, len);
-			len *= 2;
-		} else if (result == ISC_R_SUCCESS) {
-			printf("%.*s\n", (int)isc_buffer_usedlength(&b), buf);
-		}
-	} while (result == ISC_R_NOSPACE);
-
-	if (buf != NULL) {
-		isc_mem_put(mctx, buf, len);
-	}
-}
-
 
 ISC_RUN_TEST_IMPL(is_fragment_test) {
     dns_message_t *msg = NULL;
@@ -252,7 +225,7 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
         dns_message_parse(msg, &buf, 0);
         printf("msgid: %d\n", msg->id);
         //printbuffer(buffer, buffer_size);
-        printmessage(msg);
+        printmessage(mctx, msg);
 
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -290,7 +263,7 @@ ISC_RUN_TEST_IMPL(estimate_message_size_test) {
         dns_message_parse(msg, &buf, 0);
         printf("msgid: %d\n", msg->id);
         //printbuffer(buffer, buffer_size);
-        printmessage(msg);
+        printmessage(mctx, msg);
 
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -342,7 +315,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         dns_message_parse(msg, &buf, 0);
         printf("msgid: %d\n", msg->id);
         //printbuffer(buffer, buffer_size);
-        printmessage(msg);
+        printmessage(mctx, msg);
         // create key
         unsigned char key[64];
         unsigned keysize = sizeof(key) / sizeof(key[0]);
