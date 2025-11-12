@@ -696,6 +696,7 @@ renderend:
 		}
 		else {
 			printf("[NS] key not found!\n");
+			ns_client_error(client, DNS_R_FORMERR);
 			return;
 		}
 	}
