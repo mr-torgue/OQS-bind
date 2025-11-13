@@ -213,19 +213,13 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
     buffer = load_binary_file(filename, &buffer_size);
 
     if(buffer != NULL) {
-        printf("buffer_size: %lu\n", buffer_size);
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
-        printf("buf used: %d\n", buf.used);
-        printf("buf used: %d\n", buf.length);
         //isc_buffer_printf(&buf, "aa");
         msg = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
         dns_message_parse(msg, &buf, 0);
-        printf("msgid: %d\n", msg->id);
-        //printbuffer(buffer, buffer_size);
-        printmessage(mctx, msg);
 
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -246,24 +240,19 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
 }
 
 ISC_RUN_TEST_IMPL(estimate_message_size_test) {
+    // Frag 1 should contain 2 sigs and 2 keys (falcon-512)
     const char *filename = "testdata/message/frag1_response1-falcon512";
     const char *src_address = "1.2.3.4";
     buffer = load_binary_file(filename, &buffer_size);
 
     if(buffer != NULL) {
-        printf("buffer_size: %lu\n", buffer_size);
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
-        printf("buf used: %d\n", buf.used);
-        printf("buf used: %d\n", buf.length);
         //isc_buffer_printf(&buf, "aa");
         msg = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
         dns_message_parse(msg, &buf, 0);
-        printf("msgid: %d\n", msg->id);
-        //printbuffer(buffer, buffer_size);
-        printmessage(mctx, msg);
 
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -272,6 +261,36 @@ ISC_RUN_TEST_IMPL(estimate_message_size_test) {
         assert_int_equal(msgsize, 3244);
         assert_int_equal(total_size_sig_rr, 1332);
         assert_int_equal(total_size_dnskey_rr, 1794);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
+    // This fragment should contain 7 resource records: 3 signatures (falcon-512), 2 A, 1 OPT, and 1 NS
+    // Should lead to 2 fragments and a size of 2206 bytes
+    const char *filename2 = "testdata/message/falcon_estimate_2_frags";
+    buffer = load_binary_file(filename2, &buffer_size);
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        //isc_buffer_printf(&buf, "aa");
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, 0);
+
+        // main test
+        unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
+        msgsize = estimate_message_size(msg, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
+        printf("msgsize: %u\n", msgsize);
+        //assert_int_equal(msgsize, 3244);
+        assert_int_equal(total_size_sig_rr, 1998);
+        assert_int_equal(total_size_dnskey_rr, 0);
 
         // clean up
         dns_message_detach(&msg);
@@ -307,21 +326,14 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
-        printf("buf used: %d\n", buf.used);
-        printf("buf used: %d\n", buf.length);
         //isc_buffer_printf(&buf, "aa");
         msg = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
         dns_message_parse(msg, &buf, 0);
-        printf("msgid: %d\n", msg->id);
-        //printbuffer(buffer, buffer_size);
-        printmessage(mctx, msg);
         // create key
         unsigned char key[64];
         unsigned keysize = sizeof(key) / sizeof(key[0]);
-        printf("here");
         fcache_create_key(msg->id, src_address, key, &keysize);
-        printf("key: %s\n", key);
 
         // main test
         assert_int_equal(fcache_count(), 0);
@@ -332,7 +344,6 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         out_ce = NULL;
         res = fcache_get(key, keysize, &out_ce);
         assert_true(res);
-        printf("res: %u\n", res);
         assert_true(out_ce != NULL);
         // test number of fragments
         assert_int_equal(out_ce->nr_fragments, 3);
@@ -347,12 +358,8 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
                 res = fcache_get_fragment(key, keysize, i-1, &out);
-                printf("res: %u\n", res);
                 assert_true(res);
-                printf("used: %u\nfragment size: %u\n", out->used, frag1_buffer_size);
                 assert_int_equal(out->used, frag1_buffer_size);
-                printbuffer(frag1_buffer, 128);
-                printbuffer(out->base, 128);
                 for (unsigned i = 0; i < out->used; i++) {
                     assert_true(((char *)(frag1_buffer))[i] == ((char *)(out->base))[i]);
                 }
@@ -361,15 +368,9 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         }
         dns_message_t *out_msg = NULL;
         reassemble_fragments(mctx, out_ce, &out_msg);
-        printf("res: %u\n", res);
-        printf("%u\n", out_msg == NULL);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
-        printf("msg size: %u\n", out_msg->buffer->length);
-        printf("msg used: %u\n", out_msg->buffer->used);
         assert_int_equal(out_msg->buffer->used, buffer_size);
-        printbuffer(buffer + 1840, 128);
-        printbuffer(out_msg->buffer->base + 1840, 128);
         // start at three, TC is not set in testcase...
         for (unsigned i = 3; i < buffer_size; i++) {
             assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);

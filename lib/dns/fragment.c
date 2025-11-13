@@ -214,7 +214,6 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
     dns_name_t *name = NULL;
     dns_rdataset_t *rdataset = NULL;
 
-    unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
     unsigned msgsize = 12; // ID (2B) + Flags (2B) + Counts (4x2B)
 
     // count question
@@ -230,8 +229,17 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
-            
-            rr_header_size += name->length;
+            unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
+            // usually names are compressed
+            if (name->attributes.nocompress) { 
+                rr_header_size += name->length;
+            }
+            else if (name->length == 1) { // for root
+                rr_header_size++;
+            }
+            else {
+                rr_header_size += 2;
+            }
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 isc_result_t tresult;
                 for (tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
