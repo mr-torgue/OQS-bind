@@ -321,8 +321,9 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
     isc_buffer_t *out = NULL;
     fragment_cache_entry_t *out_ce;
 
+
+    fcache_init(mainloop);
     if(buffer != NULL) {
-        fcache_init(mainloop);
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
@@ -338,7 +339,6 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // main test
         assert_int_equal(fcache_count(), 0);
         res = fragment(mctx, msg, src_address);
-        printf("Number of cache entries: %u\n", fcache_count());
         assert_int_equal(fcache_count(), 1); // one cache entry
 
         out_ce = NULL;
@@ -360,8 +360,8 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
                 res = fcache_get_fragment(key, keysize, i-1, &out);
                 assert_true(res);
                 assert_int_equal(out->used, frag1_buffer_size);
-                for (unsigned i = 0; i < out->used; i++) {
-                    assert_true(((char *)(frag1_buffer))[i] == ((char *)(out->base))[i]);
+                for (unsigned j = 0; j < out->used; j++) {
+                    assert_true(((char *)(frag1_buffer))[j] == ((char *)(out->base))[j]);
                 }
                 isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
             }
@@ -384,6 +384,75 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
     else {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
+
+    const char *filename2 = "testdata/message/falcon512-full-message";
+    buffer = load_binary_file(filename2, &buffer_size);
+
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        //isc_buffer_printf(&buf, "aa");
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+        // create key
+        unsigned char key[64];
+        unsigned keysize = sizeof(key) / sizeof(key[0]);
+        fcache_create_key(msg->id, src_address, key, &keysize);
+
+        // main test
+        assert_int_equal(fcache_count(), 0);
+        res = fragment(mctx, msg, src_address);
+        assert_int_equal(fcache_count(), 1); // one cache entry
+
+        out_ce = NULL;
+        res = fcache_get(key, keysize, &out_ce);
+        assert_true(res);
+        assert_true(out_ce != NULL);
+        // test number of fragments
+        assert_int_equal(out_ce->nr_fragments, 3);
+        // test fragment bitmap
+        assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2)));
+        // raw byte comparison
+        for(unsigned i = 1; i <= out_ce->nr_fragments; i++) {
+            char frag1_filename[128];
+            snprintf(frag1_filename, 128, "testdata/message/frag%u-falcon512-full-message", i);
+            unsigned char *frag1_buffer = NULL;
+            size_t frag1_buffer_size;
+            frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
+            if(frag1_buffer != NULL) {
+                res = fcache_get_fragment(key, keysize, i-1, &out);
+                assert_true(res);
+                assert_int_equal(out->used, frag1_buffer_size);
+                printbuffer((char *)(frag1_buffer), 64);
+                printbuffer((char *)(out->base), 64);
+                for (unsigned j = 0; j < 64; j++) {
+                    assert_true(((char *)(frag1_buffer))[j] == ((char *)(out->base))[j]);
+                }
+                isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
+            }
+        }
+        //dns_message_t *out_msg = NULL;
+        //reassemble_fragments(mctx, out_ce, &out_msg);
+        //assert_true(out_msg != NULL);
+        //assert_true(out_msg->buffer != NULL);
+        //assert_int_equal(out_msg->buffer->used, buffer_size);
+        // start at three, TC is not set in testcase...
+        //for (unsigned i = 3; i < buffer_size; i++) {
+        //    assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
+        //}
+
+        // clean up
+        dns_message_detach(&msg);
+        //dns_message_detach(&out_msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
     fcache_deinit();
 	isc_loopmgr_shutdown(loopmgr);
 }

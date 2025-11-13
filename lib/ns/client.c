@@ -689,7 +689,7 @@ renderend:
 		if(fcache_get_fragment(key, keysize, frag_nr, &out_frag)) {
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			buffer = *out_frag;
-			dns_message_parse(msg, out_frag, 0);
+			dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER);
 			client->message = msg;	
 			client->message->from_to_wire = 2;
 			printf("Fragment %lu is sent!\n", frag_nr);
@@ -725,7 +725,7 @@ renderend:
 			printf("Returning the first fragment...\n");
         	dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 			buffer = *out_frag;
-			dns_message_parse(msg, out_frag, 0);
+			dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER);
 			//dns_message_detach(&(client->message));
 			client->message = msg;		
 			//dns_message_takebuffer(msg, &out_frag);

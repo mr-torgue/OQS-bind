@@ -47,11 +47,11 @@ static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_mess
 	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
 
     // always the same order
-    //unsigned options = DNS_MESSAGERENDER_ORDERED; 
-	REQUIRE(dns_message_rendersection(message, DNS_SECTION_QUESTION, 0) == ISC_R_SUCCESS);
-    REQUIRE(dns_message_rendersection(message, DNS_SECTION_ANSWER, 0) == ISC_R_SUCCESS);
-	REQUIRE(dns_message_rendersection(message, DNS_SECTION_AUTHORITY, 0) == ISC_R_SUCCESS);
-	REQUIRE(dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, 0) == ISC_R_SUCCESS);
+    unsigned options = DNS_MESSAGERENDER_ORDERED; 
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_QUESTION, options) == ISC_R_SUCCESS);
+    REQUIRE(dns_message_rendersection(message, DNS_SECTION_ANSWER, options) == ISC_R_SUCCESS);
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_AUTHORITY, options) == ISC_R_SUCCESS);
+	REQUIRE(dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, options) == ISC_R_SUCCESS);
     message->flags &= ~DNS_MESSAGEFLAG_TC; // disable TC to trick renderend to render complete message
 	REQUIRE(dns_message_renderend(message) == ISC_R_SUCCESS);
 
@@ -586,13 +586,13 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     // copy first fragment
     //isc_buffer_t *msg_buf = NULL;
     //isc_buffer_dup(mctx, &msg_buf, entry->fragments[0]);
-    dns_message_parse(*out_msg, entry->fragments[0], 0); // create first fragment message
+    dns_message_parse(*out_msg, entry->fragments[0], DNS_MESSAGEPARSE_PRESERVEORDER); // create first fragment message
 
     // first fragment is already copied
     for(unsigned frag_nr = 1; frag_nr < entry->nr_fragments; frag_nr++) {
         dns_message_t *frag = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &frag);
-        dns_message_parse(frag, entry->fragments[frag_nr], 0);
+        dns_message_parse(frag, entry->fragments[frag_nr], DNS_MESSAGEPARSE_PRESERVEORDER);
 
         // we build a new message everytime
         //dns_message_t *builder = NULL;

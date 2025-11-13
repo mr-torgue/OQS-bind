@@ -664,7 +664,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		// NOTE: do we need to do this? Yes, for fragment estimation
 		dns_message_t *msg = NULL;
 		dns_message_create(disp->mgr->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-		isc_result_t result = dns_message_parse(msg, &buf, 0);
+		isc_result_t result = dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
 		if (msg->counts[DNS_SECTION_QUESTION] > 0) {
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Parse msg with name %s...", msg->sections[0].head->ndata); 
