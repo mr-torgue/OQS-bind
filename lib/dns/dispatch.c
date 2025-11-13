@@ -706,6 +706,11 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 					"All fragments received! Message size: %u", out_msg->buffer->used); 
 				region->base = out_msg->buffer->base;
 				region->length = out_msg->buffer->used;
+				printf("Received full buffer:\n");
+				for (unsigned i = 0; i < region->length; i++) {
+					printf("%X", region->base[i]);
+				}
+				printf("\n");
 				
 				goto done;
 			}
