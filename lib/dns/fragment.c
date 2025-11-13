@@ -587,12 +587,14 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     //isc_buffer_t *msg_buf = NULL;
     //isc_buffer_dup(mctx, &msg_buf, entry->fragments[0]);
     dns_message_parse(*out_msg, entry->fragments[0], DNS_MESSAGEPARSE_PRESERVEORDER); // create first fragment message
+    printmessage(mctx, *out_msg);
 
     // first fragment is already copied
     for(unsigned frag_nr = 1; frag_nr < entry->nr_fragments; frag_nr++) {
         dns_message_t *frag = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &frag);
         dns_message_parse(frag, entry->fragments[frag_nr], DNS_MESSAGEPARSE_PRESERVEORDER);
+        printmessage(mctx, frag);
 
         // we build a new message everytime
         //dns_message_t *builder = NULL;
