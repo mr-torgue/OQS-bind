@@ -685,8 +685,6 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
         //isc_buffer_free(&(frag->buffer));
         dns_message_detach(&frag);
     }
-    // would be slightly more efficient to do this in the loop
-    fcache_remove(entry->key, entry->keysize);
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
     render_fragment(mctx,  entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
     // unset the TC flag so it gets parsed by resolver.c (resquery_response)
@@ -695,5 +693,8 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
 
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Reassembled entry %s from %u fragments into one message with size %u", entry->key, entry->nr_fragments, (*out_msg)->buffer->used);  
+    
+    // would be slightly more efficient to do this in the loop
+    fcache_remove(entry->key, entry->keysize);
     return true;
 }
