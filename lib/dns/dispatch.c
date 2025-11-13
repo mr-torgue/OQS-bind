@@ -708,7 +708,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				region->length = out_msg->buffer->used;
 				printf("Received full buffer (%u):\n", region->length);
 				for (unsigned i = 0; i < region->length; i++) {
-					printf("%X ", region->base[i]);
+					printf("%02X ", region->base[i]);
 				}
 				printf("\n");
 				

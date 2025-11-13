@@ -713,7 +713,7 @@ renderend:
 		client->message->buffer = &buffer; // not associated by default
 		printf("Send full buffer (%u):\n", buffer.used);
 		for (unsigned i = 0; i < buffer.used; i++) {
-			printf("%X ", ((unsigned char *)(buffer.base))[i]);
+			printf("%02X ", ((unsigned char *)(buffer.base))[i]);
 		}
 		printf("\n");
 		fragment(client->manager->mctx, client->message, addr_buf);
