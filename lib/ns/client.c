@@ -711,9 +711,9 @@ renderend:
         fcache_create_key(client->message->id, addr_buf, key, &keysize);
 		printf("[UDP Fragmentation] fragmenting message %s (flags: %x)!\n", key, client->message->flags);
 		client->message->buffer = &buffer; // not associated by default
-		printf("Send full buffer:\n");
+		printf("Send full buffer (%u):\n", buffer.used);
 		for (unsigned i = 0; i < buffer.used; i++) {
-			printf("%X", ((char *)(buffer.base))[i]);
+			printf("%X ", ((unsigned char *)(buffer.base))[i]);
 		}
 		printf("\n");
 		fragment(client->manager->mctx, client->message, addr_buf);
