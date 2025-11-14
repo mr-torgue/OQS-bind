@@ -648,13 +648,12 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
                                             unsigned header_size = 0;
                                             if(rdata_msg->type == DNSKEY) {
                                                 header_size = calc_dnskey_header_size();
-                                                REQUIRE(memcmp(rdata_msg->data, rdata_frag.data, header_size));
                                             }
                                             // RRSIG
                                             else {
                                                 header_size = calc_rrsig_header_size(rdata_msg);
                                             }
-                                            REQUIRE(memcmp(rdata_msg->data, rdata_frag.data, header_size)); // headers should be the same
+                                            REQUIRE(memcmp(rdata_msg->data, rdata_frag.data, header_size) == 0); // headers should be the same
                                             
                                             isc_region_t new_rdata_region;
                                             isc_buffer_t *buf = NULL;
