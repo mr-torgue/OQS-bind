@@ -556,7 +556,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
         fcache_add(key, keysize, frag, nr_fragments);
         printf("frag %u\n", frag_nr + 1);
-        printmessage(mctx, msg);
+        printmessage(mctx, frag);
         dns_message_detach(&frag);
     }
 
