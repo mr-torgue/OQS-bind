@@ -374,7 +374,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         assert_int_equal(out_msg->buffer->used, buffer_size);
         // start at three, TC is not set in testcase...
         for (unsigned i = 3; i < buffer_size; i++) {
-        //    assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
+            assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
         }
 
         // clean up
@@ -386,7 +386,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
 
-/*
+
     const char *filename2 = "testdata/message/falcon512-full-message";
     buffer = load_binary_file(filename2, &buffer_size);
 
@@ -425,30 +425,30 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
                 res = fcache_get_fragment(key, keysize, i-1, &out);
-                //assert_true(res);
-                //assert_int_equal(out->used, frag1_buffer_size);
+                assert_true(res);
+                assert_int_equal(out->used, frag1_buffer_size);
                 isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
             }
         }
-        //dns_message_t *out_msg = NULL;
-        //reassemble_fragments(mctx, out_ce, &out_msg);
-        //assert_true(out_msg != NULL);
-        //assert_true(out_msg->buffer != NULL);
-        //assert_int_equal(out_msg->buffer->used, buffer_size);
+        dns_message_t *out_msg = NULL;
+        reassemble_fragments(mctx, out_ce, &out_msg);
+        assert_true(out_msg != NULL);
+        assert_true(out_msg->buffer != NULL);
+        assert_int_equal(out_msg->buffer->used, buffer_size);
         // start at three, TC is not set in testcase...
-        //for (unsigned i = 3; i < buffer_size; i++) {
-        //    assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
-        //}
+        for (unsigned i = 3; i < buffer_size; i++) {
+            assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
+        }
 
         // clean up
         dns_message_detach(&msg);
-        //dns_message_detach(&out_msg);
+        dns_message_detach(&out_msg);
         isc_mem_put(mctx, buffer, buffer_size);
     }
     else {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
-*/
+
     fcache_deinit();
 	isc_loopmgr_shutdown(loopmgr);
 }

@@ -344,6 +344,8 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
     REQUIRE(msg != NULL);
     REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
     REQUIRE(mctx != NULL);
+    printf("msg before fragment\n");
+    printmessage(mctx, msg);
     //msg->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
     //REQUIRE(msg->flags & DNS_MESSAGEFLAG_TC); // truncated flag should be set
     unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -553,6 +555,8 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
         fcache_add(key, keysize, frag, nr_fragments);
+        printf("frag %u\n", frag_nr + 1);
+        printmessage(mctx, msg);
         dns_message_detach(&frag);
     }
 
@@ -587,6 +591,7 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     //isc_buffer_t *msg_buf = NULL;
     //isc_buffer_dup(mctx, &msg_buf, entry->fragments[0]);
     dns_message_parse(*out_msg, entry->fragments[0], DNS_MESSAGEPARSE_PRESERVEORDER); // create first fragment message
+    printf("fragment 1\n");
     printmessage(mctx, *out_msg);
 
     // first fragment is already copied
@@ -594,6 +599,7 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
         dns_message_t *frag = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &frag);
         dns_message_parse(frag, entry->fragments[frag_nr], DNS_MESSAGEPARSE_PRESERVEORDER);
+        printf("fragment %u\n", frag_nr + 1);
         printmessage(mctx, frag);
 
         // we build a new message everytime
@@ -627,8 +633,6 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
 
                             // find matching resource record in the message
                             while (result_msg == ISC_R_SUCCESS) {
-                                name_msg = NULL;
-                                dns_message_currentname(*out_msg, section, &name_msg);
                                 while (rdataset_msg != NULL) {
                                     while(tresult_msg == ISC_R_SUCCESS) {
                                         //dns_rdata_t rdata = DNS_RDATA_INIT;
@@ -673,6 +677,8 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
                                 }
                                 result_msg = dns_message_nextname(*out_msg, section); 
                                 if (result_msg == ISC_R_SUCCESS) {
+                                    name_msg = NULL;
+                                    dns_message_currentname(*out_msg, section, &name_msg);
                                     rdataset_msg = ISC_LIST_HEAD(name_msg->list); // reset to first rdataset 
                                     tresult_msg = dns_rdataset_first(rdataset_msg); // reset to first rdata
                                 }
@@ -684,11 +690,15 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
                 }
             }
         }
+        printf("temp out_msg:\n");
+        printmessage(mctx, *out_msg);
         //isc_buffer_free(&(frag->buffer));
         dns_message_detach(&frag);
     }
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-    render_fragment(mctx,  entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
+    printf("final out_msg:\n");
+    printmessage(mctx, *out_msg);
+    render_fragment(mctx, entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
     // unset the TC flag so it gets parsed by resolver.c (resquery_response)
     (*out_msg)->flags &= ~DNS_MESSAGEFLAG_TC;
     *(unsigned short *)((*out_msg)->buffer->base + 1) &= ~DNS_MESSAGEFLAG_TC;
