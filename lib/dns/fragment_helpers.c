@@ -1,3 +1,4 @@
+#include <isc/util.h>
 #include <dns/fragment_helpers.h>
 
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize) {

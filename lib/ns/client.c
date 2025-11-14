@@ -509,6 +509,7 @@ ns_client_send(ns_client_t *client) {
 	} else {
 		render_opts = DNS_MESSAGERENDER_OMITDNSSEC;
 	}
+	render_opts |= DNS_MESSAGERENDER_ORDERED; // make sure the order is correct. Needed for UDP fragmentation
 
 	preferred_glue = 0;
 	if (client->view != NULL) {

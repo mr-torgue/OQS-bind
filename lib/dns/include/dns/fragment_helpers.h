@@ -32,4 +32,5 @@ unsigned calc_rrsig_header_size(dns_rdata_t *rdata);
 // 4. construct OPT --> use default values
 bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, dns_message_t **question, isc_buffer_t **question_buffer);
 
+// prints the dns message in a human-readable format
 void printmessage(isc_mem_t *mctx, dns_message_t *msg);
