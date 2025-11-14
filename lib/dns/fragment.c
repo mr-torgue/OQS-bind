@@ -557,6 +557,10 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         fcache_add(key, keysize, frag, nr_fragments);
         printf("frag %u\n", frag_nr + 1);
         printmessage(mctx, frag);
+		for (unsigned i = 0; i < frag->buffer->used; i++) {
+			printf("%02X ", ((unsigned char *)(frag->buffer->base))[i]);
+		}
+		printf("\n");
         dns_message_detach(&frag);
     }
 
@@ -593,7 +597,10 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
     dns_message_parse(*out_msg, entry->fragments[0], DNS_MESSAGEPARSE_PRESERVEORDER); // create first fragment message
     printf("fragment 1\n");
     printmessage(mctx, *out_msg);
-
+    for (unsigned i = 0; i < entry->fragments[0]->used; i++) {
+        printf("%02X ", ((unsigned char *)(entry->fragments[0]->base))[i]);
+    }
+    printf("\n");
     // first fragment is already copied
     for(unsigned frag_nr = 1; frag_nr < entry->nr_fragments; frag_nr++) {
         dns_message_t *frag = NULL;
@@ -601,6 +608,10 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
         dns_message_parse(frag, entry->fragments[frag_nr], DNS_MESSAGEPARSE_PRESERVEORDER);
         printf("fragment %u\n", frag_nr + 1);
         printmessage(mctx, frag);
+        for (unsigned i = 0; i < entry->fragments[frag_nr]->used; i++) {
+            printf("%02X ", ((unsigned char *)(entry->fragments[frag_nr]->base))[i]);
+        }
+        printf("\n");
 
         // we build a new message everytime
         //dns_message_t *builder = NULL;
