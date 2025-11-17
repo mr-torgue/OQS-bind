@@ -298,8 +298,9 @@ towiresorted(dns_rdataset_t *rdataset, const dns_name_t *owner_name,
 
 	/*
 	 * Do we want to sort and/or shuffle this answer?
+	 * Comment Folmer: what is the point of the randomization and why was the rrsig excluded (I added the dnskey)
 	 */
-	if (!question && count > 1 && rdataset->type != dns_rdatatype_rrsig) {
+	if (!question && count > 1 && rdataset->type != dns_rdatatype_rrsig && rdataset->type != dns_rdatatype_dnskey) { 
 		if (order != NULL) {
 			sort = true;
 		}

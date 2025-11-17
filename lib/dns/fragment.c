@@ -47,7 +47,7 @@ static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_mess
 	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
 
     // always the same order
-    unsigned options = DNS_MESSAGERENDER_ORDERED; 
+    unsigned options = 0; //DNS_MESSAGERENDER_ORDERED; 
 	REQUIRE(dns_message_rendersection(message, DNS_SECTION_QUESTION, options) == ISC_R_SUCCESS);
     REQUIRE(dns_message_rendersection(message, DNS_SECTION_ANSWER, options) == ISC_R_SUCCESS);
 	REQUIRE(dns_message_rendersection(message, DNS_SECTION_AUTHORITY, options) == ISC_R_SUCCESS);
