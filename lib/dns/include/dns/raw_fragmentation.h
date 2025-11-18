@@ -1,5 +1,18 @@
 /*
-raw fragmentation fragments the complete UDP message.
+QBF has a few limitations:
+1. Does NOT work for all messages: 
+only DNSKEY and RRSIG resource records are fragmented, thus excluding situations that don't use these records but still exceed the max UDP limit
+2. Fragmentation and recombination is complex and error prone:
+Fragments cannot simply be concatenated because only certain RR types are fragmented (DNSKEY and RRSIG).
+So, every resource record for all fragments need to be matched and should not be mismatched.
+For example if a fragment has two keys, a and b, we should make sure that no part of a gets added to b.
+Currrently, this matching relies on the order of RR's. BIND9 does not necesarily always keep the order.
+3. No distinction between UDP fragmentation and TCP retransmission:
+The resolver does not know if a DNS message is a fragment or not if the TC flag is set.
+
+
+RAW fragmentation does not have these limitations.
+It relies on an OPT RR to encode everything.
 the flow works as follows:
 1. Oversize DNS Response generated
 2. Nr of fragments calculated based on body size (e.g. 4000 bytes of data needs 4 fragments)
@@ -13,6 +26,7 @@ Advantages:
 */
 
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
+
 
 
 recombine:
