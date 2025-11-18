@@ -451,13 +451,14 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
     // interesting case, because P256_FALCON uses four fragments but only three are used for RRSIG
     const char *filename3 = "testdata/message/P256_FALCON512";
-    buffer = load_binary_file(filename2, &buffer_size);
+    buffer = load_binary_file(filename3, &buffer_size);
 
     if(buffer != NULL) {
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
         isc_buffer_add(&buf, buffer_size);
         //isc_buffer_printf(&buf, "aa");
+        printf("buffer size: %u\n", buffer_size);
         msg = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
         dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
@@ -480,7 +481,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         assert_int_equal(out_ce->nr_fragments, 4);
         // test fragment bitmap
         assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3)));
-        /*
+        
         // raw byte comparison
         for(unsigned i = 1; i <= out_ce->nr_fragments; i++) {
             char frag1_filename[128];
@@ -490,6 +491,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
                 res = fcache_get_fragment(key, keysize, i-1, &out);
+                printf("used: %u, buffer_size: %u\n", out->used, frag1_buffer_size);
                 assert_true(res);
                 assert_int_equal(out->used, frag1_buffer_size);
                 isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
@@ -503,11 +505,11 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // start at three, TC is not set in testcase...
         for (unsigned i = 3; i < buffer_size; i++) {
             assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
-        }*/
+        }
 
         // clean up
         dns_message_detach(&msg);
-        //dns_message_detach(&out_msg);
+        dns_message_detach(&out_msg);
         isc_mem_put(mctx, buffer, buffer_size);
     }
     else {
