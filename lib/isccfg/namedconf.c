@@ -1124,6 +1124,13 @@ static cfg_type_t cfg_type_fetchesper = { "fetchesper",	   cfg_parse_tuple,
 					  cfg_print_tuple, cfg_doc_tuple,
 					  &cfg_rep_tuple,  fetchesper_fields };
 
+// for UDP fragmentation
+static const char *udp_fragmentation_enums[] = { "QBF", "RAW", NULL };
+static cfg_type_t cfg_type_udp_fragmentation = {
+	"udp_fragmentation",	      cfg_parse_enum,  cfg_print_ustring,
+	cfg_doc_enum, &cfg_rep_string, &udp_fragmentation_enums
+};
+
 /*%
  * Clauses that can be found within the top level of the named.conf
  * file only.
@@ -1329,6 +1336,7 @@ static cfg_clausedef_t options_clauses[] = {
 	{ "transfers-out", &cfg_type_uint32, 0 },
 	{ "transfers-per-ns", &cfg_type_uint32, 0 },
 	{ "treat-cr-as-space", NULL, CFG_CLAUSEFLAG_ANCIENT },
+	{ "udp-fragmentation", &cfg_type_udp_fragmentation, 0 }, // new
 	{ "udp-receive-buffer", &cfg_type_uint32, 0 },
 	{ "udp-send-buffer", &cfg_type_uint32, 0 },
 	{ "update-quota", &cfg_type_uint32, 0 },

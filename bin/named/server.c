@@ -8511,6 +8511,14 @@ load_configuration(const char *filename, named_server_t *server,
 	INSIST(result == ISC_R_SUCCESS);
 	env->match_mapped = cfg_obj_asboolean(obj);
 
+
+	/*
+	 * Configure UDP fragmentation
+	 */
+	obj = NULL;
+	result = named_config_get(maps, "udp-fragmentation", &obj);
+	INSIST(result == ISC_R_SUCCESS);
+
 	/*
 	 * Configure the network manager
 	 */

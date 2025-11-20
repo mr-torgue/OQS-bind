@@ -297,6 +297,7 @@ options {
 	transfers-per-ns <integer>;
 	trust-anchor-telemetry <boolean>; // experimental
 	try-tcp-refresh <boolean>;
+	udp-fragmentation ( QBF | RAW );
 	udp-receive-buffer <integer>;
 	udp-send-buffer <integer>;
 	update-check-ksk <boolean>; // obsolete
