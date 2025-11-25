@@ -342,7 +342,8 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 		data = client->tcpbuf;
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
 	} 
-	else if(true) {
+	// if fragmentation is enabled, increase buffer
+	else if(client->manager->sctx->udp_fragmentation_mode != 0) {
 		data = client->sendbuf;
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
 	} 
