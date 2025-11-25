@@ -138,6 +138,13 @@ dns_dispatchmgr_getblackhole(dns_dispatchmgr_t *mgr);
  *\li	A pointer to the current blackhole list, or NULL.
  */
 
+isc_nm_t *
+dns_dispatchmgr_getnetmgr(dns_dispatchmgr_t *mgr);
+/*
+ * Needed to get the fragmentation mode from the network manager
+ * Dirty fix, but could not find anything better
+ */
+
 isc_result_t
 dns_dispatchmgr_setavailports(dns_dispatchmgr_t *mgr, isc_portset_t *v4portset,
 			      isc_portset_t *v6portset);

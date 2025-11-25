@@ -415,6 +415,9 @@ isc_nm_setnetbuffers(isc_nm_t *mgr, int32_t recv_tcp, int32_t send_tcp,
  * \li	'mgr' is a valid netmgr.
  */
 
+void
+isc_nm_setudpfragmentation(isc_nm_t *mgr, uint8_t mode);
+
 bool
 isc_nm_getloadbalancesockets(isc_nm_t *mgr);
 void
@@ -439,6 +442,9 @@ isc_nm_gettimeouts(isc_nm_t *mgr, uint32_t *initial, uint32_t *idle,
  * Requires:
  * \li	'mgr' is a valid netmgr.
  */
+
+uint8_t
+isc_nm_getudpfragmentation(isc_nm_t *mgr);
 
 void
 isc_nm_maxudp(isc_nm_t *mgr, uint32_t maxudp);

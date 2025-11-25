@@ -563,7 +563,8 @@ ns_client_send(ns_client_t *client) {
 	}
 
 	// RENDERING STARTS HERE
-	bool udp_fragmentation_enabled = true;
+	uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(dns_dispatchmgr_getnetmgr(client->dispatch));
+	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 
 	dns_compress_init(&cctx, client->manager->mctx, compflags);
 	cleanup_cctx = true;
@@ -717,8 +718,15 @@ renderend:
 			printf("%02X ", ((unsigned char *)(buffer.base))[i]);
 		}
 		printf("\n");
-		fragment(client->manager->mctx, client->message, addr_buf);
-
+		// QBF
+		if (udp_fragmentation_mode == 1) {
+			fragment(client->manager->mctx, client->message, addr_buf);
+		}
+		// RAW
+		else if (udp_fragmentation_mode == 2) {
+			perror("RAW is not implemented yet!\n");
+			exit(0);
+		}
 		// get first fragment from cache and set it as client->message
 		isc_buffer_t *out_frag = NULL;
 		dns_message_t *msg = NULL;

@@ -13,6 +13,7 @@
 #include <dns/rdataset.h>
 #include <dns/types.h>
 
+
 // key = id + client ip:port
 // overwrites keysize to match the string length
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize);

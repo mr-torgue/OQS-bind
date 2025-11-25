@@ -364,6 +364,12 @@ isc_nm_setnetbuffers(isc_nm_t *mgr, int32_t recv_tcp, int32_t send_tcp,
 	atomic_store_relaxed(&mgr->send_udp_buffer_size, send_udp);
 }
 
+void
+isc_nm_setudpfragmentation(isc_nm_t *mgr, uint8_t mode) {
+	REQUIRE(VALID_NM(mgr));
+	atomic_store_relaxed(&mgr->udp_fragmentation_mode, mode);
+}
+
 bool
 isc_nm_getloadbalancesockets(isc_nm_t *mgr) {
 	REQUIRE(VALID_NM(mgr));
@@ -392,6 +398,12 @@ isc_nm_gettimeouts(isc_nm_t *mgr, uint32_t *initial, uint32_t *idle,
 	SET_IF_NOT_NULL(keepalive, atomic_load_relaxed(&mgr->keepalive));
 
 	SET_IF_NOT_NULL(advertised, atomic_load_relaxed(&mgr->advertised));
+}
+
+uint8_t
+isc_nm_getudpfragmentation(isc_nm_t *mgr) {
+	REQUIRE(VALID_NM(mgr));
+	return atomic_load_relaxed(&mgr->udp_fragmentation_mode);
 }
 
 bool

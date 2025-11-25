@@ -641,9 +641,10 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	 * 1. efficiency: quite a bit of parsing and rendering --> reduce
 	 * 2. hardcoded 1232: use variable name instead
 	 */
-	bool udp_fragmentation_enabled = true;
+	uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(disp->mgr->nm);
 	bool is_any_fragment = (flags & DNS_MESSAGEFLAG_TC) != 0;
-	if(udp_fragmentation_enabled && is_any_fragment) {
+	// QBF fragmentation
+	if (udp_fragmentation_mode == 1 && is_any_fragment) {
 
 		// get source address
 		char from_addr_buf[ISC_SOCKADDR_FORMATSIZE];
@@ -743,6 +744,11 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		// the complete response has not been received 
 		// make sure that the resolver does not return the data but waits for all the fragments
 		goto next;
+	}
+	// RAW Fragmentation
+	else if (udp_fragmentation_mode == 2) {
+		perror("RAW has not been implemented yet!");
+		exit(0);
 	}
 
 	/*
@@ -1176,6 +1182,12 @@ dns_acl_t *
 dns_dispatchmgr_getblackhole(dns_dispatchmgr_t *mgr) {
 	REQUIRE(VALID_DISPATCHMGR(mgr));
 	return (mgr->blackhole);
+}
+
+isc_nm_t *
+dns_dispatchmgr_getnetmgr(dns_dispatchmgr_t *mgr) {
+	REQUIRE(VALID_DISPATCHMGR(mgr));
+	return (mgr->nm);
 }
 
 isc_result_t

@@ -474,7 +474,7 @@ void
 isc__nm_udp_read_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 		    const struct sockaddr *addr, unsigned int flags) {
 	isc_nmsocket_t *sock = uv_handle_get_data((uv_handle_t *)handle);
-	isc__nm_uvreq_t *req = NULL;
+	isc__nm_uvreq_t *req = NULL; 
 	uint32_t maxudp;
 	isc_result_t result;
 	isc_sockaddr_t sockaddr, *sa = NULL;
@@ -570,19 +570,21 @@ isc__nm_udp_read_cb(uv_udp_t *handle, ssize_t nrecv, const uv_buf_t *buf,
 	req->uvbuf.len = nrecv;
 
 
+	// UDP fragmentation disabled, stop the socket
+	if(atomic_load_relaxed(&sock->worker->netmgr->udp_fragmentation_mode) == 0) {
+		sock->reading = false;
 
-	//sock->reading = false;
-
-	/*
-	 * The client isc_nm_read() expects just a single message, so we need to
-	 * stop reading now.  The reading could be restarted in the read
-	 * callback with another isc_nm_read() call.
-	 */
-	//if (sock->client) {
-	//	isc__nmsocket_timer_stop(sock);
-//		isc__nm_stop_reading(sock);
-//		isc__nmsocket_clearcb(sock);
-//	}
+		/*
+		* The client isc_nm_read() expects just a single message, so we need to
+		* stop reading now.  The reading could be restarted in the read
+		* callback with another isc_nm_read() call.
+		*/
+		if (sock->client) {
+			isc__nmsocket_timer_stop(sock);
+			isc__nm_stop_reading(sock);
+			isc__nmsocket_clearcb(sock);
+		}
+	}
 
 	REQUIRE(!sock->processing);
 	sock->processing = true;

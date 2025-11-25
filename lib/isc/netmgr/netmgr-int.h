@@ -327,6 +327,10 @@ struct isc_nm {
 
 	bool load_balance_sockets;
 
+
+	// UDP FRAGMENTATION
+	atomic_uint_fast8_t udp_fragmentation_mode; // 0 = NONE, 1 = QBF, 2 = RAW
+
 	/*
 	 * Active connections are being closed and new connections are
 	 * no longer allowed.
