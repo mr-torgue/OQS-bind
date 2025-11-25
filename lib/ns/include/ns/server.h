@@ -91,6 +91,9 @@ struct ns_server {
 	ISC_LIST(isc_quota_t) http_quotas;
 	isc_mutex_t http_quotas_lock;
 
+	// UDP FRAGMENTATION (make sure to also change isc_nm)
+	uint8_t udp_fragmentation_mode; // 0 = NONE, 1 = QBF, 2 = RAW
+
 	/*% Test options and other configurables */
 	uint32_t options;
 

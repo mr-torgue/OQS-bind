@@ -8534,6 +8534,7 @@ load_configuration(const char *filename, named_server_t *server,
 		}
 	}
 	isc_nm_setudpfragmentation(named_g_netmgr, udp_fragmentation_mode);
+	server->sctx->udp_fragmentation_mode = udp_fragmentation_mode;
 
 	/*
 	 * Configure the network manager

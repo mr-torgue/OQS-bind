@@ -563,7 +563,8 @@ ns_client_send(ns_client_t *client) {
 	}
 
 	// RENDERING STARTS HERE
-	uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(dns_dispatchmgr_getnetmgr(client->dispatch));
+	//uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(dns_dispatchmgr_getnetmgr(client->dispatch)); 
+	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
 	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 
 	dns_compress_init(&cctx, client->manager->mctx, compflags);
