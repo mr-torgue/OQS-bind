@@ -8519,13 +8519,19 @@ load_configuration(const char *filename, named_server_t *server,
 	result = named_config_get(maps, "udp-fragmentation", &obj);
 	INSIST(result == ISC_R_SUCCESS || result == ISC_R_NOTFOUND);
 	uint8_t udp_fragmentation_mode = 0;
-	if (strcmp(cfg_obj_asstring(obj), "QBF") == 0) {
-		cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,"Using QBF UDP Fragmentation!");
-		udp_fragmentation_mode = 1;
-	} 
-	else if (strcmp(cfg_obj_asstring(obj), "RAW") == 0) {
-		cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,"Using RAW UDP Fragmentation!");
-		udp_fragmentation_mode = 2;
+	if (result == ISC_R_SUCCESS) {
+		if (strcmp(cfg_obj_asstring(obj), "QBF") == 0) {
+			cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,"Using QBF UDP Fragmentation!");
+			udp_fragmentation_mode = 1;
+		} 
+		else if (strcmp(cfg_obj_asstring(obj), "RAW") == 0) {
+			cfg_obj_log(obj, named_g_lctx, ISC_LOG_WARNING,"Using RAW UDP Fragmentation!");
+			udp_fragmentation_mode = 2;
+		}
+		else {
+			perror("Fragmentation mode not implemented!\n");
+			exit(0);
+		}
 	}
 	isc_nm_setudpfragmentation(named_g_netmgr, udp_fragmentation_mode);
 
