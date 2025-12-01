@@ -1,31 +1,61 @@
 
+#include <sys/types.h>
 #include <isc/result.h>
+#include <isc/types.h>
+#include <isc/buffer.h>
+#include <dns/message.h>
+
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned header_size) {
     return (total_msg_size - (header_size + 4)) / max_msg_size; 
 }
 
 bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
-    REQUIRE(msg != NULL);
-    REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
-    REQUIRE(mctx != NULL);
-    //REQUIRE(msg->flags & DNS_MESSAGEFLAG_TC); // truncated flag should be set
 
     isc_result_t result;
-    unsigned msgsize;
-    // calculate message size
-    result = calc_message_size(msg, &msgsize);
+    unsigned msgsize = msg->buffer->used;
     
-    // print information
-    unsigned total_sig_pk_bytes = total_size_sig_rr + total_size_dnskey_rr;
-    unsigned rr_pk_sig_count = nr_sig_rr + nr_dnskey_rr;
-    
-    // calculate nr of fragments
-    unsigned can_send_first_fragment, can_send_other_fragments;
-    unsigned nr_fragments = get_nr_fragments(MAXUDP, msgsize, total_sig_pk_bytes, savings, &can_send_first_fragment, &can_send_other_fragments);
+    // calculate header and question size
+    unsigned header_size = 12;
+    unsigned question_size = 0;
+    for (unsigned i = 0; i < msg->counts[DNS_SECTION_QUESTION]; i++) {
 
-    unsigned num_sig_bytes_per_frag = total_size_sig_rr / nr_fragments;
-    unsigned num_pk_bytes_per_frag = total_size_dnskey_rr / nr_fragments;
-    unsigned total_sig_pk_bytes_per_frag = num_sig_bytes_per_frag + num_pk_bytes_per_frag;
+    }
+
+    // calculate overhead
+
+
+    unsigned start = 0;
+    unsigned frag_length;
+    for (unsigned frag_nr = 0; frag_nr < nr_fragments; frag_nr++) {    
+        isc_buffer_t *frag_buf = NULL;
+        frag_length =  msgsize - start < 1232 ? (msgsize - start) : 1232;
+        isc_buffer_allocate(mctx, &frag_buf, frag_length); // allocate
+
+        // copy header and question
+        isc_buffer_putmem(frag_buf, msg->buffer->base, header_size + question_size);
+
+        // copy body
+
+        // handle OPT record
+
+
+
+                                    else if (frag_nr == 0) {
+                                isc_buffer_t *buf = NULL;
+                                isc_buffer_allocate(mctx, &buf, rdata_region.length); // allocate
+                                isc_buffer_putmem(buf, rdata_region.base, rdata_region.length); // copy rdata
+                                isc_buffer_usedregion(buf, &new_rdata_region); 
+                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                REQUIRE(new_rdata_region.length == rdata_region.length);
+                                dns_message_takebuffer(msg, &buf);
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+                                new_section_count++;
+
+        start += frag_length;
+
+    }
+
+
 
     if (nr_fragments == 1) { 
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
