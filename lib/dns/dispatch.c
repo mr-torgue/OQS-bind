@@ -695,6 +695,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		fragment_cache_entry_t *out_ce = NULL;
 		// process incoming fragment
 		if (is_fragment_resp) {
+        	printmessage(disp->mgr->mctx, msg);
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Response to fragment query %lu!", msg->fragment_nr); 
 			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
