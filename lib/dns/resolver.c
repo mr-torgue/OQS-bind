@@ -266,11 +266,6 @@ typedef struct query {
 	unsigned char data[512];
 } resquery_t;
 
-void inc_resquery(void *arg) {
-	resquery_t *query = (resquery_t *)arg;
-	query->references++;
-}
-
 #if DNS_RESOLVER_TRACE
 #define resquery_ref(ptr)   resquery__ref(ptr, __func__, __FILE__, __LINE__)
 #define resquery_unref(ptr) resquery__unref(ptr, __func__, __FILE__, __LINE__)
@@ -4903,8 +4898,8 @@ same_question(fetchctx_t *fctx, dns_message_t *message) {
 	INSIST(ISC_LIST_NEXT(rdataset, link) == NULL);
 
 	if (fctx->type != rdataset->type ||
-	    fctx->res->rdclass != rdataset->rdclass) // ||
-	    //!dns_name_equal(fctx->name, name))
+	    fctx->res->rdclass != rdataset->rdclass ||
+	    !dns_name_equal(fctx->name, name))
 	{
 		char namebuf[DNS_NAME_FORMATSIZE];
 		char classbuf[DNS_RDATACLASS_FORMATSIZE];
@@ -7510,7 +7505,10 @@ resquery_response(isc_result_t eresult, isc_region_t *region, void *arg) {
 	}
 
 	rctx_edns(&rctx);
-	
+
+	/*
+	 * Deal with truncated responses by retrying using TCP.
+	 */
 	if ((query->rmessage->flags & DNS_MESSAGEFLAG_TC) != 0) {
 		rctx.truncated = true;
 	}

@@ -100,8 +100,6 @@ struct dns_fetchresponse {
 	ISC_LINK(dns_fetchresponse_t) link;
 };
 
-void inc_resquery(void *arg);
-
 /*%
  * The two quota types (fetches-per-zone and fetches-per-server)
  */

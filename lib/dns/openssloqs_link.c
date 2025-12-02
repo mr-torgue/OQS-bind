@@ -525,21 +525,18 @@ openssloqs_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, alginfo->alg_name, NULL);
 	fprintf(stderr, "alg_name: %s\n", alginfo->alg_name);
 	if (ctx == NULL) {
-		fprintf(stderr, "ctx == null");
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen_init(ctx);
 	if (status != 1) {
-		fprintf(stderr, "init not working");
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
 					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen(ctx, &pkey);
 	if (status != 1) {
-		fprintf(stderr, "keygen not working");
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
 					       DST_R_OPENSSLFAILURE));
 	}
