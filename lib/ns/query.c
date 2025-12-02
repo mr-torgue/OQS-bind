@@ -5615,8 +5615,8 @@ ns__query_start(query_ctx_t *qctx) {
 	qctx->need_wildcardproof = false;
 	qctx->rpz = false;
 
-	// UDP Fragmentation
-	if (is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
+	// UDP Fragmentation triggers if enabled and the incoming request is a fragment request
+	if (qctx->client->manager->sctx->udp_fragmentation_mode != 0 && is_fragment(qctx->client->manager->mctx, qctx->client->message)) {
 		ns_client_log(qctx->client, NS_LOGCATEGORY_CLIENT,
 				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
 				      "[NS] received a fragment query...");

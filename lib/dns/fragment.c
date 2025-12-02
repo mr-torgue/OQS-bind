@@ -310,6 +310,10 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
         nr_fragments++;
         REQUIRE(nr_fragments < 100); // just to make sure qname_overhead is correct
     }
+    // we always need at least one fragment
+    if (total_sig_pk_bytes == 0) {
+        nr_fragments++;
+    }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Message with size %u needs %u fragments (max size: %u, pk-sig bytes: %u)", total_msg_size, nr_fragments, max_msg_size, total_sig_pk_bytes);  
     return nr_fragments;
