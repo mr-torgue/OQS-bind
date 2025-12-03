@@ -343,10 +343,10 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
 	} 
 	// if fragmentation is enabled, increase buffer
-	else if(client->manager->sctx->udp_fragmentation_mode != 0) {
-		data = client->sendbuf;
-		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
-	} 
+	//else if(client->manager->sctx->udp_fragmentation_mode != 0) {
+	//	data = client->sendbuf;
+	//	isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
+	//} 
 	else {
 		data = client->sendbuf;
 		if ((client->attributes & NS_CLIENTATTR_HAVECOOKIE) == 0) {
@@ -538,8 +538,85 @@ ns_client_send(ns_client_t *client) {
 			goto cleanup;
 		}
 	}
+	
+	// UDP fragmentation
+	// do the fragmentation before rendering: we either have the buffers stored in the fcache or we will generate them
+	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
+	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
+	if (udp_fragmentation_enabled) {
+		
+		// send a cached fragment if fragment request
+		if(client->message->is_fragment) {
+			unsigned char key[64];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+			fcache_create_key(client->message->id, addr_buf, key, &keysize);
 
-	// if UDP fragmentation is enabled, this is set to 65536 bytes
+			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
+					 "Sending fragment %lu to %s (key %s)", client->message->fragment_nr, addr_buf, key);
+
+			isc_buffer_t *out_frag = NULL;
+			dns_message_t *msg = NULL;
+			unsigned long frag_nr = client->message->fragment_nr;
+			if(fcache_get_fragment(key, keysize, frag_nr, &out_frag)) {
+				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+				buffer = *out_frag;
+				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+				client->message = msg;	
+				client->message->from_to_wire = 2;
+				// remove fragment here
+				goto sendbuffer; // skip render
+			}
+			else {
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "Fragment not found, sending FORMERR!");
+				msg->rcode = dns_rcode_formerr;
+				client->formerrcache.addr = client->peeraddr;
+				client->formerrcache.time = isc_time_seconds(&client->requesttime);
+				client->formerrcache.id = msg->id;
+			}
+		}
+		// fragmentation triggers when the response is too large 
+		else if((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) { // not sure if this works before rendering
+			// create a key
+			unsigned char key[64];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+			fcache_create_key(client->message->id, addr_buf, key, &keysize);
+
+			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
+					 "Fragmenting message %s (flags: %x)!", key, client->message->flags);
+			client->message->buffer = &buffer; // not associated by default
+			// QBF
+			if (udp_fragmentation_mode == 1) {
+				fragment(client->manager->mctx, client->message, addr_buf);
+			}
+			// RAW
+			else if (udp_fragmentation_mode == 2) {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "RAW is not implemented yet!");
+				exit(0);
+			}
+			// get first fragment from cache and set it as client->message
+			isc_buffer_t *out_frag = NULL;
+			dns_message_t *msg = NULL;
+			if(fcache_get_fragment(key, keysize, 0, &out_frag)) {
+				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+				buffer = *out_frag;
+				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+				client->message = msg;		
+				// remove fragment here (not yet we are not copying the buffer)
+				goto sendbuffer; // skip render
+			}
+			else {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "Could not find first fragment!");
+			}
+		}
+	}
+
 	client_allocsendbuf(client, &buffer, &data);
 	compflags = 0;
 	if (client->peeraddr_valid && client->view != NULL) {
@@ -563,16 +640,11 @@ ns_client_send(ns_client_t *client) {
 		}
 	}
 
-	// RENDERING STARTS HERE
-	//uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(dns_dispatchmgr_getnetmgr(client->dispatch)); 
-	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
-	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
-
 	dns_compress_init(&cctx, client->manager->mctx, compflags);
 	cleanup_cctx = true;
 
 	result = dns_message_renderbegin(client->message, &cctx, &buffer);
-	if (result != ISC_R_SUCCESS) { // && !udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 
@@ -588,17 +660,15 @@ ns_client_send(ns_client_t *client) {
 					   DNS_SECTION_QUESTION, 0);
 	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
-			goto renderend;
-		}
+		goto renderend;
 	}
-	else if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	/*
 	 * Stop after the question if TC was set for rate limiting.
 	 */
-	if ((client->message->flags & DNS_MESSAGEFLAG_TC) != 0 && !udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
+	if ((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
 		goto renderend;
 	}
 	result = dns_message_rendersection(client->message, DNS_SECTION_ANSWER,
@@ -606,35 +676,25 @@ ns_client_send(ns_client_t *client) {
 						   render_opts);
 	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
-			goto renderend;
-		}
+		goto renderend;
 	}
-	else if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	result = dns_message_rendersection(
 		client->message, DNS_SECTION_AUTHORITY,
 		DNS_MESSAGERENDER_PARTIAL | render_opts);
-	if (result == ISC_R_NOSPACE) { 
+	if (result == ISC_R_NOSPACE) {
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
-			goto renderend;
-		}
+		goto renderend;
 	}
-	else if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
 	result = dns_message_rendersection(client->message,
 					   DNS_SECTION_ADDITIONAL,
 					   preferred_glue | render_opts);
-	if (result == ISC_R_NOSPACE) { 
-		client->message->flags |= DNS_MESSAGEFLAG_TC;
-		if (!udp_fragmentation_enabled) { // keep going if UDP fragmentation is enabled
-			goto renderend;
-		}
-	}
-	else if (result != ISC_R_SUCCESS) {
+	if (result != ISC_R_SUCCESS && result != ISC_R_NOSPACE) {
 		goto cleanup;
 	}
 renderend:
@@ -673,79 +733,7 @@ renderend:
 		dns_compress_invalidate(&cctx);
 	}
 
-	// UDP FRAGMENTATION
-	if (udp_fragmentation_enabled) {
-		
-		// Buffer is set to 64K so TC flag will not be set 
-		if (buffer.used > client->udpsize) {
-			client->message->flags |= DNS_MESSAGEFLAG_TC;
-		}
-
-		// send a cached fragment if fragment request
-		if(client->message->is_fragment) {
-			printf("Sending fragment %lu...\n", client->message->fragment_nr);
-			unsigned char key[64];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
-
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			unsigned long frag_nr = client->message->fragment_nr;
-			printf("[NS] getting %s from cache...\n", key);
-			if(fcache_get_fragment(key, keysize, frag_nr, &out_frag)) {
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER);
-				client->message = msg;	
-				client->message->from_to_wire = 2;
-				printf("Fragment %lu is sent!\n", frag_nr);
-			}
-			else {
-				printf("[NS] key not found!\n");
-				ns_client_error(client, DNS_R_FORMERR);
-				return;
-			}
-		}
-		// fragmentation triggers when the response is too large
-		else if((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
-			// create a key
-			unsigned char key[64];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
-			printf("[UDP Fragmentation] fragmenting message %s (flags: %x)!\n", key, client->message->flags);
-			client->message->buffer = &buffer; // not associated by default
-			// QBF
-			if (udp_fragmentation_mode == 1) {
-				fragment(client->manager->mctx, client->message, addr_buf);
-			}
-			// RAW
-			else if (udp_fragmentation_mode == 2) {
-				perror("RAW is not implemented yet!\n");
-				exit(0);
-			}
-			// get first fragment from cache and set it as client->message
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			if(fcache_get_fragment(key, keysize, 0, &out_frag)) {
-				printf("Returning the first fragment...\n");
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER);
-				//dns_message_detach(&(client->message));
-				client->message = msg;		
-				//dns_message_takebuffer(msg, &out_frag);
-				printf("First fragment is sent!\n");
-			}
-			else {
-				printf("Could not find fragment 0!\n");
-			}
-		}
-	}
-
+sendbuffer:
 	if (client->sendcb != NULL) {
 		client->sendcb(&buffer);
 	} else if (TCP_CLIENT(client)) {
