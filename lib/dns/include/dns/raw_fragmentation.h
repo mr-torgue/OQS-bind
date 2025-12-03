@@ -26,6 +26,11 @@ Advantages:
 2. Simple and effective: we do not require changes to resource records
 */
 
+// chosen based on https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml
+#define RAW_OPCODE 7
+#define RAW_RCODE 12
+#define RAW_OPT_OPTION 22
+
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
 
 

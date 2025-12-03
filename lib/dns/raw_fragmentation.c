@@ -1,15 +1,110 @@
 
+#include <stdint.h>
 #include <sys/types.h>
 #include <isc/result.h>
 #include <isc/types.h>
 #include <isc/buffer.h>
+#include <isc/util.h>
 #include <dns/message.h>
+#include <dns/rdata.h>
+#include <dns/rdataset.h>
+#include <dns/raw_fragmentation.h>
 
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned header_size) {
     return (total_msg_size - (header_size + 4)) / max_msg_size; 
 }
 
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
+// clones the rdataset
+isc_result_t rdataset_clone(dns_rdataset_t *source, dns_rdataset_t *target) {
+
+}
+
+isc_result_t section_clone(dns_message_t *source, dns_message_t *target, unsigned section) {
+    REQUIRE(section < DNS_SECTION_MAX);
+
+}
+
+/*
+creates and initializes a fragment response by including the following:
+1. copy header from message
+2. change rcode to 10 (FRAGMENT), 1-9 are taken by RFC1035 and RFC2136
+3. copy question from message
+4. add an opt record with | frag_nr | nr_fragments | flags |
+*/
+isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, unsigned frag_nr, unsigned nr_fragments) {
+    REQUIRE(frag != NULL && *frag == NULL);
+    dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, frag);
+    isc_result_t result;
+
+    // set header metadata
+    (*frag)->id = msg->id;
+    (*frag)->flags = msg->flags;
+    (*frag)->rcode = msg->rcode; // change to fragment
+    (*frag)->opcode = msg->opcode;
+    (*frag)->rdclass = msg->rdclass;
+    // set fragmentation metadata
+    (*frag)->is_fragment = true;
+    (*frag)->fragment_nr = frag_nr;
+
+    // copy question
+    dns_rdataset_t *question = NULL;
+    dns_
+    dns_message_gettemprdataset(*frag, &question);
+    rdataset_clone(msg->, question);
+}
+
+
+isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, unsigned frag_nr, unsigned nr_fragments, bool truncated) {
+    // copy opt if exists, else create new one
+    isc_result_t result;
+    dns_rdataset_t *opt = NULL;
+    dns_rdata_t rdata;
+    isc_buffer_t optbuf;
+    dns_message_gettemprdataset(*frag, &opt);
+    unsigned version = 0; // is this correct?
+    uint16_t udpsize = 65535; // max UDP size
+    unsigned flags = DNS_MESSAGEEXTFLAG_DO;
+    dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS + 1]; // we allow for a max of 9
+    size_t opts_count = 0;
+    // parse the old opt message
+    result = dns_rdataset_first(msg->opt);
+    if (result == ISC_R_SUCCESS) {
+        // copy buffer
+        dns_rdata_init(&rdata);
+        dns_rdataset_current(msg->opt, &rdata);
+        isc_buffer_init(&optbuf, rdata.data, rdata.length);
+        isc_buffer_add(&optbuf, rdata.length);
+
+        // parse count and ednsopts and add to array
+        while (isc_buffer_remaininglength(&optbuf) >= 4) {
+            REQUIRE(opts_count < DNS_EDNSOPTIONS);
+            ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+            opts_count++;
+        }
+
+        // copy values
+        version = msg->opt->ttl >> 16;
+        flags = msg->opt->ttl & 0xffff;
+        udpsize = msg->opt->rdclass;
+    }
+    // add the new opt data
+    ednsopts[opts_count].code = RAW_OPT_OPTION;
+    ednsopts[opts_count].length = 2;
+    // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
+    uint16_t data = (frag_nr << 10) | (nr_fragments << 4) | (truncated ? 1 : 0);
+    unsigned char value[2];
+    value[0] = (data >> 8);
+    value[1] = data & 0xff;
+    ednsopts[opts_count].value = value;
+
+    // build and set opt record
+    dns_message_buildopt(*frag, &opt, version, udpsize, flags, ednsopts, opts_count);
+    return dns_message_setopt(*frag, opt);
+}
+
+bool raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 
     isc_result_t result;
     unsigned msgsize = msg->buffer->used;
