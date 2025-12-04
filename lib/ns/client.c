@@ -572,6 +572,7 @@ ns_client_send(ns_client_t *client) {
 				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
 					 "Fragment not found, sending FORMERR!");
 				client->message->rcode = dns_rcode_formerr;
+				client->message->flags |= DNS_MESSAGEFLAG_TC; // set TC so resolver detects it as fragment
 				client->formerrcache.addr = client->peeraddr;
 				client->formerrcache.time = isc_time_seconds(&client->requesttime);
 				client->formerrcache.id = client->message->id;
