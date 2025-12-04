@@ -21,6 +21,9 @@ void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *
 // DNSKEY header: 2 (Flags) + 1 (Protocol) + 1 (Algorithm) = 4 Bytes
 unsigned calc_dnskey_header_size(void);
 
+// calculates the size of a name
+unsigned calc_name_size(unsigned char *base, unsigned length);
+
 // RRSIG header: 2 (Type Covered) + 1 (Algorithm) + 1 (Labels) + 4 (TTL) + 4 (Expiration) + 4 (Inception) + 2 (Key Tag) + x (Signer Name) = 18 + x
 unsigned calc_rrsig_header_size(dns_rdata_t *rdata);
 
@@ -35,3 +38,6 @@ bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment
 
 // prints the dns message in a human-readable format
 void printmessage(isc_mem_t *mctx, dns_message_t *msg);
+
+
+isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const unsigned section);

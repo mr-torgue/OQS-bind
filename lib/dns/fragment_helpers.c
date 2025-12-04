@@ -1,5 +1,11 @@
+#include <isc/result.h>
+#include <isc/types.h>
 #include <isc/util.h>
 #include <dns/fragment_helpers.h>
+#include <dns/message.h>
+#include <dns/name.h>
+#include <dns/rdata.h>
+#include <dns/rdataset.h>
 
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize) {
     REQUIRE(*keysize >= 64);
@@ -9,6 +15,14 @@ void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *
 
 unsigned calc_dnskey_header_size(void) {
     return 4;
+}
+
+unsigned calc_name_size(unsigned char *base, unsigned length) {
+    unsigned size = 0;
+    while (base[size] != 0 && size < length) {
+        size++;
+    }    
+    return size;
 }
 
 unsigned calc_rrsig_header_size(dns_rdata_t *rdata) {
@@ -45,6 +59,49 @@ void printmessage(isc_mem_t *mctx, dns_message_t *msg) {
 	}
 }
 
+// clones a complete section from source to target
+isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const unsigned section) {
+    REQUIRE(section < DNS_SECTION_MAX);
+    REQUIRE(DNS_MESSAGE_VALID(source));
+    REQUIRE(DNS_MESSAGE_VALID(target));
+    isc_result_t ret = ISC_R_SUCCESS;
+    for (isc_result_t result = dns_message_firstname(source, section); 
+         result == ISC_R_SUCCESS;  
+         result = dns_message_nextname(source, section)) {
+        // clone name (shallow)
+        dns_name_t *name = NULL;
+        dns_message_currentname(source, section, &name);
+        dns_name_t *new_name = NULL;
+        dns_message_gettempname(target, &new_name);
+        dns_name_clone(name, new_name);
+        // clone all rdatasets
+        for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+            dns_rdataset_t *new_rdataset = NULL;
+            dns_message_gettemprdataset(target, &new_rdataset);
+            dns_rdataset_clone(rdataset, new_rdataset);
+            // clone all rdata's
+            for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
+                dns_rdata_t rdata = DNS_RDATA_INIT;
+                dns_rdataset_current(rdataset, &rdata);
+                dns_rdata_t *new_rdata = NULL;
+                dns_message_gettemprdata(target, &new_rdata);
+                dns_rdata_clone(&rdata, new_rdata);
+                ISC_LIST_APPEND(new_rdataset->rdlist.list->rdata, new_rdata, link); // append to list
+            }
+            ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+        }
+        dns_message_addname(target, new_name, section);
+    }
+    // clone OPT if in the additional section
+    if (source->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
+        REQUIRE(dns_rdataset_count(source->opt) == 1);
+        dns_rdataset_t *new_opt_rdataset = NULL;
+        dns_message_gettemprdataset(target, &new_opt_rdataset);    
+        dns_rdataset_clone(source->opt, new_opt_rdataset);
+        ret = dns_message_setopt(target, new_opt_rdataset);
+    }
+    return ret;
+}
 
 bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, dns_message_t **question, isc_buffer_t **question_buffer) {
     REQUIRE(question != NULL && *question == NULL);

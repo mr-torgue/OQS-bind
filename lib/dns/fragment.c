@@ -408,8 +408,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 
             // ignore if there are no resource records
             if(msg->counts[section_nr] > 0) {
-                for (isc_result_t result = dns_message_firstname(msg, section_nr); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section_nr))
-                {
+                for (isc_result_t result = dns_message_firstname(msg, section_nr); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section_nr)) {
                     name = NULL;
                     dns_message_currentname(msg, section_nr, &name);
                     dns_name_t *new_name = NULL;
@@ -585,6 +584,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 // assumption: cache contains all fragments
 // assumption: size of fragments should add up to size specified in entry
 bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_message_t **out_msg) {
+    REQUIRE(entry != NULL);
     REQUIRE(out_msg != NULL && *out_msg == NULL);
 
     // check if all fragments are in cache

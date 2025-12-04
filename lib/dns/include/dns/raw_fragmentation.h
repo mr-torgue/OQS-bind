@@ -31,6 +31,10 @@ Advantages:
 #define RAW_RCODE 12
 #define RAW_OPT_OPTION 22
 
+#define DNS_HEADER_SIZE 12
+#define RR_HEADER_SIZE 10
+#define QUESTION_HEADER_SIZE 4
+
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
 
 
