@@ -574,7 +574,7 @@ ns_client_send(ns_client_t *client) {
 				client->message->rcode = dns_rcode_formerr;
 				client->formerrcache.addr = client->peeraddr;
 				client->formerrcache.time = isc_time_seconds(&client->requesttime);
-				client->formerrcache.id = msg->id;
+				client->formerrcache.id = client->message->id;
 			}
 		}
 		// fragmentation triggers when the response is too large 
