@@ -30,7 +30,7 @@ creates and initializes a fragment response by including the following:
 3. copy question from message
 4. set opt
 */
-isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, unsigned frag_nr, unsigned nr_fragments) {
+isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments) {
     REQUIRE(frag != NULL && *frag == NULL);
     dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, frag);
     isc_result_t result;
@@ -110,13 +110,6 @@ isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *
     // build and set opt record
     dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
     return dns_message_setopt(frag, opt);
-}
-
-/*
-builds the fragment
-*/
-static raw_add_reset() {
-
 }
 
 bool raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
@@ -228,7 +221,7 @@ bool raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 
 
 //
-isc_result_t get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size, 
+isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size, 
                                 unsigned *opt_offset, unsigned *opt_size, 
                                 unsigned *first_rr_offset, unsigned *last_rr_offset, bool *is_truncated) {
     isc_region_t frag_region;

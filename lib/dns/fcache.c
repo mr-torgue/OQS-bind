@@ -50,10 +50,14 @@ static void fcache_timer_cb(void *arg) {
     */
 }
 
-void fcache_init(isc_loop_t *loop) {
+void fcache_init(fcache_t **fcache, isc_loop_t *loop, unsigned ttl) {
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Initializing fragment cache..."); 
+    REQUIRE(fcache != NULL && *fcache == NULL);
     REQUIRE(loop != NULL);
+    REQUIRE(ttl > 0);
+
+    
     REQUIRE(frag_mctx == NULL);
     REQUIRE(fragment_cache == NULL);
     REQUIRE(expiry_timer == NULL);
@@ -62,6 +66,7 @@ void fcache_init(isc_loop_t *loop) {
 	//isc_mem_attach(ntatable->mctx, &nta->mctx);
 	//isc_loop_attach(isc_loop_main(frag_loopmgr_p), &frag_loop);
 	//isc_loop_attach(isc_loop_current(frag_loopmgr), &frag_loop);
+    
     isc_time_set(&fragment_ttl, 10, 0); // hardcoded
     isc_time_set(&loop_timeout, 0, 0);  // hardcoded
     isc_ht_init(&fragment_cache, frag_mctx, 16, 0); // use size 2^16, case sensitive 

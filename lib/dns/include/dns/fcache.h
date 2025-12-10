@@ -42,20 +42,21 @@ typedef struct fragment_cache_entry {
 
 typedef ISC_LIST(fragment_cache_entry_t) fragmentlist_t;
 
-// global variables
-static isc_mem_t *frag_mctx = NULL;            // for memory allocations
-static isc_ht_t *fragment_cache = NULL;        // fragment hashtable
-static fragmentlist_t expiry_list; // linked list to keep track of which fragment entries need to be removed
-static isc_timer_t *expiry_timer = NULL;       // timer
-static isc_time_t fragment_ttl;                // specifies ttl in the cache for a cache entry
-static isc_time_t loop_timeout;                // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
+typedef struct fcache {
+    isc_mem_t *mctx;                // for memory allocations
+    isc_ht_t *cache;                // fragment hashtable
+    fragmentlist_t expiry_list;     // linked list to keep track of which fragment entries need to be removed
+    isc_timer_t *expiry_timer;      // timer ensuring 
+    isc_time_t ttl;                 // specifies ttl in the cache for a cache entry
+    isc_time_t loop_timeout;        // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
+} fcache_t;
 
-// initializes the global variables
-// initializes the timer (hardcoded intervals currently)
-void fcache_init(isc_loop_t *frag_loopmgr_p);
+
+// initializes the fache object
+void fcache_init(fcache_t *fcache, isc_loop_t *frag_loopmgr_p);
 
 // deinitializes the timer and cleans up
-void fcache_deinit(void);
+void fcache_deinit(fcache_t *fcache, void);
 
 // add a fragment to cache
 // creates a new cache entry if not exists
