@@ -78,6 +78,13 @@ struct dns_dispatchset {
  */
 #define DNS_DISPATCHOPT_FIXEDID 0x00000001U
 
+void 
+dns_dispatchmgr_setudpfragmentation(dns_dispatchmgr_t *mgr, uint8_t udp_fragmentation_mode);
+
+void 
+dns_dispatch_initfcache(dns_dispatchmgr_t *mgr, isc_loopmgr_t *loopmgr);
+
+
 isc_result_t
 dns_dispatchmgr_create(isc_mem_t *mctx, isc_nm_t *nm, dns_dispatchmgr_t **mgrp);
 /*%<

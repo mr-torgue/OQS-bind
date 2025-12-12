@@ -544,6 +544,7 @@ ns_client_send(ns_client_t *client) {
 	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
 	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 	if (udp_fragmentation_enabled) {
+		fcache_t *fcache = client->manager->sctx->fcache;
 		
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
@@ -559,7 +560,7 @@ ns_client_send(ns_client_t *client) {
 			isc_buffer_t *out_frag = NULL;
 			dns_message_t *msg = NULL;
 			unsigned long frag_nr = client->message->fragment_nr;
-			if(fcache_get_fragment(key, keysize, frag_nr, &out_frag)) {
+			if(fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag)) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
@@ -592,7 +593,7 @@ ns_client_send(ns_client_t *client) {
 			client->message->buffer = &buffer; // not associated by default
 			// QBF
 			if (udp_fragmentation_mode == 1) {
-				fragment(client->manager->mctx, client->message, addr_buf);
+				fragment(client->manager->mctx, fcache, client->message, addr_buf);
 			}
 			// RAW
 			else if (udp_fragmentation_mode == 2) {				
@@ -603,7 +604,7 @@ ns_client_send(ns_client_t *client) {
 			// get first fragment from cache and set it as client->message
 			isc_buffer_t *out_frag = NULL;
 			dns_message_t *msg = NULL;
-			if(fcache_get_fragment(key, keysize, 0, &out_frag)) {
+			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag)) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache

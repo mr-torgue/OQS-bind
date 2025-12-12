@@ -78,6 +78,10 @@ struct dns_dispatchmgr {
 	unsigned int nv4ports; /*%< # of available ports for IPv4 */
 	in_port_t *v6ports;    /*%< available ports for IPv4 */
 	unsigned int nv6ports; /*%< # of available ports for IPv4 */
+
+	// UDP FRAGMENTATION (make sure to also change isc_nm and dispatch)
+	uint8_t udp_fragmentation_mode; // 0 = NONE, 1 = QBF, 2 = RAW
+	fcache_t *fcache;
 };
 
 typedef enum {
@@ -641,11 +645,12 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	 * 1. efficiency: quite a bit of parsing and rendering --> reduce
 	 * 2. hardcoded 1232: use variable name instead
 	 */
-	uint8_t udp_fragmentation_mode = isc_nm_getudpfragmentation(disp->mgr->nm);
+	uint8_t udp_fragmentation_mode = disp->mgr->udp_fragmentation_mode;
 	bool is_any_fragment = (flags & DNS_MESSAGEFLAG_TC) != 0;
 	// QBF fragmentation
 	if (udp_fragmentation_mode == 1 && is_any_fragment) {
 
+		fcache_t *fcache = disp->mgr->fcache;
 		// get source address
 		char from_addr_buf[ISC_SOCKADDR_FORMATSIZE];
 		char to_addr_buf[ISC_SOCKADDR_FORMATSIZE];
@@ -682,7 +687,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		// create cache key
 		unsigned char key[64];
 		unsigned keysize = sizeof(key) / sizeof(key[0]);
-		fcache_create_key(id, to_addr_buf, key, &keysize);
+		fcache_create_key(id, to_addr_buf, key, &keysize); // chagne this ...
 
 		// determine the amount of fragments
 		unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
@@ -699,12 +704,12 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
         	printmessage(disp->mgr->mctx, msg);
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Response to fragment query %lu!", msg->fragment_nr); 
-			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
-			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+			REQUIRE(fcache_add(fcache, key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(fcache, key, keysize, &out_ce)); // can be combined with add
 
 			if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
 				dns_message_t *out_msg = NULL;
-				reassemble_fragments(disp->mgr->mctx, out_ce, &out_msg);
+				reassemble_fragments(disp->mgr->mctx, fcache, out_ce, &out_msg);
 				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 					"All fragments received! Message size: %u", out_msg->buffer->used); 
 				region->base = out_msg->buffer->base;
@@ -717,8 +722,8 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		// note that this is currently not well-defined
 		else {
 			
-			REQUIRE(fcache_add(key, keysize, msg, nr_fragments)); // adding should never fail
-			REQUIRE(fcache_get(key, keysize, &out_ce)); // can be combined with add
+			REQUIRE(fcache_add(fcache, key, keysize, msg, nr_fragments)); // adding should never fail
+			REQUIRE(fcache_get(fcache, key, keysize, &out_ce)); // can be combined with add
 
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Requesting %u additional fragments...", nr_fragments - 1); 
@@ -1118,6 +1123,20 @@ setavailports(dns_dispatchmgr_t *mgr, isc_portset_t *v4portset,
 /*
  * Publics.
  */
+
+void 
+dns_dispatchmgr_setudpfragmentation(dns_dispatchmgr_t *mgr, uint8_t udp_fragmentation_mode) {
+	mgr->udp_fragmentation_mode = udp_fragmentation_mode;
+}
+
+void 
+dns_dispatch_initfcache(dns_dispatchmgr_t *mgr, isc_loopmgr_t *loopmgr) {
+	fcache_t *fcache = NULL;
+	// records stay for 10 seconds, trigger manual clean up every 30 seconds
+	// TODO: turn into settings
+	fcache_init(&fcache, loopmgr, 10, 30); 
+	mgr->fcache = fcache;
+}
 
 isc_result_t
 dns_dispatchmgr_create(isc_mem_t *mctx, isc_nm_t *nm,
@@ -1561,6 +1580,10 @@ dispatch_destroy(dns_dispatch_t *disp) {
 	isc_mutex_destroy(&disp->lock);
 
 	isc_mem_put(mgr->mctx, disp, sizeof(*disp));
+
+	if (mgr->fcache != NULL) {
+		fcache_deinit(&mgr->fcache);
+	}
 
 	/*
 	 * Because dispatch uses mgr->mctx, we must detach after freeing

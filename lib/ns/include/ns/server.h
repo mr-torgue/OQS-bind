@@ -29,6 +29,7 @@
 
 #include <dns/acl.h>
 #include <dns/types.h>
+#include <dns/fcache.h>
 
 #include <ns/types.h>
 
@@ -91,8 +92,9 @@ struct ns_server {
 	ISC_LIST(isc_quota_t) http_quotas;
 	isc_mutex_t http_quotas_lock;
 
-	// UDP FRAGMENTATION (make sure to also change isc_nm)
+	// UDP FRAGMENTATION (make sure to also change isc_nm and dispatch)
 	uint8_t udp_fragmentation_mode; // 0 = NONE, 1 = QBF, 2 = RAW
+	fcache_t *fcache;
 
 	/*% Test options and other configurables */
 	uint32_t options;
@@ -135,6 +137,12 @@ struct ns_altsecret {
 	ISC_LINK(ns_altsecret_t) link;
 	unsigned char secret[32];
 };
+
+void 
+ns_server_setudpfragmentation(ns_server_t *sctx, uint8_t udp_fragmentation_mode);
+
+void
+ns_server_initfcache(ns_server_t *sctx, isc_loopmgr_t *loopmgr);
 
 void
 ns_server_create(isc_mem_t *mctx, ns_matchview_t matchingview,

@@ -344,12 +344,10 @@ static void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, uns
     REQUIRE(fragment_nr != nr_fragments - 1 || *frag_len + *start == rdata_size);
 }
  
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
+bool fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address) {
     REQUIRE(msg != NULL);
     REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
     REQUIRE(mctx != NULL);
-    printf("msg before fragment\n");
-    printmessage(mctx, msg);
     //msg->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
     //REQUIRE(msg->flags & DNS_MESSAGEFLAG_TC); // truncated flag should be set
     unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -560,7 +558,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
         render_fragment(mctx, 1280, &frag); // slightly larger than max UDP
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
-        fcache_add(key, keysize, frag, nr_fragments);
+        fcache_add(fcache, key, keysize, frag, nr_fragments);
         printf("frag %u\n", frag_nr + 1);
         printmessage(mctx, frag);
 		for (unsigned i = 0; i < frag->buffer->used; i++) {
@@ -583,7 +581,7 @@ bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 // reassembles the complete message from cache
 // assumption: cache contains all fragments
 // assumption: size of fragments should add up to size specified in entry
-bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_message_t **out_msg) {
+bool reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg) {
     REQUIRE(entry != NULL);
     REQUIRE(out_msg != NULL && *out_msg == NULL);
 
@@ -726,6 +724,6 @@ bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_me
             "Reassembled entry %s from %u fragments into one message with size %u", entry->key, entry->nr_fragments, (*out_msg)->buffer->used);  
     
     // would be slightly more efficient to do this in the loop
-    fcache_remove(entry->key, entry->keysize);
+    fcache_remove(fcache, entry->key, entry->keysize);
     return true;
 }

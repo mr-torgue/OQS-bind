@@ -19,6 +19,7 @@
 #include <isc/stats.h>
 #include <isc/util.h>
 
+#include <dns/fcache.h>
 #include <dns/stats.h>
 #include <dns/tkey.h>
 
@@ -34,6 +35,20 @@
 		result = (op);                          \
 		RUNTIME_CHECK(result == ISC_R_SUCCESS); \
 	} while (0)
+
+void 
+ns_server_setudpfragmentation(ns_server_t *sctx, uint8_t udp_fragmentation_mode) {
+	sctx->udp_fragmentation_mode = udp_fragmentation_mode;
+}
+
+void
+ns_server_initfcache(ns_server_t *sctx, isc_loopmgr_t *loopmgr) {
+	fcache_t *fcache = NULL;
+	// records stay for 10 seconds, trigger manual clean up every 30 seconds
+	// TODO: turn into settings
+	fcache_init(&fcache, loopmgr, 10, 30); 
+	sctx->fcache = fcache;
+}
 
 void
 ns_server_create(isc_mem_t *mctx, ns_matchview_t matchingview,
@@ -204,6 +219,10 @@ ns_server_detach(ns_server_t **sctxp) {
 		}
 
 		sctx->magic = 0;
+
+		if (sctx->fcache != NULL) {
+			fcache_deinit(&sctx->fcache);
+		}
 
 		isc_mem_putanddetach(&sctx->mctx, sctx, sizeof(*sctx));
 	}

@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "include/named/globals.h"
 
 #ifdef HAVE_DNSTAP
 #include <fstrm.h>
@@ -8533,8 +8534,16 @@ load_configuration(const char *filename, named_server_t *server,
 			exit(0);
 		}
 	}
-	isc_nm_setudpfragmentation(named_g_netmgr, udp_fragmentation_mode);
-	server->sctx->udp_fragmentation_mode = udp_fragmentation_mode;
+	// set the fragmentation mode
+	dns_dispatchmgr_setudpfragmentation(named_g_dispatchmgr, udp_fragmentation_mode);
+	ns_server_setudpfragmentation(server->sctx, udp_fragmentation_mode);
+	isc_nm_setudpfragmentation(named_g_netmgr, udp_fragmentation_mode); // needed for keeping sockets open
+	// initialize fcache
+	if (udp_fragmentation_mode != 0) {
+		dns_dispatch_initfcache(named_g_dispatchmgr, named_g_loopmgr);
+		ns_server_initfcache(server->sctx, named_g_loopmgr);
+	}
+
 
 	/*
 	 * Configure the network manager
@@ -9963,9 +9972,6 @@ run_server(void *arg) {
 				 &server->interface_timer);
 	}
 
-	// start fcache for UDP fragmentation
-	fcache_init(named_g_mainloop);
-
 	isc_timer_create(named_g_mainloop, heartbeat_timer_tick, server,
 			 &server->heartbeat_timer);
 
@@ -10007,8 +10013,6 @@ shutdown_server(void *arg) {
 	bool flush = server->flushonshutdown;
 	named_cache_t *nsc = NULL;
 
-	// empty fragment cache
-	fcache_deinit();
 #if HAVE_LIBSYSTEMD
 	sd_notify(0, "STOPPING=1\n");
 #endif /* HAVE_LIBSYSTEMD */

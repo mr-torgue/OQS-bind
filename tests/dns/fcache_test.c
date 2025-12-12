@@ -19,9 +19,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <sys/param.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
 #include <isc/loop.h>
+#include <isc/result.h>
+#include <isc/time.h>
 #include <isc/types.h>
 
 #define UNIT_TESTING
@@ -43,18 +46,59 @@
 
 #include <tests/dns.h>
 
-static int
-setup_test(void **state) {
-	setup_loopmgr(state);
+/*
+static isc_timer_t *timer = NULL;
+static isc_time_t endtime;
+static isc_mutex_t lasttime_mx;
+static isc_time_t lasttime;
+static int seconds;
+static int nanoseconds;
+static atomic_int_fast32_t eventcnt;
+static atomic_uint_fast32_t errcnt;
+static int nevents;
 
-	return (0);
+typedef struct setup_test_arg {
+	isc_timertype_t timertype;
+	isc_interval_t *interval;
+	isc_job_cb action;
+} setup_test_arg_t;
+
+// from isc/timer_test.c
+static void
+setup_test_run(void *data) {
+	isc_timertype_t timertype = ((setup_test_arg_t *)data)->timertype;
+	isc_interval_t *interval = ((setup_test_arg_t *)data)->interval;
+	isc_job_cb action = ((setup_test_arg_t *)data)->action;
+
+	isc_mutex_lock(&lasttime_mx);
+	lasttime = isc_time_now();
+	UNLOCK(&lasttime_mx);
+
+	isc_timer_create(mainloop, action, (void *)timertype, &timer);
+	isc_timer_start(timer, timertype, interval);
 }
 
-static int
-teardown_test(void **state) {
-	teardown_loopmgr(state);
-	return (0);
-}
+static void
+setup_test(isc_timertype_t timertype, isc_interval_t *interval,
+	   isc_job_cb action) {
+	setup_test_arg_t arg = { .timertype = timertype,
+				 .interval = interval,
+				 .action = action };
+
+	isc_time_settoepoch(&endtime);
+	atomic_init(&eventcnt, 0);
+
+	isc_mutex_init(&lasttime_mx);
+
+	atomic_store(&errcnt, ISC_R_SUCCESS);
+
+	isc_loop_setup(mainloop, setup_test_run, &arg);
+	isc_loopmgr_run(loopmgr);
+
+	assert_int_equal(atomic_load(&errcnt), ISC_R_SUCCESS);
+
+	isc_mutex_destroy(&lasttime_mx);
+}*/
 
 static void compare_buffers(isc_buffer_t *a, isc_buffer_t *b) {
     printf("Comparing buffers...\n");
@@ -103,6 +147,258 @@ static unsigned char* load_binary_file(const char* filename, size_t* out_size) {
     return buffer;
 }
 
+
+// tests the init and deinit functions
+ISC_LOOP_TEST_IMPL(test_fcache_init) {
+
+    assert_true(loopmgr != NULL);
+    assert_true(mctx != NULL);
+    // test case 1: normal case
+    fcache_t *fcache = NULL;
+    fcache_init(&fcache, loopmgr, 10, 20);
+    assert_true(fcache->mctx != NULL);
+    assert_true(fcache->ht != NULL);
+    assert_true(fcache->expiry_list.head == NULL);
+    assert_true(fcache->expiry_list.tail == NULL);
+    assert_true(fcache->expiry_timer != NULL);
+    assert_int_equal(fcache->ttl.seconds, 10);
+    assert_int_equal(fcache->loop_timeout.seconds, 20);
+    fcache_deinit(&fcache);
+    
+    // test case 2: different values
+    fcache = NULL;
+    fcache_init(&fcache, loopmgr, 1, 1);
+    assert_true(fcache->mctx != NULL);
+    assert_true(fcache->ht != NULL);
+    assert_true(fcache->expiry_list.head == NULL);
+    assert_true(fcache->expiry_list.tail == NULL);
+    assert_true(fcache->expiry_timer != NULL);
+    assert_int_equal(fcache->ttl.seconds, 1);
+    assert_int_equal(fcache->loop_timeout.seconds, 1);
+    fcache_deinit(&fcache);
+        
+    // test case 3: different values
+    fcache = NULL;
+    fcache_init(&fcache, loopmgr, 12345, 98765);
+    assert_true(fcache->mctx != NULL);
+    assert_true(fcache->ht != NULL);
+    assert_true(fcache->expiry_list.head == NULL);
+    assert_true(fcache->expiry_list.tail == NULL);
+    assert_true(fcache->expiry_timer != NULL);
+    assert_int_equal(fcache->ttl.seconds, 12345);
+    assert_int_equal(fcache->loop_timeout.seconds, 98765);
+    fcache_deinit(&fcache);
+    
+	isc_loopmgr_shutdown(loopmgr);
+}
+
+// tests the add function
+ISC_LOOP_TEST_IMPL(test_fcache_add) {
+
+    assert_true(loopmgr != NULL);
+    assert_true(mctx != NULL);
+    fcache_t *fcache = NULL;
+    fcache_init(&fcache, loopmgr, 10, 20);
+    unsigned buflen = 16;
+    unsigned nr_fragments = 5;
+    unsigned frag_nr = 0;
+    unsigned keysize = 96;
+    unsigned char key[keysize];
+    unsigned char key2[keysize];
+    unsigned char key4[keysize];
+    strcpy((char *)key, "thisisakey!");
+    strcpy((char *)key2, "thisisanotherkey!");
+    strcpy((char *)key2, "stillanotherkey!");
+    fragment_cache_entry_t *out_ce;
+    isc_result_t result;
+    isc_time_t now = isc_time_now();
+
+    // test case 1: normal case
+    dns_message_t *frag1 = NULL;
+    isc_buffer_t *buffer1 = NULL;
+    isc_buffer_allocate(mctx, &buffer1, buflen);
+    isc_buffer_putuint32(buffer1, 12345678);
+    isc_buffer_putuint32(buffer1, 11111111); 
+    frag1 = isc_mem_get(mctx, sizeof(dns_message_t));
+    assert_int_equal(buffer1->length, buflen);
+    frag1->fragment_nr = frag_nr;
+    frag1->buffer = buffer1;
+    result = fcache_add(fcache, key, keysize, frag1, nr_fragments);
+    assert_true(result == ISC_R_SUCCESS);
+    result = fcache_get(fcache, key, keysize, &out_ce);
+    assert_true(result == ISC_R_SUCCESS);
+    assert_true(out_ce != NULL);
+    assert_string_equal((char *)out_ce->key, (char *)key);
+    assert_int_equal(out_ce->keysize, keysize);
+    assert_int_equal(out_ce->nr_fragments, nr_fragments);
+    assert_true(out_ce->bitmap == (1u << frag_nr));
+    assert_true(out_ce->expiry.seconds > now.seconds - 10); // assumption that it takes less than 10 seconds
+
+    // test case 2: new case with first frag set to 2
+    out_ce = NULL;
+    dns_message_t *frag2 = NULL;
+    isc_buffer_t *buffer2 = NULL;
+    frag_nr = 2;
+    isc_buffer_allocate(mctx, &buffer2, buflen);
+    isc_buffer_putuint32(buffer2, 53633633);
+    isc_buffer_putuint32(buffer2, 11111221); 
+    isc_buffer_putuint32(buffer2, 11111221); 
+    frag2 = isc_mem_get(mctx, sizeof(dns_message_t));
+    assert_int_equal(buffer2->length, buflen);
+    frag2->fragment_nr = frag_nr;
+    frag2->buffer = buffer2;
+    result = fcache_add(fcache, key2, keysize, frag2, nr_fragments);
+    assert_true(result == ISC_R_SUCCESS);
+    result = fcache_get(fcache, key2, keysize, &out_ce);
+    assert_true(result == ISC_R_SUCCESS);
+    assert_true(out_ce != NULL);
+    assert_string_equal((char *)out_ce->key, (char *)key2);
+    assert_int_equal(out_ce->keysize, keysize);
+    assert_int_equal(out_ce->nr_fragments, nr_fragments);
+    assert_true(out_ce->bitmap == (1u << frag_nr));
+    assert_true(out_ce->expiry.seconds > now.seconds - 10); // assumption that it takes less than 10 seconds
+
+    // test case 3: already exists
+    result = fcache_add(fcache, key2, keysize, frag2, nr_fragments);
+    assert_true(result == ISC_R_EXISTS);
+    assert_true(out_ce->bitmap == (1u << frag_nr)); // just to check
+
+    // test case 4: fragment number out of range
+    out_ce = NULL;
+    dns_message_t *frag4 = NULL;
+    isc_buffer_t *buffer4 = NULL;
+    frag_nr = 5;
+    isc_buffer_allocate(mctx, &buffer4, buflen);
+    isc_buffer_putuint32(buffer4, 53633633);
+    isc_buffer_putuint32(buffer4, 11111221); 
+    isc_buffer_putuint32(buffer4, 11111221); 
+    frag4 = isc_mem_get(mctx, sizeof(dns_message_t));
+    assert_int_equal(buffer4->length, buflen);
+    frag4->fragment_nr = frag_nr;
+    frag4->buffer = buffer4;
+    result = fcache_add(fcache, key4, keysize, frag4, nr_fragments);
+    assert_true(result == ISC_R_RANGE);
+    result = fcache_get(fcache, key4, keysize, &out_ce);
+    assert_true(result == ISC_R_SUCCESS);
+    assert_true(out_ce != NULL);
+    assert_string_equal((char *)out_ce->key, (char *)key4);
+    assert_int_equal(out_ce->keysize, keysize);
+    assert_int_equal(out_ce->nr_fragments, nr_fragments);
+    assert_true(out_ce->expiry.seconds > now.seconds - 10); // assumption that it takes less than 10 seconds
+
+
+    // free everything
+    isc_buffer_free(&buffer1);
+    isc_mem_put(mctx, frag1, sizeof(dns_message_t));
+    isc_buffer_free(&buffer2);
+    isc_mem_put(mctx, frag2, sizeof(dns_message_t));
+    isc_buffer_free(&buffer4);
+    isc_mem_put(mctx, frag4, sizeof(dns_message_t));
+    fcache_deinit(&fcache);
+	isc_loopmgr_shutdown(loopmgr);
+}
+
+typedef struct test_fcache {
+    fcache_t *fcache;
+    uint expected_count;
+
+} test_fcache_t;
+
+//static void timer_cleanup(void *data) {
+//        isc_buffer_free(&buffer1);
+//    isc_mem_put(mctx, frag1, sizeof(dns_message_t));
+//    fcache_deinit(&fcache);
+//	isc_loopmgr_shutdown(loopmgr);
+//}
+
+//static isc_timer_t *timer = NULL;
+//static isc_time_t endtime;
+//static isc_mutex_t lasttime_mx;
+//static isc_time_t lasttime;
+//static int seconds;
+//static int nanoseconds;
+//static atomic_int_fast32_t eventcnt;
+//static atomic_uint_fast32_t errcnt;
+//static int nevents;
+
+// globals for timer testing
+static isc_timer_t *timer_g = NULL;
+static isc_timer_t *timer_2_g = NULL;
+static fcache_t *fcache_g;
+static unsigned expected_count_g;
+static unsigned expected_count_2_g;
+static unsigned nevents_g;
+
+static void timer_cb(void *data) {
+    nevents_g--;
+    unsigned *expected_count = (unsigned *)data;
+    printf("timer_cb, nevents_g: %u, expected_count: %u\n", nevents_g, *expected_count);
+    assert_int_equal(fcache_count(fcache_g), *expected_count);
+    // iterate
+    // shutdown if 
+    if (nevents_g == 0) {
+		isc_timer_destroy(&timer_g);
+		isc_timer_destroy(&timer_2_g);
+        fcache_deinit(&fcache_g);
+        isc_loopmgr_shutdown(loopmgr);
+    }
+}
+
+ISC_LOOP_TEST_IMPL(test_fcache_expiry) {
+    assert_true(loopmgr != NULL);
+    assert_true(mctx != NULL);
+
+    nevents_g = 2;
+    fcache_g = NULL;
+    unsigned ttl = 3;
+    unsigned timeout = 5;
+
+    fcache_init(&fcache_g, loopmgr, ttl, timeout);
+    // test case 1: 3 ttl and 5 second time-out
+    unsigned buflen = 16;
+    unsigned nr_fragments = 5;
+    unsigned frag_nr = 0;
+    unsigned keysize = 96;
+    unsigned char key[keysize];
+    strcpy((char *)key, "thisisakey!");
+    fragment_cache_entry_t *out_ce;
+    isc_result_t result;
+    isc_time_t now = isc_time_now();
+
+    // test case 1: normal case
+    dns_message_t *frag1 = NULL;
+    isc_buffer_t *buffer1 = NULL;
+    isc_buffer_allocate(mctx, &buffer1, buflen);
+    isc_buffer_putuint32(buffer1, 12345678);
+    isc_buffer_putuint32(buffer1, 11111111); 
+    frag1 = isc_mem_get(mctx, sizeof(dns_message_t));
+    assert_int_equal(buffer1->length, buflen);
+    frag1->fragment_nr = frag_nr;
+    frag1->buffer = buffer1;
+    result = fcache_add(fcache_g, key, keysize, frag1, nr_fragments);
+    assert_true(result == ISC_R_SUCCESS);
+
+    // test case 1
+    expected_count_g = 1;
+    isc_timer_create(isc_loop_main(loopmgr), timer_cb, &expected_count_g, &timer_g);
+    isc_interval_t interval;
+	isc_interval_set(&interval, 1, 0);
+	isc_timer_start(timer_g, isc_timertype_once, &interval);
+
+    // test case 2
+    expected_count_2_g = 0;
+    isc_timer_create(isc_loop_main(loopmgr), timer_cb, &expected_count_2_g, &timer_2_g);
+    isc_interval_t interval2;
+	isc_interval_set(&interval2, 6, 0);
+	isc_timer_start(timer_2_g, isc_timertype_once, &interval2);
+
+
+    // empty
+    isc_buffer_free(&buffer1);
+    isc_mem_put(mctx, frag1, sizeof(dns_message_t));
+}
+
+/*
 // tests basic insertion and deletion
 ISC_LOOP_TEST_IMPL(basic) {
     
@@ -386,12 +682,15 @@ ISC_LOOP_TEST_IMPL(purge) {
     //fcache_deinit();
 	//isc_loopmgr_shutdown(loopmgr);
 }
-
+*/
 
 
 ISC_TEST_LIST_START
-ISC_TEST_ENTRY_CUSTOM(basic, setup_test, teardown_test)
-ISC_TEST_ENTRY_CUSTOM(real_dns_messages, setup_test, teardown_test)
+ISC_TEST_ENTRY_CUSTOM(test_fcache_init, setup_managers, teardown_managers)
+ISC_TEST_ENTRY_CUSTOM(test_fcache_add, setup_managers, teardown_managers)
+ISC_TEST_ENTRY_CUSTOM(test_fcache_expiry, setup_loopmgr, teardown_loopmgr)
+//ISC_TEST_ENTRY_CUSTOM(basic, setup_test, teardown_test)
+//ISC_TEST_ENTRY_CUSTOM(real_dns_messages, setup_test, teardown_test)
 //ISC_TEST_ENTRY_CUSTOM(expire, setup_test, teardown_test)
 //ISC_TEST_ENTRY_CUSTOM(purge, setup_test, teardown_test)
 // ISC_TEST_ENTRY_CUSTOM(duplicate fragment, setup_test, teardown_test)

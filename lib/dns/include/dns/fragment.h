@@ -47,11 +47,11 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address);
+bool fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address);
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false
-bool reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_message_t **out_msg);
+bool reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg);
 
 // requests remaining fragments from the name server
 // determines how many fragments to retrieve based on the provided response
