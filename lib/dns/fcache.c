@@ -13,16 +13,17 @@
 
 // schedules a time event after interval seconds
 static void fcache_schedule_timer(fcache_t *fcache, isc_time_t *interval) {
+    REQUIRE(isc_time_seconds(interval) < 600); // to ensure that we don't get comically large timeouts
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-        "Setting timer at %d seconds...", isc_time_seconds(interval)); 
-    isc_timer_start(fcache->expiry_timer, isc_timertype_ticker, interval);
+        "Setting timer at %u seconds...", isc_time_seconds(interval)); 
+    printf("Setting timer at %u seconds...\n", isc_time_seconds(interval));
+    isc_timer_start(fcache->expiry_timer, isc_timertype_once, interval);
 }
 
 // callback when a timer goes off
 static void fcache_timer_cb(void *arg) {
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Executing callback..."); 
-    printf("fcache_timer_cb\n");
     
     fcache_t *fcache = (fcache_t *)arg;
     isc_time_t now = isc_time_now();
@@ -30,14 +31,9 @@ static void fcache_timer_cb(void *arg) {
 
     for (entry = ISC_LIST_HEAD(fcache->expiry_list); entry != NULL; entry = next) {
         next = ISC_LIST_NEXT(entry, link);
-        printf("in the loop\n");
         // remove if expired
         if (isc_time_compare(&(entry->expiry), &now) <= 0) {
-            printf("removing\n");
             isc_result_t result = fcache_remove(fcache, entry->key, entry->keysize);
-            if (result == ISC_R_SUCCESS) {
-                printf("success!\n");
-            }
         } else {
             break;  // remaining entries are not yet expired
         }
@@ -45,12 +41,16 @@ static void fcache_timer_cb(void *arg) {
 
     // reschedule the timer for the next expiry (if any)
     if (ISC_LIST_HEAD(fcache->expiry_list) != NULL) {
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Executing callback..."); 
         fprintf(stderr, "Callback is rescheduling timer...\n");
         isc_time_t delta;
         isc_time_t new_time = ISC_LIST_HEAD(fcache->expiry_list)->expiry;
-        REQUIRE(isc_time_compare(&now, &new_time) >= 0);
-        isc_time_subtract(&now, &new_time, &delta);
-        // check if delta is small
+        // new_time > now
+        REQUIRE(isc_time_compare(&new_time, &now) > 0);
+        // delta is the remaning valid time period for this entry
+        isc_time_subtract(&new_time, &now, &delta);
+        // check if delta is smaller than timeout
         if (isc_time_compare(&delta, &fcache->loop_timeout) == -1) {
             delta = fcache->loop_timeout;
         }
@@ -75,11 +75,15 @@ void fcache_init(fcache_t **fcache, isc_loopmgr_t *loopmgr, unsigned ttl, unsign
     isc_time_set( &(*fcache)->ttl, ttl, 0); 
     (*fcache)->ht = NULL;
     isc_time_set(&(*fcache)->loop_timeout, loop_timeout, 0); 
+    // set max_ttl_timeout to MAX(ttl, loop_timeout)
+    (*fcache)->max_ttl_timeout = (*fcache)->ttl;
+    if (isc_time_compare(&(*fcache)->ttl, &(*fcache)->loop_timeout) == -1) {
+        (*fcache)->max_ttl_timeout = (*fcache)->loop_timeout;
+    }
     isc_ht_init(&(*fcache)->ht, (*fcache)->mctx, 16, 0); // use size 2^16, case sensitive 
     ISC_LIST_INIT((*fcache)->expiry_list);
     (*fcache)->expiry_timer = NULL;
     isc_timer_create(isc_loop_main(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
-    fcache_schedule_timer(*fcache, &(*fcache)->loop_timeout);
 
     // initialize mutex
 	isc_mutex_init(&(*fcache)->lock);
@@ -89,15 +93,6 @@ void fcache_deinit(fcache_t **fcache) {
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Deinitializing fragment cache..."); 
     isc_timer_destroy(&(*fcache)->expiry_timer);
-    // empty expiry list
-    //while (!ISC_LIST_EMPTY((*fcache)->expiry_list)) {
-    //    ISC_LIST_UNLINK((*fcache)->expiry_list, ISC_LIST_HEAD((*fcache)->expiry_list), link);
-    //}
-    //fragment_cache_entry_t *entry;
-    //while ((entry = ISC_LIST_HEAD((*fcache)->expiry_list)) != NULL) {
-    //    ISC_LIST_UNLINK((*fcache)->expiry_list, entry, link);
-    //}
-
     fcache_purge(*fcache);
     isc_ht_destroy(&(*fcache)->ht); // entries get freed here
     isc_mutex_destroy(&(*fcache)->lock);
@@ -105,10 +100,9 @@ void fcache_deinit(fcache_t **fcache) {
 }
 
 
-isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
+isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned nr_fragments) {
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Adding fragment cache entry with key %s (%u)...", (char *)key, keysize); 
-    REQUIRE(frag->buffer != NULL || frag->saved.base != NULL);
     // lookup in cache
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry);
@@ -133,19 +127,26 @@ isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, 
         ISC_LIST_APPEND(fcache->expiry_list, entry, link);          // add to linked list
 
         // schedule a timer for this entry if it's the earliest
-        if (ISC_LIST_HEAD(fcache->expiry_list) == entry) {
-            printf("Schedule next timer in %d seconds\n", fcache->ttl.seconds);
-            fcache_schedule_timer(fcache, &fcache->ttl);
+        if (ISC_LIST_HEAD(fcache->expiry_list) == entry) {    
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+            "Schedule next timer in %d seconds\n", fcache->max_ttl_timeout.seconds);
+            fcache_schedule_timer(fcache, &fcache->max_ttl_timeout);
         }
-
-        // add the first fragment
-        return fcache_add_fragment_with_entry(fcache, entry, frag, frag->fragment_nr);
+        return ISC_R_SUCCESS;
     }
     return ISC_R_EXISTS;
 }
 
-isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t *frag, unsigned frag_nr) {
-    REQUIRE(frag->buffer != NULL || frag->saved.base != NULL);
+isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
+    isc_result_t result = fcache_add(fcache, key, keysize, nr_fragments);
+    if (result == ISC_R_SUCCESS) {
+        return fcache_add_fragment(fcache, key, keysize, frag);
+    }
+    return result;
+}
+
+isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t *frag) {
+    REQUIRE(frag != NULL && (frag->buffer != NULL || frag->saved.base != NULL));
     if (frag->fragment_nr >= entry->nr_fragments) {
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
             "Can only add  where fragment_nr < nr_fragments: fragment_nr: %lu, nr_fragments: %u", frag->fragment_nr, entry->nr_fragments); 
@@ -173,11 +174,11 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
     return ISC_R_SUCCESS;
 }
 
-isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned frag_nr) {
+isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag) {
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry); 
     if (result == ISC_R_SUCCESS) {   
-        return fcache_add_fragment_with_entry(fcache, entry, frag, frag_nr);
+        return fcache_add_fragment_with_entry(fcache, entry, frag);
     }
     return ISC_R_NOTFOUND;
 }
@@ -197,7 +198,7 @@ isc_result_t fcache_remove(fcache_t *fcache, unsigned char *key, unsigned keysiz
         return ISC_R_FAILURE;
     }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-        "could not find element with key: %s", key); 
+        "Could not find element with key: %s", key); 
     return ISC_R_NOTFOUND;
 }
 

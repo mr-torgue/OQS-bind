@@ -558,7 +558,7 @@ bool fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *clien
         render_fragment(mctx, 1280, &frag); // slightly larger than max UDP
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
-        fcache_add(fcache, key, keysize, frag, nr_fragments);
+        fcache_add_with_fragment(fcache, key, keysize, frag, nr_fragments);
         printf("frag %u\n", frag_nr + 1);
         printmessage(mctx, frag);
 		for (unsigned i = 0; i < frag->buffer->used; i++) {
