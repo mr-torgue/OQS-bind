@@ -184,8 +184,16 @@ unsigned calc_message_size(dns_message_t *msg,
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
-
-            rr_header_size += name->length;
+            // usually names are compressed
+            if (name->attributes.nocompress) { 
+                rr_header_size += name->length;
+            }
+            else if (name->length == 1) { // for root
+                rr_header_size++;
+            }
+            else {
+                rr_header_size += 2;
+            }
             
             for (rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 isc_result_t tresult;
@@ -343,8 +351,19 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
     REQUIRE(offset < rdata_size);
     unsigned rem_space_per_frag, can_send_additional, rem_space_per_frag_1, can_send_additional_1;                            
     unsigned num_bytes_to_send = rdata_size / nr_fragments;
-    rem_space_per_frag_1 = can_send_first_fragment - total_pk_sig_bytes_per_frag; 
-    rem_space_per_frag = can_send - total_pk_sig_bytes_per_frag;
+    // set to zero to prevent integer underflows/overflows
+    if (can_send_first_fragment <= total_pk_sig_bytes_per_frag) {
+        rem_space_per_frag_1 = 0;
+    } 
+    else {
+        rem_space_per_frag_1 = can_send_first_fragment - total_pk_sig_bytes_per_frag; 
+    }
+    if (can_send <= total_pk_sig_bytes_per_frag) {
+        rem_space_per_frag = 0;
+    } 
+    else {
+        rem_space_per_frag = can_send - total_pk_sig_bytes_per_frag;
+    }
     can_send_additional_1 = rem_space_per_frag_1 / rr_pk_sig_count;
     can_send_additional = rem_space_per_frag / rr_pk_sig_count;
     *start = offset;

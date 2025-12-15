@@ -210,9 +210,19 @@ ISC_RUN_TEST_IMPL(calculate_start_end_test) {
     unsigned can_send_other_fragments =  1181;
     unsigned offset = 0;
     unsigned start, len;
-    calculate_start_end(frag_nr, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
-    printf("start: %u, len: %u\n", start, len);
-    assert_int_equal(0, 1);
+    //calculate_start_end(frag_nr, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
+    //printf("start: %u, len: %u\n", start, len);
+    //assert_int_equal(start, 0);
+    for (unsigned i = 0; i < nr_fragments; i++) {
+        calculate_start_end(i, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
+        printf("start: %u, len: %u\n", start, len);
+        if (i == 0) {
+            assert_true(rr_pk_sig_count * len <= can_send_first_fragment);
+        }
+        else {
+            assert_true(rr_pk_sig_count * len <= can_send_other_fragments);
+        }
+    }
 }
 
 ISC_RUN_TEST_IMPL(get_nr_fragments_test) {
@@ -677,7 +687,7 @@ ISC_TEST_ENTRY(is_fragment_test)
 ISC_TEST_ENTRY(get_nr_fragments_test)
 ISC_TEST_ENTRY(calc_message_size_test)
 ISC_TEST_ENTRY(estimate_message_size_test)
-//ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
+ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
 ISC_TEST_ENTRY(test_query_creation)
 ISC_TEST_ENTRY(calculate_start_end_test)
 ISC_TEST_LIST_END
