@@ -42,18 +42,16 @@ unsigned calc_message_size(dns_message_t *msg,
 // estimates the size of the complete message based on a fragment
 unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings);
 
+// for testing purposes
+void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned rr_pk_sig_count, unsigned *start, unsigned *frag_len);
+
 // fragments a given message msg
 // first fragment is returned in msg
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-bool fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address);
+isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address);
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false
-bool reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg);
-
-// requests remaining fragments from the name server
-// determines how many fragments to retrieve based on the provided response
-// sends a request 
-bool request_remaining_fragments(dns_request_t *query);
+isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg);

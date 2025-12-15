@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/sockaddr.h>
 #include <isc/types.h>
 #include <dns/types.h>
@@ -195,9 +196,24 @@ ISC_RUN_TEST_IMPL(is_fragment_test) {
 }
 
 
-//ISC_RUN_TEST_IMPL(calculate_start_end_test) {
-    //calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rr_sizes[section_nr][counter], can_send_first_fragment, can_send, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
-//}
+ISC_RUN_TEST_IMPL(calculate_start_end_test) {
+    // test case 1 (based on dilithium2)
+    unsigned frag_nr = 0;
+    unsigned nr_fragments = 7;
+    unsigned msgsize = 7468;
+    unsigned rdsize_no_header = 2420;
+    unsigned rr_pk_sig_count = 3;
+    unsigned sigpkbytes = 7260;
+    unsigned sigpkbytes_frag = sigpkbytes / nr_fragments;
+    unsigned savings = 161;
+    unsigned can_send_first_fragment = 1024;
+    unsigned can_send_other_fragments =  1181;
+    unsigned offset = 0;
+    unsigned start, len;
+    calculate_start_end(frag_nr, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
+    printf("start: %u, len: %u\n", start, len);
+    assert_int_equal(0, 1);
+}
 
 ISC_RUN_TEST_IMPL(get_nr_fragments_test) {
     unsigned max_msg_size, total_msg_size, total_sig_pk_bytes, savings, can_send_first_msg, can_send, result;
@@ -310,19 +326,22 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
     Destination: resolver (172.20.0.2)
     Size: 3244 bytes
     Nr. of fragments: 3
-    */
+    */    
     assert_true(loopmgr != NULL);
+    assert_true(mctx != NULL);
     const char *filename = "testdata/message/response1-falcon512";
     const char *src_address = "172.20.0.3";
     buffer = load_binary_file(filename, &buffer_size);
 
     // outputs
-    bool res;
+    isc_result_t res;
     isc_buffer_t *out = NULL;
     fragment_cache_entry_t *out_ce;
 
+    // initialize fcache
+    fcache_t *fcache = NULL;
+    fcache_init(&fcache, loopmgr, 10, 20);
 
-    fcache_init(mainloop);
     if(buffer != NULL) {
         isc_buffer_t buf;
         isc_buffer_init(&buf, buffer, buffer_size);
@@ -337,13 +356,13 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fcache_create_key(msg->id, src_address, key, &keysize);
 
         // main test
-        assert_int_equal(fcache_count(), 0);
-        res = fragment(mctx, msg, src_address);
-        assert_int_equal(fcache_count(), 1); // one cache entry
+        assert_int_equal(fcache_count(fcache), 0);
+        res = fragment(mctx, fcache, msg, src_address);
+        assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
-        res = fcache_get(key, keysize, &out_ce);
-        assert_true(res);
+        res = fcache_get(fcache, key, keysize, &out_ce);
+        assert_true(res == ISC_R_SUCCESS);
         assert_true(out_ce != NULL);
         // test number of fragments
         assert_int_equal(out_ce->nr_fragments, 3);
@@ -357,8 +376,8 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             size_t frag1_buffer_size;
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
-                res = fcache_get_fragment(key, keysize, i-1, &out);
-                assert_true(res);
+                res = fcache_get_fragment(fcache, key, keysize, i-1, &out);
+                assert_true(res == ISC_R_SUCCESS);
                 assert_int_equal(out->used, frag1_buffer_size);
                 for (unsigned j = 0; j < out->used; j++) {
                     assert_true(((char *)(frag1_buffer))[j] == ((char *)(out->base))[j]);
@@ -367,7 +386,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         printf("out_msg->buffer->used: %u, buffer_size: %u\n", out_msg->buffer->used, buffer_size);
@@ -386,7 +405,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
 
-
+    
     const char *filename2 = "testdata/message/falcon512-full-message";
     buffer = load_binary_file(filename2, &buffer_size);
 
@@ -404,13 +423,13 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fcache_create_key(msg->id, src_address, key, &keysize);
 
         // main test
-        assert_int_equal(fcache_count(), 0);
-        res = fragment(mctx, msg, src_address);
-        assert_int_equal(fcache_count(), 1); // one cache entry
+        assert_int_equal(fcache_count(fcache), 0);
+        res = fragment(mctx, fcache, msg, src_address);
+        assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
-        res = fcache_get(key, keysize, &out_ce);
-        assert_true(res);
+        res = fcache_get(fcache, key, keysize, &out_ce);
+        assert_true(res == ISC_R_SUCCESS);
         assert_true(out_ce != NULL);
         // test number of fragments
         assert_int_equal(out_ce->nr_fragments, 3);
@@ -424,14 +443,14 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             size_t frag1_buffer_size;
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
-                res = fcache_get_fragment(key, keysize, i-1, &out);
-                assert_true(res);
+                res = fcache_get_fragment(fcache, key, keysize, i-1, &out);
+                assert_true(res == ISC_R_SUCCESS);
                 assert_int_equal(out->used, frag1_buffer_size);
                 isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         assert_int_equal(out_msg->buffer->used, buffer_size);
@@ -468,14 +487,14 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fcache_create_key(msg->id, src_address, key, &keysize);
 
         // main test
-        assert_int_equal(fcache_count(), 0);
-        res = fragment(mctx, msg, src_address);
-        assert_int_equal(fcache_count(), 1); // one cache entry
+        assert_int_equal(fcache_count(fcache), 0);
+        res = fragment(mctx, fcache, msg, src_address);
+        assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
-        res = fcache_get(key, keysize, &out_ce);
+        res = fcache_get(fcache, key, keysize, &out_ce);
         printf("res: %u, nr_fragments: %u\n", res, out_ce->nr_fragments);
-        assert_true(res);
+        assert_true(res == ISC_R_SUCCESS);
         assert_true(out_ce != NULL);
         // test number of fragments
         assert_int_equal(out_ce->nr_fragments, 4);
@@ -490,15 +509,15 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             size_t frag1_buffer_size;
             frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
             if(frag1_buffer != NULL) {
-                res = fcache_get_fragment(key, keysize, i-1, &out);
+                res = fcache_get_fragment(fcache, key, keysize, i-1, &out);
                 printf("used: %u, buffer_size: %u\n", out->used, frag1_buffer_size);
-                assert_true(res);
+                assert_true(res == ISC_R_SUCCESS);
                 assert_int_equal(out->used, frag1_buffer_size);
                 isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         assert_int_equal(out_msg->buffer->used, buffer_size);
@@ -516,8 +535,80 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
 
+    // test for DILITHIUM2
+    // we add an additional FORMERR response, which should not give any problem
+    const char *filename4 = "testdata/message/response1-dilithium";
+    buffer = load_binary_file(filename4, &buffer_size);
 
-    fcache_deinit();
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        //isc_buffer_printf(&buf, "aa");
+        printf("buffer size: %u\n", buffer_size);
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+        // create key
+        unsigned char key[64];
+        unsigned keysize = sizeof(key) / sizeof(key[0]);
+        fcache_create_key(msg->id, src_address, key, &keysize);
+
+        // main test
+        assert_int_equal(fcache_count(fcache), 0);
+        res = fragment(mctx, fcache, msg, src_address);
+        assert_int_equal(fcache_count(fcache), 1); // one cache entry
+
+        out_ce = NULL;
+        res = fcache_get(fcache, key, keysize, &out_ce);
+        printf("res: %u, nr_fragments: %u\n", res, out_ce->nr_fragments);
+        assert_true(res == ISC_R_SUCCESS);
+        assert_true(out_ce != NULL);
+        // test number of fragments
+        assert_int_equal(out_ce->nr_fragments, 7);
+        // test fragment bitmap
+        assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6)));
+        
+        // raw byte comparison
+        for(unsigned i = 1; i <= out_ce->nr_fragments; i++) {
+            char frag1_filename[128];
+            snprintf(frag1_filename, 128, "testdata/message/frag%u-response1-dilithium", i);
+            unsigned char *frag1_buffer = NULL;
+            size_t frag1_buffer_size;
+            frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
+            if(frag1_buffer != NULL) {
+                res = fcache_get_fragment(fcache, key, keysize, i-1, &out);
+                printf("used: %u, buffer_size: %u\n", out->used, frag1_buffer_size);
+                assert_true(res == ISC_R_SUCCESS);
+                assert_int_equal(out->used, frag1_buffer_size);
+                isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
+            }
+        }
+        // add a FORMERR response at the end
+        //out_ce->nr_fragments++;
+
+
+        dns_message_t *out_msg = NULL;
+        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        assert_true(out_msg != NULL);
+        assert_true(out_msg->buffer != NULL);
+        assert_int_equal(out_msg->buffer->used, buffer_size);
+        // start at three, TC is not set in testcase...
+        for (unsigned i = 3; i < buffer_size; i++) {
+            assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
+        }
+
+        // clean up
+        dns_message_detach(&msg);
+        dns_message_detach(&out_msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
+    
+    fcache_deinit(&fcache);
 	isc_loopmgr_shutdown(loopmgr);
 }
 
@@ -586,9 +677,9 @@ ISC_TEST_ENTRY(is_fragment_test)
 ISC_TEST_ENTRY(get_nr_fragments_test)
 ISC_TEST_ENTRY(calc_message_size_test)
 ISC_TEST_ENTRY(estimate_message_size_test)
-//ISC_TEST_ENTRY(calculate_start_end_test)
-ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
+//ISC_TEST_ENTRY_CUSTOM(fragment_and_reassemble, setup_test, teardown_test)
 ISC_TEST_ENTRY(test_query_creation)
+ISC_TEST_ENTRY(calculate_start_end_test)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN

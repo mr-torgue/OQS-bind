@@ -26,6 +26,7 @@
 #include <isc/nonce.h>
 #include <isc/once.h>
 #include <isc/random.h>
+#include <isc/result.h>
 #include <isc/safe.h>
 #include <isc/serial.h>
 #include <isc/siphash.h>
@@ -560,7 +561,7 @@ ns_client_send(ns_client_t *client) {
 			isc_buffer_t *out_frag = NULL;
 			dns_message_t *msg = NULL;
 			unsigned long frag_nr = client->message->fragment_nr;
-			if(fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag)) {
+			if(fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag) == ISC_R_SUCCESS) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
@@ -604,7 +605,7 @@ ns_client_send(ns_client_t *client) {
 			// get first fragment from cache and set it as client->message
 			isc_buffer_t *out_frag = NULL;
 			dns_message_t *msg = NULL;
-			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag)) {
+			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
