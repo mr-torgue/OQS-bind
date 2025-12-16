@@ -548,7 +548,6 @@ ns_client_send(ns_client_t *client) {
 		fcache_t *fcache = client->manager->sctx->fcache;
 		printf("Is fragment: %u\n", client->message->is_fragment);
 		printf("TC flag: %u\n", client->message->flags & DNS_MESSAGEFLAG_TC);
-		printf("r: %s (%u)\n", r.base, r.length);
 		unsigned num_sig_rr, num_dnskey_rr, total_sig_rr, total_dnskey_rr, savings;
 		unsigned msg_size = calc_message_size(client->message, &num_sig_rr, &num_dnskey_rr, &total_sig_rr, &total_dnskey_rr, &savings);
 		printf("r: %u\n", msg_size);
