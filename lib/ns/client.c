@@ -546,7 +546,8 @@ ns_client_send(ns_client_t *client) {
 	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 	if (udp_fragmentation_enabled) {
 		fcache_t *fcache = client->manager->sctx->fcache;
-		
+		printf("Is fragment: %d\n", client->message->is_fragment);
+
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
 			unsigned char key[64];
