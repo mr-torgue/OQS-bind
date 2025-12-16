@@ -665,6 +665,40 @@ ns_client_send(ns_client_t *client) {
 	}
 renderend:
 	result = dns_message_renderend(client->message);
+	if (result != ISC_R_SUCCESS) {
+		goto cleanup;
+	}
+
+#ifdef HAVE_DNSTAP
+	memset(&zr, 0, sizeof(zr));
+	if (((client->message->flags & DNS_MESSAGEFLAG_AA) != 0) &&
+	    (client->query.authzone != NULL))
+	{
+		isc_result_t eresult;
+		isc_buffer_t b;
+		dns_name_t *zo = dns_zone_getorigin(client->query.authzone);
+
+		isc_buffer_init(&b, zone, sizeof(zone));
+		dns_compress_setpermitted(&cctx, false);
+		eresult = dns_name_towire(zo, &cctx, &b, NULL);
+		if (eresult == ISC_R_SUCCESS) {
+			isc_buffer_usedregion(&b, &zr);
+		}
+	}
+
+	if (client->message->opcode == dns_opcode_update) {
+		dtmsgtype = DNS_DTTYPE_UR;
+	} else if ((client->message->flags & DNS_MESSAGEFLAG_RD) != 0) {
+		dtmsgtype = DNS_DTTYPE_CR;
+	} else {
+		dtmsgtype = DNS_DTTYPE_AR;
+	}
+#endif /* HAVE_DNSTAP */
+
+	if (cleanup_cctx) {
+		dns_compress_invalidate(&cctx);
+	}
+
 	if (udp_fragmentation_enabled) {
 		fcache_t *fcache = client->manager->sctx->fcache;
 		if (buffer.used > client->udpsize) {
@@ -706,39 +740,6 @@ renderend:
 				}
 			}
 		}
-	}
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
-
-#ifdef HAVE_DNSTAP
-	memset(&zr, 0, sizeof(zr));
-	if (((client->message->flags & DNS_MESSAGEFLAG_AA) != 0) &&
-	    (client->query.authzone != NULL))
-	{
-		isc_result_t eresult;
-		isc_buffer_t b;
-		dns_name_t *zo = dns_zone_getorigin(client->query.authzone);
-
-		isc_buffer_init(&b, zone, sizeof(zone));
-		dns_compress_setpermitted(&cctx, false);
-		eresult = dns_name_towire(zo, &cctx, &b, NULL);
-		if (eresult == ISC_R_SUCCESS) {
-			isc_buffer_usedregion(&b, &zr);
-		}
-	}
-
-	if (client->message->opcode == dns_opcode_update) {
-		dtmsgtype = DNS_DTTYPE_UR;
-	} else if ((client->message->flags & DNS_MESSAGEFLAG_RD) != 0) {
-		dtmsgtype = DNS_DTTYPE_CR;
-	} else {
-		dtmsgtype = DNS_DTTYPE_AR;
-	}
-#endif /* HAVE_DNSTAP */
-
-	if (cleanup_cctx) {
-		dns_compress_invalidate(&cctx);
 	}
 
 sendbuffer:
