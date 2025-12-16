@@ -8539,7 +8539,7 @@ load_configuration(const char *filename, named_server_t *server,
 	ns_server_setudpfragmentation(server->sctx, udp_fragmentation_mode);
 	isc_nm_setudpfragmentation(named_g_netmgr, udp_fragmentation_mode); // needed for keeping sockets open
 	// initialize fcache
-	if (udp_fragmentation_mode != 0) {
+	if (udp_fragmentation_mode != 0) { 
 		dns_dispatch_initfcache(named_g_dispatchmgr, named_g_loopmgr);
 		ns_server_initfcache(server->sctx, named_g_loopmgr);
 	}

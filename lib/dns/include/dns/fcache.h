@@ -45,6 +45,7 @@ typedef ISC_LIST(fragment_cache_entry_t) fragmentlist_t;
 typedef struct fcache {
 	isc_mutex_t lock;               // to prevent multiple threads writing to cache
     isc_mem_t *mctx;                // for memory allocations
+    isc_loopmgr_t *loopmgr;
     isc_ht_t *ht;                   // fragment hashtable
     fragmentlist_t expiry_list;     // linked list to keep track of which fragment entries need to be removed
     isc_timer_t *expiry_timer;      // timer ensuring cache remains clean

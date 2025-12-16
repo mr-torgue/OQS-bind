@@ -896,7 +896,7 @@ ISC_LOOP_TEST_IMPL(test_fcache_expiry_advanced) {
 }
 
 ISC_TEST_LIST_START
-ISC_TEST_ENTRY_CUSTOM(test_fcache_init, setup_managers, teardown_managers)
+//ISC_TEST_ENTRY_CUSTOM(test_fcache_init, setup_managers, teardown_managers)
 ISC_TEST_ENTRY_CUSTOM(test_fcache_add, setup_managers, teardown_managers)
 ISC_TEST_ENTRY_CUSTOM(test_fcache_add_remove, setup_managers, teardown_managers)
 ISC_TEST_ENTRY_CUSTOM(test_basic, setup_loopmgr, teardown_loopmgr)

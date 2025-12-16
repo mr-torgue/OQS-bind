@@ -83,7 +83,10 @@ void fcache_init(fcache_t **fcache, isc_loopmgr_t *loopmgr, unsigned ttl, unsign
     isc_ht_init(&(*fcache)->ht, (*fcache)->mctx, 16, 0); // use size 2^16, case sensitive 
     ISC_LIST_INIT((*fcache)->expiry_list);
     (*fcache)->expiry_timer = NULL;
-    isc_timer_create(isc_loop_current(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
+    (*fcache)->loopmgr = loopmgr;
+
+
+    //isc_timer_create(isc_loop_current(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
 
     // initialize mutex
 	isc_mutex_init(&(*fcache)->lock);
@@ -92,7 +95,9 @@ void fcache_init(fcache_t **fcache, isc_loopmgr_t *loopmgr, unsigned ttl, unsign
 void fcache_deinit(fcache_t **fcache) {    
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Deinitializing fragment cache..."); 
-    isc_timer_destroy(&(*fcache)->expiry_timer);
+    if((*fcache)->expiry_timer != NULL) {
+        isc_timer_destroy(&(*fcache)->expiry_timer);
+    }
     fcache_purge(*fcache);
     isc_ht_destroy(&(*fcache)->ht); // entries get freed here
     isc_mutex_destroy(&(*fcache)->lock);
@@ -130,6 +135,10 @@ isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, 
         if (ISC_LIST_HEAD(fcache->expiry_list) == entry) {    
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
             "Schedule next timer in %d seconds\n", fcache->max_ttl_timeout.seconds);
+            // create if not exists
+            if (fcache->expiry_timer == NULL) {
+                isc_timer_create(isc_loop_current(fcache->loopmgr), fcache_timer_cb, fcache, &fcache->expiry_timer);
+            }
             fcache_schedule_timer(fcache, &fcache->max_ttl_timeout);
         }
         return ISC_R_SUCCESS;
