@@ -541,16 +541,12 @@ ns_client_send(ns_client_t *client) {
 	}
 	
 	// UDP fragmentation
-	// do the fragmentation before rendering: we either have the buffers stored in the fcache or we will generate them
+	// fragment request get detected before rendering
+	// first fragment detection happens after renering because we depend on the TC flag
 	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
 	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 	if (udp_fragmentation_enabled) {
 		fcache_t *fcache = client->manager->sctx->fcache;
-		printf("Is fragment: %u\n", client->message->is_fragment);
-		printf("TC flag: %u\n", client->message->flags & DNS_MESSAGEFLAG_TC);
-		unsigned num_sig_rr, num_dnskey_rr, total_sig_rr, total_dnskey_rr, savings;
-		unsigned msg_size = calc_message_size(client->message, &num_sig_rr, &num_dnskey_rr, &total_sig_rr, &total_dnskey_rr, &savings);
-		printf("r: %u\n", msg_size);
 
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
@@ -583,44 +579,6 @@ ns_client_send(ns_client_t *client) {
 				client->formerrcache.addr = client->peeraddr;
 				client->formerrcache.time = isc_time_seconds(&client->requesttime);
 				client->formerrcache.id = client->message->id;
-			}
-		}
-		// fragmentation triggers when the response is too large 
-		else if((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) { // not sure if this works before rendering
-			// create a key
-			unsigned char key[64];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
-
-			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
-					 "Fragmenting message %s (flags: %x)!", key, client->message->flags);
-			client->message->buffer = &buffer; // not associated by default
-			// QBF
-			if (udp_fragmentation_mode == 1) {
-				fragment(client->manager->mctx, fcache, client->message, addr_buf);
-			}
-			// RAW
-			else if (udp_fragmentation_mode == 2) {				
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					 "RAW is not implemented yet!");
-				exit(0);
-			}
-			// get first fragment from cache and set it as client->message
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				client->message = msg;		
-				// remove fragment here (not yet we are not copying the buffer)
-				goto sendbuffer; // skip render
-			}
-			else {				
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					 "Could not find first fragment!");
 			}
 		}
 	}
@@ -707,6 +665,50 @@ ns_client_send(ns_client_t *client) {
 	}
 renderend:
 	result = dns_message_renderend(client->message);
+
+	// fragmentation triggers when the response is too large 
+	if (udp_fragmentation_enabled) {
+		fcache_t *fcache = client->manager->sctx->fcache;
+
+		if((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) { 
+					// create a key
+			unsigned char key[64];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+			fcache_create_key(client->message->id, addr_buf, key, &keysize);
+
+			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
+					 "Fragmenting message %s (flags: %x)!", key, client->message->flags);
+			client->message->buffer = &buffer; // not associated by default
+			// QBF
+			if (udp_fragmentation_mode == 1) {
+				fragment(client->manager->mctx, fcache, client->message, addr_buf);
+			}
+			// RAW
+			else if (udp_fragmentation_mode == 2) {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "RAW is not implemented yet!");
+				exit(0);
+			}
+			// get first fragment from cache and set it as client->message
+			isc_buffer_t *out_frag = NULL;
+			dns_message_t *msg = NULL;
+			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
+				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+				buffer = *out_frag;
+				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+				client->message = msg;		
+				// remove fragment here (not yet we are not copying the buffer)
+				goto sendbuffer; // skip render
+			}
+			else {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "Could not find first fragment!");
+			}
+		}
+	}
+
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
