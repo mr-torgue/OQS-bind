@@ -589,7 +589,6 @@ ns_client_send(ns_client_t *client) {
 		// try to fragment: fragment will tell us if it is needed or not
 		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-		client->message->buffer = &buffer; // not associated by default
 		// QBF
 		if (udp_fragmentation_mode == 1) {
 			result = fragment(client->manager->mctx, fcache, client->message, addr_buf, client->udpsize);
