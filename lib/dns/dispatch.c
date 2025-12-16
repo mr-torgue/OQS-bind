@@ -696,7 +696,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		unsigned msg_size = estimate_message_size(msg, &total_sig_bytes, &total_dnskey_bytes, &savings);
 		unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
 		unsigned nr_fragments = get_nr_fragments(1232, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
-		//nr_fragments++; // to trigger a FORMERR
+		nr_fragments++; // to trigger a FORMERR
 		isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 			"Key %s has total message size %u and needs %u fragments...", key, msg_size, nr_fragments); 
 
