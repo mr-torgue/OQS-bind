@@ -398,7 +398,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         printf("out_msg->buffer->used: %u, buffer_size: %u\n", out_msg->buffer->used, buffer_size);
@@ -462,7 +462,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         assert_int_equal(out_msg->buffer->used, buffer_size);
@@ -529,7 +529,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             }
         }
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         assert_int_equal(out_msg->buffer->used, buffer_size);
@@ -582,12 +582,8 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6)));
         
 
-        // add a FORMERR response at the end
-        //out_ce->nr_fragments++;
-
-
         dns_message_t *out_msg = NULL;
-        isc_result_t result = reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        isc_result_t result = reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
         assert_true(result == ISC_R_SUCCESS);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
@@ -598,11 +594,16 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         }
 
         // increase nr_fragments and check if we get a ISC_R_INPROGRESS result
+        res = fragment(mctx, fcache, msg, src_address);
         dns_message_t *out_msg2 = NULL;
         out_ce->nr_fragments++;
         //printf("nr_fragments: %u\nbitmap %u\ncalulated value: %u\n", out_ce->nr_fragments, out_ce->bitmap, (1u << out_ce->nr_fragments) - 1);
-        result = reassemble_fragments(mctx, fcache, out_ce, &out_msg2);
+        result = reassemble_fragments(mctx, fcache, key, keysize, &out_msg2);
         assert_true(result == ISC_R_INPROGRESS);
+        out_ce->nr_fragments--;
+        // try to fragment again, should not work because key still exists
+        res = fragment(mctx, fcache, msg, src_address);
+        assert_true(res == ISC_R_EXISTS);
 
         // FORMERR response for ID 0x676f (WRONG ID)
         unsigned char formerr_bytes[] = {
@@ -622,9 +623,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         //isc_buffer_add(&formerr_buf, sizeof(formerr_bytes));
         formerr_frag->buffer = &formerr_buf;
         formerr_frag->fragment_nr = 7;
-        // fragment again, because it got removed earlier
         // create a new entry
-        res = fragment(mctx, fcache, msg, src_address);
         unsigned newkeysize = 96;
         unsigned char newkey[newkeysize];
         strcpy((char *)newkey, "thisisakey!");
@@ -651,23 +650,15 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // ID should mismatch
         dns_message_t *out_msg3 = NULL;
-        //result = reassemble_fragments(mctx, fcache, out_ce, &out_msg3);
+        //result = reassemble_fragments(mctx, fcache, newkey, newkeysize, &out_msg3);
         //assert_true(result == ISC_R_FAILURE);
         //assert_true(out_msg3 == NULL);
 
-        printf("used: %u\n", out_ce->fragments[0]->used);
-        printf("used: %u\n", out_ce->fragments[1]->used);
-        printf("used: %u\n", out_ce->fragments[2]->used);
-        printf("used: %u\n", out_ce->fragments[3]->used);
-        printf("used: %u\n", out_ce->fragments[4]->used);
-        printf("used: %u\n", out_ce->fragments[5]->used);
-        printf("used: %u\n", out_ce->fragments[6]->used);
-        printf("used: %u\n", out_ce->fragments[7]->used);
         // set correct ID
         *(unsigned char *)(out_ce->fragments[formerr_frag->fragment_nr]->base) = 0xd5;
         *(unsigned char *)(out_ce->fragments[formerr_frag->fragment_nr]->base + 1) = 0x09;
         dns_message_t *out_msg4 = NULL;
-        result = reassemble_fragments(mctx, fcache, out_ce, &out_msg4);
+        result = reassemble_fragments(mctx, fcache, newkey, newkeysize, &out_msg4);
         assert_true(result == ISC_R_SUCCESS);
         assert_true(out_msg4 != NULL);
         assert_true(out_msg4->buffer != NULL);

@@ -91,11 +91,17 @@ isc_result_t fcache_remove(fcache_t *fcache, unsigned char *key, unsigned keysiz
 isc_result_t fcache_remove_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr);
 
 // returns a cache entry
-// returns ISC_R_NOTFOUND if not in cache
+// returns:
+//   ISC_R_SUCCESS
+//   ISC_R_NOTFOUND if not in cache
 isc_result_t fcache_get(fcache_t *fcache, unsigned char *key, unsigned keysize, fragment_cache_entry_t **out_cache_entry);
 
 // returns the fragment in out_frag
-// returns ISC_R_NOTFOUND if not found
+// `fcache_get_fragment_from_entry` skips the lookup part
+// returns:
+//   ISC_R_SUCCESS
+//   ISC_R_NOTFOUND if not found
+isc_result_t fcache_get_fragment_from_entry(fcache_t *fcache, fragment_cache_entry_t *entry, unsigned fragment_nr, isc_buffer_t **out_frag);
 isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag);
 
 // purges the cache (hashtable)

@@ -703,23 +703,24 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		fragment_cache_entry_t *out_ce = NULL;
 		// process incoming fragment
 		if (is_fragment_resp) {
-        	printmessage(disp->mgr->mctx, msg);
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Response to fragment query %lu!", msg->fragment_nr); 
 
 			result = fcache_add_fragment(fcache, key, keysize, msg);
 			if (result == ISC_R_SUCCESS) {
-				REQUIRE(fcache_get(fcache, key, keysize, &out_ce)); // should not fail, just added
-
-				if (out_ce->bitmap == (1ul << out_ce->nr_fragments) - 1) {
-					dns_message_t *out_msg = NULL;
-					reassemble_fragments(disp->mgr->mctx, fcache, out_ce, &out_msg);
+				dns_message_t *out_msg = NULL;
+				isc_result_t reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
+				if (reassemble_result == ISC_R_SUCCESS) {
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 						"All fragments received! Message size: %u", out_msg->buffer->used); 
 					region->base = out_msg->buffer->base;
 					region->length = out_msg->buffer->used;
 					
 					goto done;
+				}
+				else if (reassemble_result != ISC_R_INPROGRESS) {
+					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+						"Failure during reassembly!"); 						
 				}
 			}
 			else if (result == ISC_R_RANGE) {

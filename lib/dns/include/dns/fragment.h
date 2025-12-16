@@ -59,4 +59,4 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
 //   ISC_R_SUCCESS if succesfully reassembled
 //   ISC_R_INPROGRESS if not all fragments have been received yet
 //   ISC_R_FAILURE if the fragments mismatch (for example, mismatching id)
-isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg);
+isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t **out_msg);

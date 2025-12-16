@@ -229,18 +229,25 @@ isc_result_t fcache_get(fcache_t *fcache, unsigned char *key, unsigned keysize, 
     return isc_ht_find(fcache->ht, key, keysize, (void **)out_cache_entry);
 }
 
+
+isc_result_t fcache_get_fragment_from_entry(fcache_t *fcache, fragment_cache_entry_t *entry, unsigned fragment_nr, isc_buffer_t **out_frag) {
+    if(entry->bitmap & (1 << fragment_nr)) {
+        *out_frag = entry->fragments[fragment_nr];
+        (*out_frag)->current = 0; // in case it is not set to the beginning
+        return ISC_R_SUCCESS;
+    }
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+        "Could not find fragment %u!", fragment_nr);
+    return ISC_R_NOTFOUND;
+}
+
+
 isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        if(entry->bitmap & (1 << fragment_nr)) {
-            *out_frag = entry->fragments[fragment_nr];
-            return ISC_R_SUCCESS;
-        }
-        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-            "Could not find fragment %u!", fragment_nr);
-        return ISC_R_NOTFOUND;
+        return fcache_get_fragment_from_entry(fcache, entry, fragment_nr, out_frag);
     }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Could not find cache entry!");
