@@ -567,12 +567,9 @@ ns_client_send(ns_client_t *client) {
 					 "Sending fragment from fcache!");
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				client->message = msg;	
-				client->message->from_to_wire = 2;
-				if (msg->opt == NULL) {
-					printf("testing\n");
-				}
+				//dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+				//client->message = msg;	
+				//client->message->from_to_wire = 2;
 				// remove fragment here
 				goto sendbuffer; // skip render
 			}
