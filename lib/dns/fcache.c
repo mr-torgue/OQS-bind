@@ -83,7 +83,7 @@ void fcache_init(fcache_t **fcache, isc_loopmgr_t *loopmgr, unsigned ttl, unsign
     isc_ht_init(&(*fcache)->ht, (*fcache)->mctx, 16, 0); // use size 2^16, case sensitive 
     ISC_LIST_INIT((*fcache)->expiry_list);
     (*fcache)->expiry_timer = NULL;
-    isc_timer_create(isc_loop_main(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
+    isc_timer_create(isc_loop_current(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
 
     // initialize mutex
 	isc_mutex_init(&(*fcache)->lock);
