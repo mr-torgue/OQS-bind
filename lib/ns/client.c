@@ -563,6 +563,8 @@ ns_client_send(ns_client_t *client) {
 			dns_message_t *msg = NULL;
 			unsigned long frag_nr = client->message->fragment_nr;
 			if(fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag) == ISC_R_SUCCESS) {
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					 "Sending fragment from fcache!");
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
@@ -705,6 +707,7 @@ renderend:
 			// try to fragment: fragment will tell us if it is needed or not
 			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+			client->message->buffer = &buffer; // not associated by default
 			// QBF
 			if (udp_fragmentation_mode == 1) {
 				result = fragment(client->manager->mctx, fcache, client->message, addr_buf, client->udpsize);
@@ -739,6 +742,11 @@ renderend:
 						"Could not find first fragment!");
 				}
 			}
+			else {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+					"Could not do the fragmenting!");
+			}
+			
 		}
 	}
 
