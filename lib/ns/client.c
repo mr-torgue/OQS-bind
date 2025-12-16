@@ -613,7 +613,7 @@ ns_client_send(ns_client_t *client) {
 			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+				//dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
 				//client->message = msg;		
 				// remove fragment here (not yet we are not copying the buffer)
 				goto sendbuffer; // skip render
