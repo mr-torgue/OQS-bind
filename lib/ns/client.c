@@ -698,7 +698,7 @@ renderend:
 					dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
 					client->message = msg;		
 					// remove fragment here (not yet we are not copying the buffer)
-					goto sendbuffer; // skip render
+					//goto sendbuffer; // skip render
 				}
 				else {				
 					ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
