@@ -614,7 +614,7 @@ ns_client_send(ns_client_t *client) {
 				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 				buffer = *out_frag;
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				client->message = msg;		
+				//client->message = msg;		
 				// remove fragment here (not yet we are not copying the buffer)
 				goto sendbuffer; // skip render
 			}
