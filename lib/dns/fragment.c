@@ -631,7 +631,12 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        render_fragment(mctx, 1232, &frag); // slightly larger than max UDP
+        isc_result_t render_result = render_fragment(mctx, 1232, &frag); 
+        if (render_result != ISC_R_SUCCESS) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Failed to render the fragment!");  
+            return result;
+        }
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
         fcache_res = fcache_add_fragment(fcache, key, keysize, frag);
