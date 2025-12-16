@@ -631,7 +631,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        render_fragment(mctx, 1280, &frag); // slightly larger than max UDP
+        render_fragment(mctx, 1232, &frag); // slightly larger than max UDP
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
         fcache_res = fcache_add_fragment(fcache, key, keysize, frag);
@@ -811,7 +811,7 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, unsigned ch
         dns_message_detach(&frag);
     }
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-    result = render_fragment(mctx, entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
+    result = render_fragment(mctx, entry->nr_fragments * 1232, out_msg); // slightly larger than max UDP
     if (result != ISC_R_SUCCESS) {
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Failed to render the reassembled message!");  
