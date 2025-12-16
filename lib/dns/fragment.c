@@ -356,21 +356,24 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     return nr_fragments;
 }
 
+
+
 void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned rr_pk_sig_count, unsigned *start, unsigned *frag_len) {
     REQUIRE(offset < rdata_size);
     unsigned rem_space_per_frag, can_send_additional, rem_space_per_frag_1, can_send_additional_1;                            
     unsigned num_bytes_to_send = rdata_size / nr_fragments;
-    // set to zero to prevent integer underflows/overflows
+    
+    // this is possible because can_send_first_fragment and can_send can be different
     if (can_send_first_fragment <= total_pk_sig_bytes_per_frag) {
         rem_space_per_frag_1 = 0;
-        num_bytes_to_send = can_send_first_fragment / rr_pk_sig_count;
+        num_bytes_to_send -= ((total_pk_sig_bytes_per_frag - can_send_first_fragment) / rr_pk_sig_count);
     } 
     else {
         rem_space_per_frag_1 = can_send_first_fragment - total_pk_sig_bytes_per_frag; 
     }
     if (can_send <= total_pk_sig_bytes_per_frag) {
         rem_space_per_frag = 0;
-        num_bytes_to_send = can_send / rr_pk_sig_count;
+        num_bytes_to_send -= ((total_pk_sig_bytes_per_frag - can_send) / rr_pk_sig_count);
     } 
     else {
         rem_space_per_frag = can_send - total_pk_sig_bytes_per_frag;

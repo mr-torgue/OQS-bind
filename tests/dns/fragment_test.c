@@ -220,9 +220,11 @@ ISC_RUN_TEST_IMPL(calculate_start_end_test) {
         offset = start + len;
         printf("start: %u, len: %u\n", start, len);
         if (i == 0) {
+            printf("%u\n", rr_pk_sig_count * len);
             assert_true(rr_pk_sig_count * len <= can_send_first_fragment);
         }
         else {
+            printf("%u\n", rr_pk_sig_count * len);
             assert_true(rr_pk_sig_count * len <= can_send_other_fragments);
         }
     }
@@ -234,6 +236,12 @@ ISC_RUN_TEST_IMPL(get_nr_fragments_test) {
     assert_int_equal(result, 1);
     result = get_nr_fragments(1232, 1300, 900, 0, &can_send_first_msg, &can_send);
     assert_int_equal(result, 2);
+    assert_int_equal(can_send_first_msg, 832); // 1300 - 900 = 400 of static bytes, 1232 - 400 = 832 that can be send in the first fragment
+    assert_int_equal(can_send, 828); // 832 + savings (0) - 4 = 828
+    result = get_nr_fragments(1232, 2500, 1900, 130, &can_send_first_msg, &can_send);
+    assert_int_equal(result, 3);
+    assert_int_equal(can_send_first_msg, 632); // 2500 - 1900 = 600 of static bytes, 1232 - 600 = 632 that can be send in the first fragment
+    assert_int_equal(can_send, 758); // 632 + 130 - 4 = 758
 }
 
 ISC_RUN_TEST_IMPL(calc_message_size_test) {
