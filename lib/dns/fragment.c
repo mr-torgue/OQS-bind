@@ -178,7 +178,6 @@ unsigned calc_message_size(dns_message_t *msg,
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
     for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
-        unsigned counter = 0;
         // go through each name, rdataset, and rdata item
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
@@ -213,27 +212,22 @@ unsigned calc_message_size(dns_message_t *msg,
                         *savings += rr_header_size + rdata_size;
                     }
                     msgsize += rr_header_size + rdata_size;
-                    counter++;
                 }
             }
         }
-
-        // can be moved outside of this loop 
-        // OPT record found!
-        // only one allowed and can only be in the additional section
-        if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
-            REQUIRE(dns_rdataset_count(msg->opt) == 1);
-            msgsize += 11; // OPT header size
-            isc_result_t tresult;
-            // iterate through this (i think there only should be one)
-            for (tresult = dns_rdataset_first(msg->opt); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(msg->opt)) {
-                dns_rdata_t rdata = DNS_RDATA_INIT;
-                dns_rdataset_current(msg->opt, &rdata);
-                msgsize += rdata.length;
-            }
-            counter++;
+    }
+    // OPT record found!
+    // only one allowed and can only be in the additional section
+    if (msg->opt != NULL) {
+        REQUIRE(dns_rdataset_count(msg->opt) == 1);
+        msgsize += 11; // OPT header size
+        isc_result_t tresult;
+        // iterate through this (i think there only should be one)
+        for (tresult = dns_rdataset_first(msg->opt); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(msg->opt)) {
+            dns_rdata_t rdata = DNS_RDATA_INIT;
+            dns_rdataset_current(msg->opt, &rdata);
+            msgsize += rdata.length;
         }
-        REQUIRE(msg->counts[section] == counter); // sanity check: msg->counts[i] and counter should be the same after this  (NOTE: this goes wrong with TSIG/SIG(0))
     }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
         "Calculated message size %u for message %u with %u bytes of DNSKEY and %u bytes of RRSIG", msgsize, msg->id, *total_dnskey_rr, *total_sig_rr); 
