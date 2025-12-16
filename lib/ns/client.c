@@ -570,13 +570,8 @@ ns_client_send(ns_client_t *client) {
 				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
 				client->message = msg;	
 				client->message->from_to_wire = 2;
-				if (client->opt != NULL) {
-					result = dns_message_setopt(client->message, client->opt);
-					opt_included = true;
-					client->opt = NULL;
-					if (result != ISC_R_SUCCESS) {
-						goto cleanup;
-					}
+				if (msg->opt == NULL) {
+					printf("testing\n");
 				}
 				// remove fragment here
 				goto sendbuffer; // skip render
