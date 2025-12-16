@@ -354,12 +354,14 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
     // set to zero to prevent integer underflows/overflows
     if (can_send_first_fragment <= total_pk_sig_bytes_per_frag) {
         rem_space_per_frag_1 = 0;
+        num_bytes_to_send = can_send_first_fragment / rr_pk_sig_count;
     } 
     else {
         rem_space_per_frag_1 = can_send_first_fragment - total_pk_sig_bytes_per_frag; 
     }
     if (can_send <= total_pk_sig_bytes_per_frag) {
         rem_space_per_frag = 0;
+        num_bytes_to_send = can_send / rr_pk_sig_count;
     } 
     else {
         rem_space_per_frag = can_send - total_pk_sig_bytes_per_frag;
@@ -603,7 +605,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        render_fragment(mctx, 7500, &frag); // slightly larger than max UDP
+        render_fragment(mctx, 1280, &frag); // slightly larger than max UDP
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Adding fragment %u of length %u for message %u to cache...", frag_nr, frag->buffer->used, frag->id);  
         fcache_res = fcache_add_fragment(fcache, key, keysize, frag);
@@ -632,6 +634,7 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_ca
     REQUIRE(entry != NULL);
     REQUIRE(out_msg != NULL && *out_msg == NULL);
 
+    isc_result_t result;
     // check if all fragments are in cache
     if (entry->bitmap != (1u << entry->nr_fragments) - 1) {    
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
@@ -644,15 +647,22 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_ca
     dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
 
     // copy first fragment
-    //isc_buffer_t *msg_buf = NULL;
-    //isc_buffer_dup(mctx, &msg_buf, entry->fragments[0]);
     dns_message_parse(*out_msg, entry->fragments[0], DNS_MESSAGEPARSE_PRESERVEORDER); // create first fragment message
+    dns_messageid_t id = (*out_msg)->id;
 
     // first fragment is already copied
     for(unsigned frag_nr = 1; frag_nr < entry->nr_fragments; frag_nr++) {
         dns_message_t *frag = NULL;
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &frag);
         dns_message_parse(frag, entry->fragments[frag_nr], DNS_MESSAGEPARSE_PRESERVEORDER);
+        // check if the fragments in fcache belong to the same message
+        if (id != frag->id) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Fragments have a mismatching ID: %u and %u", id, frag->id);  
+            dns_message_detach(&frag);
+            dns_message_detach(out_msg);
+            return ISC_R_FAILURE;            
+        }
 
         // we build a new message everytime
         //dns_message_t *builder = NULL;
@@ -747,7 +757,12 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_ca
         dns_message_detach(&frag);
     }
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-    render_fragment(mctx, entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
+    result = render_fragment(mctx, entry->nr_fragments * 1280, out_msg); // slightly larger than max UDP
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+            "Failed to render the reassembled message!");  
+        return result;
+    }
     // unset the TC flag so it gets parsed by resolver.c (resquery_response)
     (*out_msg)->flags &= ~DNS_MESSAGEFLAG_TC;
     *(unsigned short *)((*out_msg)->buffer->base + 1) &= ~DNS_MESSAGEFLAG_TC;
@@ -756,6 +771,11 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_ca
             "Reassembled entry %s from %u fragments into one message with size %u", entry->key, entry->nr_fragments, (*out_msg)->buffer->used);  
     
     // would be slightly more efficient to do this in the loop
-    fcache_remove(fcache, entry->key, entry->keysize);
+    result = fcache_remove(fcache, entry->key, entry->keysize);
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+            "Could not remove cache entry after reassembly!");  
+        return result;
+    }
     return ISC_R_SUCCESS;
 }

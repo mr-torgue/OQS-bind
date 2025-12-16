@@ -43,6 +43,7 @@ unsigned calc_message_size(dns_message_t *msg,
 unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings);
 
 // for testing purposes
+// calculates the start and length for the given resource record
 void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned rr_pk_sig_count, unsigned *start, unsigned *frag_len);
 
 // fragments a given message msg
@@ -54,4 +55,8 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false
+// returns:
+//   ISC_R_SUCCESS if succesfully reassembled
+//   ISC_R_INPROGRESS if not all fragments have been received yet
+//   ISC_R_FAILURE if the fragments mismatch (for example, mismatching id)
 isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t **out_msg);

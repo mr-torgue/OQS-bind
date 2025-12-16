@@ -27,6 +27,7 @@
 #include <isc/result.h>
 #include <isc/sockaddr.h>
 #include <isc/types.h>
+#include <dns/fcache.h>
 #include <dns/types.h>
 
 #define UNIT_TESTING
@@ -215,6 +216,7 @@ ISC_RUN_TEST_IMPL(calculate_start_end_test) {
     //assert_int_equal(start, 0);
     for (unsigned i = 0; i < nr_fragments; i++) {
         calculate_start_end(i, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
+        offset = start + len;
         printf("start: %u, len: %u\n", start, len);
         if (i == 0) {
             assert_true(rr_pk_sig_count * len <= can_send_first_fragment);
@@ -579,27 +581,14 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // test fragment bitmap
         assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6)));
         
-        // raw byte comparison
-        for(unsigned i = 1; i <= out_ce->nr_fragments; i++) {
-            char frag1_filename[128];
-            snprintf(frag1_filename, 128, "testdata/message/frag%u-response1-dilithium", i);
-            unsigned char *frag1_buffer = NULL;
-            size_t frag1_buffer_size;
-            frag1_buffer = load_binary_file(frag1_filename, &frag1_buffer_size);
-            if(frag1_buffer != NULL) {
-                res = fcache_get_fragment(fcache, key, keysize, i-1, &out);
-                printf("used: %u, buffer_size: %u\n", out->used, frag1_buffer_size);
-                assert_true(res == ISC_R_SUCCESS);
-                assert_int_equal(out->used, frag1_buffer_size);
-                isc_mem_put(mctx, frag1_buffer, frag1_buffer_size);
-            }
-        }
+
         // add a FORMERR response at the end
         //out_ce->nr_fragments++;
 
 
         dns_message_t *out_msg = NULL;
-        reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        isc_result_t result = reassemble_fragments(mctx, fcache, out_ce, &out_msg);
+        assert_true(result == ISC_R_SUCCESS);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
         assert_int_equal(out_msg->buffer->used, buffer_size);
@@ -608,9 +597,100 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
             assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
         }
 
+        // increase nr_fragments and check if we get a ISC_R_INPROGRESS result
+        dns_message_t *out_msg2 = NULL;
+        out_ce->nr_fragments++;
+        //printf("nr_fragments: %u\nbitmap %u\ncalulated value: %u\n", out_ce->nr_fragments, out_ce->bitmap, (1u << out_ce->nr_fragments) - 1);
+        result = reassemble_fragments(mctx, fcache, out_ce, &out_msg2);
+        assert_true(result == ISC_R_INPROGRESS);
+
+        // FORMERR response for ID 0x676f (WRONG ID)
+        unsigned char formerr_bytes[] = {
+            0x67, 0x6f, 0x86, 0x21, 0x00, 0x01, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x01, 0x06, 0x3f, 0x32, 0x3f,
+            0x6e, 0x73, 0x31, 0x07, 0x65, 0x78, 0x61, 0x6d,
+            0x70, 0x6c, 0x65, 0x05, 0x6c, 0x6f, 0x63, 0x61,
+            0x6c, 0x00, 0x00, 0x1c, 0x00, 0x01, 0x00, 0x00,
+            0x29, 0x04, 0xd0, 0x00, 0x00, 0x80, 0x00, 0x00,
+            0x00
+        };
+        dns_message_t *formerr_frag = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &formerr_frag);
+        isc_buffer_t formerr_buf;
+        isc_buffer_init(&formerr_buf, formerr_bytes, sizeof(formerr_bytes));
+        isc_buffer_putmem(&formerr_buf, formerr_bytes, sizeof(formerr_bytes));
+        //isc_buffer_add(&formerr_buf, sizeof(formerr_bytes));
+        formerr_frag->buffer = &formerr_buf;
+        formerr_frag->fragment_nr = 7;
+        // fragment again, because it got removed earlier
+        // create a new entry
+        res = fragment(mctx, fcache, msg, src_address);
+        unsigned newkeysize = 96;
+        unsigned char newkey[newkeysize];
+        strcpy((char *)newkey, "thisisakey!");
+        fcache_add(fcache, newkey, newkeysize, out_ce->nr_fragments + 1);
+        // copy fragments
+        for (unsigned i = 0; i < out_ce->nr_fragments; i++) {
+            printf("i: %u\n", i);
+            dns_message_t *tmp = NULL;
+            dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &tmp);
+            isc_buffer_t *out_buf = NULL;
+            fcache_get_fragment(fcache, key, keysize, i, &out_buf);
+            dns_message_parse(tmp, out_buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+            tmp->fragment_nr = i;
+            fcache_add_fragment(fcache, newkey, newkeysize, tmp);
+            dns_message_detach(&tmp);
+        }
+
+        out_ce = NULL;
+        res = fcache_get(fcache, newkey, newkeysize, &out_ce);
+        assert_true(res == ISC_R_SUCCESS);
+        result = fcache_add_fragment(fcache, newkey, newkeysize, formerr_frag);
+        assert_true(result == ISC_R_SUCCESS);
+
+
+        // ID should mismatch
+        dns_message_t *out_msg3 = NULL;
+        //result = reassemble_fragments(mctx, fcache, out_ce, &out_msg3);
+        //assert_true(result == ISC_R_FAILURE);
+        //assert_true(out_msg3 == NULL);
+
+        printf("used: %u\n", out_ce->fragments[0]->used);
+        printf("used: %u\n", out_ce->fragments[1]->used);
+        printf("used: %u\n", out_ce->fragments[2]->used);
+        printf("used: %u\n", out_ce->fragments[3]->used);
+        printf("used: %u\n", out_ce->fragments[4]->used);
+        printf("used: %u\n", out_ce->fragments[5]->used);
+        printf("used: %u\n", out_ce->fragments[6]->used);
+        printf("used: %u\n", out_ce->fragments[7]->used);
+        // set correct ID
+        *(unsigned char *)(out_ce->fragments[formerr_frag->fragment_nr]->base) = 0xd5;
+        *(unsigned char *)(out_ce->fragments[formerr_frag->fragment_nr]->base + 1) = 0x09;
+        dns_message_t *out_msg4 = NULL;
+        result = reassemble_fragments(mctx, fcache, out_ce, &out_msg4);
+        assert_true(result == ISC_R_SUCCESS);
+        assert_true(out_msg4 != NULL);
+        assert_true(out_msg4->buffer != NULL);
+        printf("out_msg4->buffer->used: %u, buffer_size: %u\n", out_msg4->buffer->used, buffer_size);
+        assert_int_equal(out_msg4->buffer->used, buffer_size);
+        // start at three, TC is not set in testcase...
+        for (unsigned i = 3; i < buffer_size; i++) {
+            assert_true(((char *)(buffer))[i] == ((char *)(out_msg4->buffer->base))[i]);
+        }
+
         // clean up
         dns_message_detach(&msg);
         dns_message_detach(&out_msg);
+        if (out_msg2 != NULL) {
+            dns_message_detach(&out_msg2);
+        }
+        dns_message_detach(&formerr_frag);
+        if (out_msg3 != NULL) {
+            dns_message_detach(&out_msg3);
+        }
+        if (out_msg4 != NULL) {
+            dns_message_detach(&out_msg4);
+        }
         isc_mem_put(mctx, buffer, buffer_size);
     }
     else {

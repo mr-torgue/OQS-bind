@@ -271,7 +271,7 @@ unsigned fcache_count(fcache_t *fcache) {
 void fcache_free_entry(fcache_t *fcache, fragment_cache_entry_t *entry) {
     ISC_LIST_UNLINK(fcache->expiry_list, entry, link);
     for (unsigned i = 0; i < entry->nr_fragments; i++) {
-        if(entry->bitmap & (1 << i)) {
+        if(entry->bitmap & (1 << i) && entry->fragments[i] != NULL) {
             isc_buffer_free(&(entry->fragments[i]));
         }
     }
