@@ -157,7 +157,6 @@ unsigned calc_message_size(dns_message_t *msg,
     unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
     unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {
     REQUIRE(msg != NULL);
-    REQUIRE(msg->saved.base != NULL || msg->buffer != NULL); // message size is based on either one of these fields
     // initalize values
     *num_sig_rr = 0;
     *num_dnskey_rr = 0;
@@ -168,14 +167,13 @@ unsigned calc_message_size(dns_message_t *msg,
     dns_name_t *name = NULL;
     dns_rdataset_t *rdataset = NULL;
 
-    unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
-    unsigned msgsize;
-    if (msg->saved.base != NULL) {
-        msgsize = msg->saved.length;
-    }
-    else {
-        msgsize = msg->buffer->used; // used instead of length
-    }
+    unsigned msgsize = 12; // ID (2B) + Flags (2B) + Counts (4x2B)
+
+    // count question
+    isc_result_t result = dns_message_firstname(msg, DNS_SECTION_QUESTION);
+    REQUIRE(result == ISC_R_SUCCESS);
+    dns_message_currentname(msg, DNS_SECTION_QUESTION, &name);
+    msgsize += name->length + 4; // 4: type (2B) + class (2B)
 
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
@@ -185,6 +183,7 @@ unsigned calc_message_size(dns_message_t *msg,
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
+            unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
             // usually names are compressed
             if (name->attributes.nocompress) { 
                 rr_header_size += name->length;
@@ -213,6 +212,7 @@ unsigned calc_message_size(dns_message_t *msg,
                     else {
                         *savings += rr_header_size + rdata_size;
                     }
+                    msgsize += rr_header_size + rdata_size;
                     counter++;
                 }
             }
@@ -223,6 +223,14 @@ unsigned calc_message_size(dns_message_t *msg,
         // only one allowed and can only be in the additional section
         if (msg->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
             REQUIRE(dns_rdataset_count(msg->opt) == 1);
+            msgsize += 11; // OPT header size
+            isc_result_t tresult;
+            // iterate through this (i think there only should be one)
+            for (tresult = dns_rdataset_first(msg->opt); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(msg->opt)) {
+                dns_rdata_t rdata = DNS_RDATA_INIT;
+                dns_rdataset_current(msg->opt, &rdata);
+                msgsize += rdata.length;
+            }
             counter++;
         }
         REQUIRE(msg->counts[section] == counter); // sanity check: msg->counts[i] and counter should be the same after this  (NOTE: this goes wrong with TSIG/SIG(0))
