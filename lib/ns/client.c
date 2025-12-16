@@ -591,7 +591,8 @@ ns_client_send(ns_client_t *client) {
 		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
 		// QBF
 		if (udp_fragmentation_mode == 1) {
-			result = fragment(client->manager->mctx, fcache, client->message, addr_buf, client->udpsize);
+			// hardcoded 1232 since client->udpsize can be set to 512 as well..
+			result = fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
 		}
 		// RAW
 		else if (udp_fragmentation_mode == 2) {				
