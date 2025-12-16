@@ -153,16 +153,19 @@ bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
 
 
 // TODO: don't rely on the buffers to calculate size
+// only support for question section with one question
 unsigned calc_message_size(dns_message_t *msg,
     unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
-    unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings) {
+    unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings, unsigned *counts, const unsigned count_size) {
     REQUIRE(msg != NULL);
+    REQUIRE(counts != NULL && count_size == DNS_SECTION_MAX);
     // initalize values
     *num_sig_rr = 0;
     *num_dnskey_rr = 0;
     *total_sig_rr = 0;
     *total_dnskey_rr = 0;
     *savings = 0;
+    
     
     dns_name_t *name = NULL;
     dns_rdataset_t *rdataset = NULL;
@@ -174,6 +177,7 @@ unsigned calc_message_size(dns_message_t *msg,
     REQUIRE(result == ISC_R_SUCCESS);
     dns_message_currentname(msg, DNS_SECTION_QUESTION, &name);
     msgsize += name->length + 4; // 4: type (2B) + class (2B)
+    counts[DNS_SECTION_QUESTION] = 1; 
 
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
@@ -212,6 +216,7 @@ unsigned calc_message_size(dns_message_t *msg,
                         *savings += rr_header_size + rdata_size;
                     }
                     msgsize += rr_header_size + rdata_size;
+                    counts[section]++; 
                 }
             }
         }
@@ -228,6 +233,7 @@ unsigned calc_message_size(dns_message_t *msg,
             dns_rdataset_current(msg->opt, &rdata);
             msgsize += rdata.length;
         }
+        counts[DNS_SECTION_ADDITIONAL]++; 
     }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
         "Calculated message size %u for message %u with %u bytes of DNSKEY and %u bytes of RRSIG", msgsize, msg->id, *total_dnskey_rr, *total_sig_rr); 
@@ -391,13 +397,25 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
 // todo, reduce size
 isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
     REQUIRE(msg != NULL);
-    REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
     REQUIRE(mctx != NULL);
     //msg->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
     //REQUIRE(msg->flags & DNS_MESSAGEFLAG_TC); // truncated flag should be set
     unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
     // calculate message size
-    msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
+    unsigned counts[DNS_SECTION_MAX] = {0};
+    msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, counts, DNS_SECTION_MAX);
+    if (msg->counts[0] != 0) {
+        REQUIRE(msg->counts[0] == counts[0]);
+    }
+    if (msg->counts[1] != 0) {
+        REQUIRE(msg->counts[1] == counts[1]);
+    }
+    if (msg->counts[2] != 0) {
+        REQUIRE(msg->counts[2] == counts[2]);
+    }
+    if (msg->counts[3] != 0) {
+        REQUIRE(msg->counts[3] == counts[3]);
+    }
     // print information
     unsigned total_sig_pk_bytes = total_size_sig_rr + total_size_dnskey_rr;
     unsigned rr_pk_sig_count = nr_sig_rr + nr_dnskey_rr;
@@ -419,8 +437,8 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     // 0-initialized array of offsets
     unsigned **offsets = isc_mem_get(mctx, DNS_SECTION_MAX * sizeof(unsigned *));
     for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
-        offsets[section_nr] = isc_mem_get(mctx, msg->counts[section_nr] * sizeof(unsigned));
-        memset(offsets[section_nr], 0, msg->counts[section_nr] * sizeof(unsigned));
+        offsets[section_nr] = isc_mem_get(mctx, counts[section_nr] * sizeof(unsigned));
+        memset(offsets[section_nr], 0, counts[section_nr] * sizeof(unsigned));
     }
     
     // create cache key
@@ -433,7 +451,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     if (fcache_res == ISC_R_EXISTS) {
         // free memory
         for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
-            isc_mem_put(mctx, offsets[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+            isc_mem_put(mctx, offsets[section_nr], counts[section_nr] * sizeof(unsigned));
         }
         isc_mem_put(mctx, offsets, DNS_SECTION_MAX * sizeof(unsigned *));
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
@@ -461,7 +479,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             unsigned counter = 0;
 
             // ignore if there are no resource records
-            if(msg->counts[section_nr] > 0) {
+            if(counts[section_nr] > 0) {
                 for (isc_result_t result = dns_message_firstname(msg, section_nr); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section_nr)) {
                     name = NULL;
                     dns_message_currentname(msg, section_nr, &name);
@@ -567,7 +585,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                     if (section_nr == DNS_SECTION_QUESTION) {
                         counter++;
                         new_section_count = 1; // should always be one
-                        REQUIRE(msg->counts[DNS_SECTION_QUESTION == 1]); // too strict?
+                        REQUIRE(counts[DNS_SECTION_QUESTION == 1]); // too strict?
                     }
                     dns_message_addname(frag, new_name, section_nr);
                 }
@@ -606,7 +624,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                 counter++;
             }
 
-            REQUIRE(counter == msg->counts[section_nr]); 
+            REQUIRE(counter == counts[section_nr]); 
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
@@ -617,7 +635,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
         if (fcache_res != ISC_R_SUCCESS) { 
             // free memory
             for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
-                isc_mem_put(mctx, offsets[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+                isc_mem_put(mctx, offsets[section_nr], counts[section_nr] * sizeof(unsigned));
             }
             isc_mem_put(mctx, offsets, DNS_SECTION_MAX * sizeof(unsigned *));
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
@@ -629,7 +647,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     
     // free memory
     for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
-        isc_mem_put(mctx, offsets[section_nr], msg->counts[section_nr] * sizeof(unsigned));
+        isc_mem_put(mctx, offsets[section_nr], counts[section_nr] * sizeof(unsigned));
     }
     isc_mem_put(mctx, offsets, DNS_SECTION_MAX * sizeof(unsigned *));
 

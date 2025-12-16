@@ -252,7 +252,8 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
 
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
-        msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
+        unsigned count[DNS_SECTION_MAX] = {0};
+        msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, count, DNS_SECTION_MAX);
         assert_int_equal(msgsize, 3244);
         assert_int_equal(nr_sig_rr, 2);
         assert_int_equal(nr_dnskey_rr, 2);

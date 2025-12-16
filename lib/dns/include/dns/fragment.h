@@ -37,7 +37,7 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
 // total_sig_rr / total_dnskey_rr contains the total size in bytes
 unsigned calc_message_size(dns_message_t *msg,
                        unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
-                       unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings);
+                       unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings, unsigned *counts, const unsigned count_size);
 
 // estimates the size of the complete message based on a fragment
 unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings);
