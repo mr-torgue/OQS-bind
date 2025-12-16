@@ -344,10 +344,10 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
 	} 
 	// if fragmentation is enabled, increase buffer
-	//else if(client->manager->sctx->udp_fragmentation_mode != 0) {
-	//	data = client->sendbuf;
-	//	isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
-	//} 
+	else if(client->manager->sctx->udp_fragmentation_mode != 0) {
+		data = client->sendbuf;
+		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
+	} 
 	else {
 		data = client->sendbuf;
 		if ((client->attributes & NS_CLIENTATTR_HAVECOOKIE) == 0) {
@@ -581,43 +581,6 @@ ns_client_send(ns_client_t *client) {
 				client->formerrcache.id = client->message->id;
 			}
 		}
-		// try to fragment: fragment will tell us if it is needed or not
-		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-		// QBF
-		if (udp_fragmentation_mode == 1) {
-			result = fragment(client->manager->mctx, fcache, client->message, addr_buf, client->udpsize);
-		}
-		// RAW
-		else if (udp_fragmentation_mode == 2) {				
-			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					"RAW is not implemented yet!");
-			exit(0);
-		}
-
-		// succesfully fragmented
-		if (result == ISC_R_SUCCESS) {
-			// get first fragment from cache and set it as client->message
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			// create key
-			unsigned char key[64];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
-	
-			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				client->message = msg;		
-				// remove fragment here (not yet we are not copying the buffer)
-				goto sendbuffer; // skip render
-			}
-			else {				
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					 "Could not find first fragment!");
-			}
-		}
 	}
 
 	client_allocsendbuf(client, &buffer, &data);
@@ -702,6 +665,48 @@ ns_client_send(ns_client_t *client) {
 	}
 renderend:
 	result = dns_message_renderend(client->message);
+	if (udp_fragmentation_enabled) {
+		fcache_t *fcache = client->manager->sctx->fcache;
+		if (buffer.used > client->udpsize) {
+			// try to fragment: fragment will tell us if it is needed or not
+			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+			// QBF
+			if (udp_fragmentation_mode == 1) {
+				result = fragment(client->manager->mctx, fcache, client->message, addr_buf, client->udpsize);
+			}
+			// RAW
+			else if (udp_fragmentation_mode == 2) {				
+				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+						"RAW is not implemented yet!");
+				exit(0);
+			}
+
+			// succesfully fragmented
+			if (result == ISC_R_SUCCESS) {
+				// get first fragment from cache and set it as client->message
+				isc_buffer_t *out_frag = NULL;
+				dns_message_t *msg = NULL;
+				// create key
+				unsigned char key[64];
+				unsigned keysize = sizeof(key) / sizeof(key[0]);
+				fcache_create_key(client->message->id, addr_buf, key, &keysize);
+		
+				if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
+					dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+					buffer = *out_frag;
+					dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
+					client->message = msg;		
+					// remove fragment here (not yet we are not copying the buffer)
+					goto sendbuffer; // skip render
+				}
+				else {				
+					ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+						"Could not find first fragment!");
+				}
+			}
+		}
+	}
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
