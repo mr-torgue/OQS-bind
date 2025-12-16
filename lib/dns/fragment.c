@@ -331,8 +331,8 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     REQUIRE(total_msg_size > total_sig_pk_bytes); 
     unsigned num_fixed_bytes = total_msg_size - total_sig_pk_bytes;
     REQUIRE(max_msg_size > num_fixed_bytes); // fixed bytes should fit in a message
-    *can_send = max_msg_size - ;
-    *can_send_first_msg = *can_send;num_fixed_bytes
+    *can_send = max_msg_size - num_fixed_bytes;
+    *can_send_first_msg = *can_send;
 
     int qname_overhead = 4;     // ?fragnum? overhead. Assuming fragnum to be at most 2 digits.
     unsigned nr_fragments = 0;
