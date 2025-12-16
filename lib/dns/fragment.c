@@ -389,7 +389,7 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
 }
  
 // todo, reduce size
-isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address) {
+isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
     REQUIRE(msg != NULL);
     REQUIRE(msg->counts[DNS_SECTION_QUESTION] == 1);
     REQUIRE(mctx != NULL);
@@ -404,7 +404,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     
     // calculate nr of fragments
     unsigned can_send_first_fragment, can_send_other_fragments;
-    unsigned nr_fragments = get_nr_fragments(MAXUDP, msgsize, total_sig_pk_bytes, savings, &can_send_first_fragment, &can_send_other_fragments);
+    unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, total_sig_pk_bytes, savings, &can_send_first_fragment, &can_send_other_fragments);
 
     unsigned num_sig_bytes_per_frag = total_size_sig_rr / nr_fragments;
     unsigned num_pk_bytes_per_frag = total_size_dnskey_rr / nr_fragments;
@@ -422,7 +422,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
         offsets[section_nr] = isc_mem_get(mctx, msg->counts[section_nr] * sizeof(unsigned));
         memset(offsets[section_nr], 0, msg->counts[section_nr] * sizeof(unsigned));
     }
-
+    
     // create cache key
     unsigned char key[69];
     unsigned keysize = sizeof(key) / sizeof(key[0]);

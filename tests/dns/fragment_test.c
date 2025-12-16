@@ -55,6 +55,7 @@
 static dns_message_t *msg = NULL;
 unsigned char *buffer = NULL;
 size_t buffer_size;
+static unsigned max_udp_size = 1232;
 
 static int
 setup_test(void **state) {
@@ -369,7 +370,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // main test
         assert_int_equal(fcache_count(fcache), 0);
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -436,7 +437,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // main test
         assert_int_equal(fcache_count(fcache), 0);
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -500,7 +501,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // main test
         assert_int_equal(fcache_count(fcache), 0);
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -568,7 +569,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // main test
         assert_int_equal(fcache_count(fcache), 0);
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -594,7 +595,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         }
 
         // increase nr_fragments and check if we get a ISC_R_INPROGRESS result
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         dns_message_t *out_msg2 = NULL;
         out_ce->nr_fragments++;
         //printf("nr_fragments: %u\nbitmap %u\ncalulated value: %u\n", out_ce->nr_fragments, out_ce->bitmap, (1u << out_ce->nr_fragments) - 1);
@@ -602,7 +603,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         assert_true(result == ISC_R_INPROGRESS);
         out_ce->nr_fragments--;
         // try to fragment again, should not work because key still exists
-        res = fragment(mctx, fcache, msg, src_address);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
         assert_true(res == ISC_R_EXISTS);
 
         // FORMERR response for ID 0x676f (WRONG ID)

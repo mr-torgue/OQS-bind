@@ -51,7 +51,7 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
 // remaining fragments are added to cache
 // returns true if success, false otherwise
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
-isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address);
+isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size);
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false
