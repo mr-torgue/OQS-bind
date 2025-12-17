@@ -640,7 +640,6 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fcache_add(fcache, newkey, newkeysize, out_ce->nr_fragments + 1);
         // copy fragments
         for (unsigned i = 0; i < out_ce->nr_fragments; i++) {
-            printf("i: %u\n", i);
             dns_message_t *tmp = NULL;
             dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &tmp);
             isc_buffer_t *out_buf = NULL;
@@ -698,7 +697,68 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
 
-    
+    // this was causing some issues with the fragment
+    // first fragments get underestimated: 1265 bytes instead of close to 1280 (including UDP header)
+    // second fragment exceeds 1232 bytes... 
+    const char *filename5 = "testdata/message/P256_FALCON512-test.example.local2";
+    buffer = load_binary_file(filename5, &buffer_size);
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        //isc_buffer_printf(&buf, "aa");
+        printf("buffer size: %u\n", buffer_size);
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+        // create key
+        unsigned char key[64];
+        unsigned keysize = sizeof(key) / sizeof(key[0]);
+        fcache_create_key(msg->id, src_address, key, &keysize);
+        fcache_purge(fcache);
+
+        // main test
+        assert_int_equal(fcache_count(fcache), 0);
+        res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS);
+        assert_int_equal(fcache_count(fcache), 1); // one cache entry
+
+        out_ce = NULL;
+        res = fcache_get(fcache, key, keysize, &out_ce);
+        printf("res: %u, nr_fragments: %u\n", res, out_ce->nr_fragments);
+
+        assert_true(res == ISC_R_SUCCESS);
+        assert_true(out_ce != NULL);
+        printf("here\n");
+        // test number of fragments
+        assert_int_equal(out_ce->nr_fragments, 3);
+        printf("here %u\n", out_ce->bitmap);
+        // test fragment bitmap
+        assert_true(out_ce->bitmap == ((1 << 0) | (1 << 1) | (1 << 2)));
+        printf("here\n");
+
+        dns_message_t *out_msg = NULL;
+        reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
+        assert_true(out_msg != NULL);
+        assert_true(out_msg->buffer != NULL);
+        assert_int_equal(out_msg->buffer->used, buffer_size);
+        // start at three, TC is not set in testcase...
+        for (unsigned i = 3; i < buffer_size; i++) {
+            assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);
+        }
+
+        // clean up
+        dns_message_detach(&msg);
+        dns_message_detach(&out_msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
+        printf("here2\n");
+
     fcache_deinit(&fcache);
 	isc_loopmgr_shutdown(loopmgr);
 }

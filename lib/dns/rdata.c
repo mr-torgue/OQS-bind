@@ -651,6 +651,7 @@ dns_rdata_init(dns_rdata_t *rdata) {
 
 	rdata->data = NULL;
 	rdata->length = 0;
+	rdata->wirelength = 0;
 	rdata->rdclass = 0;
 	rdata->type = 0;
 	rdata->flags = 0;
@@ -667,6 +668,7 @@ dns_rdata_reset(dns_rdata_t *rdata) {
 
 	rdata->data = NULL;
 	rdata->length = 0;
+	rdata->wirelength = 0;
 	rdata->rdclass = 0;
 	rdata->type = 0;
 	rdata->flags = 0;
@@ -778,6 +780,7 @@ dns_rdata_fromregion(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	rdata->data = r->base;
 	rdata->length = r->length;
+	rdata->wirelength = r->length;
 	rdata->rdclass = rdclass;
 	rdata->type = type;
 	rdata->flags = 0;
@@ -2305,6 +2308,7 @@ dns_rdata_exists(dns_rdata_t *rdata, dns_rdatatype_t type) {
 
 	rdata->data = NULL;
 	rdata->length = 0;
+	rdata->wirelength = 0;
 	rdata->flags = DNS_RDATA_UPDATE;
 	rdata->type = type;
 	rdata->rdclass = dns_rdataclass_any;
@@ -2317,6 +2321,7 @@ dns_rdata_notexist(dns_rdata_t *rdata, dns_rdatatype_t type) {
 
 	rdata->data = NULL;
 	rdata->length = 0;
+	rdata->wirelength = 0;
 	rdata->flags = DNS_RDATA_UPDATE;
 	rdata->type = type;
 	rdata->rdclass = dns_rdataclass_none;
@@ -2329,6 +2334,7 @@ dns_rdata_deleterrset(dns_rdata_t *rdata, dns_rdatatype_t type) {
 
 	rdata->data = NULL;
 	rdata->length = 0;
+	rdata->wirelength = 0;
 	rdata->flags = DNS_RDATA_UPDATE;
 	rdata->type = type;
 	rdata->rdclass = dns_rdataclass_any;

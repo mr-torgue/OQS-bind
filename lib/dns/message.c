@@ -1366,6 +1366,7 @@ getsection(isc_buffer_t *source, dns_message_t *msg, dns_decompress_t dctx,
 			 */
 			rdata->data = (unsigned char *)1;
 			rdata->length = 0;
+			rdata->wirelength = rdatalen;
 			rdata->rdclass = rdclass;
 			rdata->type = rdtype;
 			rdata->flags = DNS_RDATA_UPDATE;

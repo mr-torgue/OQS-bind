@@ -6,6 +6,8 @@
 #include <isc/result.h>
 #include <isc/types.h>
 #include <isc/util.h>
+#include <dns/compress.h>
+#include <dns/enumtype.h>
 #include <dns/fragment.h>
 #include <dns/message.h>
 #include <dns/name.h>
@@ -158,6 +160,7 @@ unsigned calc_message_size(dns_message_t *msg,
     unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
     unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings, unsigned *counts, const unsigned count_size) {
     REQUIRE(msg != NULL);
+    REQUIRE(msg->mctx != NULL);
     REQUIRE(counts != NULL && count_size == DNS_SECTION_MAX);
     // initalize values
     *num_sig_rr = 0;
@@ -179,6 +182,15 @@ unsigned calc_message_size(dns_message_t *msg,
     msgsize += name->length + 4; // 4: type (2B) + class (2B)
     counts[DNS_SECTION_QUESTION] = 1; 
 
+    // create a compression object to take care of compressed objects
+    dns_compress_t cctx;
+    dns_compress_init(&cctx, msg->mctx, 0);
+    // initialize tmp buffer
+    isc_buffer_t tmp_buffer;
+    uint8_t tmpmsgbuf[1024];
+    isc_buffer_init(&tmp_buffer, tmpmsgbuf, sizeof(tmpmsgbuf));
+    unsigned return_prefix = 0, return_coff = 0;
+
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
     for(unsigned section = 1; section < DNS_SECTION_MAX; section++) {
@@ -186,6 +198,11 @@ unsigned calc_message_size(dns_message_t *msg,
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
+            return_prefix = 0;
+            return_coff = 0;
+            dns_compress_name(&cctx, &tmp_buffer, name, &return_prefix, &return_coff);
+            printf("return_prefix: %u, return_coff: %u\n", return_prefix, return_coff);
+            isc_buffer_first(&tmp_buffer);
             unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
             // usually names are compressed
             if (name->attributes.nocompress) { 
@@ -212,6 +229,21 @@ unsigned calc_message_size(dns_message_t *msg,
                         *num_dnskey_rr += 1;
                         *total_dnskey_rr += (rdata_size - calc_dnskey_header_size()); // exclude DNSKEY header
                     }
+                    // handle compressed NS data
+                    else if (rdata.type == dns_rdatatype_ns) {
+                        // convert string to name
+                        dns_name_t *tmp_name = NULL;                    
+                        dns_message_gettempname(msg, &tmp_name);
+                        dns_name_fromstring(tmp_name, (char *)rdata.data, NULL, 0, msg->mctx);
+                        tmp_name->attributes.absolute = true;
+
+                        // look up in cctx
+                        return_prefix = 0;
+                        return_coff = 0;
+                        dns_compress_name(&cctx, &tmp_buffer, tmp_name, &return_prefix, &return_coff);
+                        isc_buffer_first(&tmp_buffer);
+                        printf("return_prefix: %u, return_coff: %u\n", return_prefix, return_coff);
+                    }
                     else {
                         *savings += rr_header_size + rdata_size;
                     }
@@ -235,6 +267,7 @@ unsigned calc_message_size(dns_message_t *msg,
         }
         counts[DNS_SECTION_ADDITIONAL]++; 
     }
+    dns_compress_invalidate(&cctx);
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
         "Calculated message size %u for message %u with %u bytes of DNSKEY and %u bytes of RRSIG", msgsize, msg->id, *total_dnskey_rr, *total_sig_rr); 
     return msgsize;
@@ -408,6 +441,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     unsigned counts[DNS_SECTION_MAX] = {0};
     msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, counts, DNS_SECTION_MAX);
     if (msg->counts[0] != 0) {
+        printf("counts: %u %u\n", msg->counts[0], counts[0]);
         REQUIRE(msg->counts[0] == counts[0]);
     }
     if (msg->counts[1] != 0) {
@@ -547,6 +581,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                                 if (offsets[section_nr][counter] < rdsize_no_header) {
                                     // get start and length
                                     calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rdsize_no_header, can_send_first_fragment, can_send_other_fragments, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
+                                    printf("frag: %u, start: %u, len: %u\n", frag_nr, new_rdata_start, new_rdata_length);
                                     REQUIRE(new_rdata_start + new_rdata_length <= rdsize_no_header);
                                     isc_buffer_t *buf = NULL;
                                     isc_buffer_allocate(mctx, &buf, new_rdata_length + header_size); // allocate

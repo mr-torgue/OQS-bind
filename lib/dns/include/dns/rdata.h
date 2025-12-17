@@ -111,6 +111,7 @@ ISC_LANG_BEGINDECLS
 struct dns_rdata {
 	unsigned char	*data;
 	unsigned int	 length;
+	unsigned int	 wirelength; // indicates the length of the field in wireformat (in case data is compressed)
 	dns_rdataclass_t rdclass;
 	dns_rdatatype_t	 type;
 	unsigned int	 flags;
@@ -119,13 +120,13 @@ struct dns_rdata {
 
 #define DNS_RDATA_INIT                                           \
 	{                                                        \
-		NULL, 0, 0, 0, 0, { (void *)(-1), (void *)(-1) } \
+		NULL, 0, 0, 0, 0, 0, { (void *)(-1), (void *)(-1) } \
 	}
 
 #define DNS_RDATA_CHECKINITIALIZED
 #ifdef DNS_RDATA_CHECKINITIALIZED
 #define DNS_RDATA_INITIALIZED(rdata)                                           \
-	((rdata)->data == NULL && (rdata)->length == 0 &&                      \
+	((rdata)->data == NULL && (rdata)->length == 0 && (rdata)->wirelength == 0 && \
 	 (rdata)->rdclass == 0 && (rdata)->type == 0 && (rdata)->flags == 0 && \
 	 !ISC_LINK_LINKED((rdata), link))
 #else /* ifdef DNS_RDATA_CHECKINITIALIZED */
