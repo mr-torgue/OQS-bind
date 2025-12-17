@@ -572,10 +572,6 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                                 ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
                                 new_section_count++;
                             }
-                            // already added in first fragment
-                            else {
-                                savings += rdata.length; // do we need to include this? And is it with or without header?
-                            }
                             counter++;
                         }
                         // convert to rdataset and link to new name
@@ -631,8 +627,8 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        isc_result_t render_result = render_fragment(mctx, 1232, &frag); 
-        if (render_result != ISC_R_SUCCESS) {
+        isc_result_t render_result = render_fragment(mctx, 1280, &frag); 
+        if (frag->buffer->used > 1232) { //if (render_result != ISC_R_SUCCESS) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Failed to render the fragment!");  
             return render_result;
