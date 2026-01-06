@@ -292,6 +292,9 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     if (total_sig_pk_bytes == 0) {
         nr_fragments++;
     }
+    // check that the can send never exceeds max_msg_size
+    REQUIRE(num_fixed_bytes + *can_send_first_msg <= max_msg_size);
+    REQUIRE(num_fixed_bytes - savings + *can_send <= max_msg_size);
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Message with size %u needs %u fragments (max size: %u, pk-sig bytes: %u)", total_msg_size, nr_fragments, max_msg_size, total_sig_pk_bytes);  
     return nr_fragments;
@@ -299,35 +302,24 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
 
 
 
-void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned rr_pk_sig_count, unsigned *start, unsigned *frag_len) {
-    REQUIRE(offset < rdata_size);
-    unsigned rem_space_per_frag, can_send_additional, rem_space_per_frag_1, can_send_additional_1;                            
-    unsigned num_bytes_to_send = rdata_size / nr_fragments;
+
+void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes, unsigned *start, unsigned *frag_len) {
+    REQUIRE(offset < rdata_size);                       
+    // need to be normalized because first fragment can send less
+    unsigned num_bytes_to_send;
     
-    // this is possible because can_send_first_fragment and can_send can be different
-    if (can_send_first_fragment <= total_pk_sig_bytes_per_frag) {
-        rem_space_per_frag_1 = 0;
-        num_bytes_to_send -= ((total_pk_sig_bytes_per_frag - can_send_first_fragment) / rr_pk_sig_count);
-    } 
-    else {
-        rem_space_per_frag_1 = can_send_first_fragment - total_pk_sig_bytes_per_frag; 
-    }
-    if (can_send <= total_pk_sig_bytes_per_frag) {
-        rem_space_per_frag = 0;
-        num_bytes_to_send -= ((total_pk_sig_bytes_per_frag - can_send) / rr_pk_sig_count);
-    } 
-    else {
-        rem_space_per_frag = can_send - total_pk_sig_bytes_per_frag;
-    }
-    can_send_additional_1 = rem_space_per_frag_1 / rr_pk_sig_count;
-    can_send_additional = rem_space_per_frag / rr_pk_sig_count;
+     
+    // should make sure that it spreads evenly according to 
     *start = offset;
+
     // first fragment
     if (offset == 0) {
-        *frag_len = num_bytes_to_send + can_send_additional_1;
+        num_bytes_to_send = ((float)rdata_size / total_pk_sig_bytes) * can_send_first_fragment;
+        *frag_len = num_bytes_to_send;
     }
     else {
-        *frag_len = num_bytes_to_send + can_send_additional;
+        num_bytes_to_send = ((float)rdata_size / total_pk_sig_bytes) * can_send;
+        *frag_len = num_bytes_to_send;
     }   
 
     if (fragment_nr == nr_fragments - 1 || *start + *frag_len > rdata_size) {
@@ -349,7 +341,6 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     unsigned counts[DNS_SECTION_MAX] = {0};
     msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, counts, DNS_SECTION_MAX);
     if (msg->counts[0] != 0) {
-        printf("counts: %u %u\n", msg->counts[0], counts[0]);
         REQUIRE(msg->counts[0] == counts[0]);
     }
     if (msg->counts[1] != 0) {
@@ -368,6 +359,10 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     // calculate nr of fragments
     unsigned can_send_first_fragment, can_send_other_fragments;
     unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, total_sig_pk_bytes, savings, &can_send_first_fragment, &can_send_other_fragments);
+
+    unsigned total_bytes_to_send = savings + total_sig_pk_bytes; // only RR in savings and total_sig_pk_bytes need to be sent
+    unsigned num_bytes_per_frag = total_bytes_to_send / nr_fragments;
+
 
     unsigned num_sig_bytes_per_frag = total_size_sig_rr / nr_fragments;
     unsigned num_pk_bytes_per_frag = total_size_dnskey_rr / nr_fragments;
@@ -488,8 +483,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                                 // edge case: some rr's get sent in n-1 fragments instead of n
                                 if (offsets[section_nr][counter] < rdsize_no_header) {
                                     // get start and length
-                                    calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rdsize_no_header, can_send_first_fragment, can_send_other_fragments, total_sig_pk_bytes_per_frag, rr_pk_sig_count, &new_rdata_start, &new_rdata_length);
-                                    printf("frag: %u, start: %u, len: %u\n", frag_nr, new_rdata_start, new_rdata_length);
+                                    calculate_start_end(frag_nr, nr_fragments, offsets[section_nr][counter], rdsize_no_header, can_send_first_fragment, can_send_other_fragments, total_sig_pk_bytes, &new_rdata_start, &new_rdata_length);
                                     REQUIRE(new_rdata_start + new_rdata_length <= rdsize_no_header);
                                     isc_buffer_t *buf = NULL;
                                     isc_buffer_allocate(mctx, &buf, new_rdata_length + header_size); // allocate
@@ -570,7 +564,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        isc_result_t render_result = render_fragment(mctx, 1280, &frag); 
+        isc_result_t render_result = render_fragment(mctx, 1232, &frag); 
         if (render_result != ISC_R_SUCCESS) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Failed to render the fragment!");  

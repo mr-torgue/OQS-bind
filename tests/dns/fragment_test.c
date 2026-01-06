@@ -216,15 +216,13 @@ ISC_RUN_TEST_IMPL(calculate_start_end_test) {
     //printf("start: %u, len: %u\n", start, len);
     //assert_int_equal(start, 0);
     for (unsigned i = 0; i < nr_fragments; i++) {
-        calculate_start_end(i, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, rr_pk_sig_count, &start, &len);
+        calculate_start_end(i, nr_fragments, offset, rdsize_no_header, can_send_first_fragment, can_send_other_fragments, sigpkbytes_frag, &start, &len);
         offset = start + len;
-        printf("start: %u, len: %u\n", start, len);
+        //printf("start: %u, len: %u\n", start, len);
         if (i == 0) {
-            printf("%u\n", rr_pk_sig_count * len);
             assert_true(rr_pk_sig_count * len <= can_send_first_fragment);
         }
         else {
-            printf("%u\n", rr_pk_sig_count * len);
             assert_true(rr_pk_sig_count * len <= can_send_other_fragments);
         }
     }
@@ -292,8 +290,34 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
         unsigned count[DNS_SECTION_MAX] = {0};
         msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, count, DNS_SECTION_MAX);
-        printf("message size: %d\n", msgsize);
         assert_int_equal(msgsize, 888);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
+    // this is a fragment
+    const char *filename3 = "testdata/message/NS-message-for-msgsize2";
+    buffer = load_binary_file(filename3, &buffer_size);
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        isc_result_t res = dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+
+        // main test
+        unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
+        unsigned count[DNS_SECTION_MAX] = {0};
+        msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, count, DNS_SECTION_MAX);
+        assert_int_equal(msgsize, 1218);
+        assert_int_equal(savings, 50);
 
         // clean up
         dns_message_detach(&msg);
@@ -322,7 +346,6 @@ ISC_RUN_TEST_IMPL(estimate_message_size_test) {
         // main test
         unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
         msgsize = estimate_message_size(msg, &total_size_sig_rr, &total_size_dnskey_rr, &savings);
-        printf("msgsize: %u\n", msgsize);
         assert_int_equal(msgsize, 3244);
         assert_int_equal(total_size_sig_rr, 1332);
         assert_int_equal(total_size_dnskey_rr, 1794);
