@@ -28,6 +28,7 @@
 #include <isc/utf8.h>
 #include <isc/util.h>
 
+#include <dns/compress.h>
 #include <dns/dnssec.h>
 #include <dns/keyvalues.h>
 #include <dns/log.h>

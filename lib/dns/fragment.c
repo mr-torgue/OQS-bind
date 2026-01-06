@@ -1,4 +1,5 @@
 #include "include/dns/fragment.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <isc/buffer.h>
 #include <isc/list.h>
@@ -16,74 +17,8 @@
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
 #include "include/dns/fcache.h"
+#include "include/dns/fragment_helpers.h"
 
-
-// renders a fragment: 
-// allocates msg_size bytes 
-// for fragments usually 1232
-// for complete messages number of fragments * 1232
-// TODO:
-// 1. Better error handling
-// 2. Return proper result
-// 3. Fix issue with TC flag
-static isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep) {
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-        "Rendering message %u with buffer size %u", (*messagep)->id, msg_size); 
-    REQUIRE((*messagep)->buffer == NULL); // otherwise it is already rendered
-	REQUIRE((*messagep)->from_to_wire == DNS_MESSAGE_INTENTRENDER);
-
-    // REQUIRE(..) // check if ready for rendering (do not know how...) 
-    // dynamic allocation, so we can attach to the message
-	isc_buffer_t *buffer = NULL;
-    isc_buffer_allocate(mctx, &buffer, msg_size);
-	isc_result_t result = ISC_R_SUCCESS;
-	dns_message_t *message = *messagep;
-	dns_compress_t cctx;
-
-	message->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-	for (size_t i = 0; i < DNS_SECTION_MAX; i++) {
-		message->counts[i] = 0;
-	}
-
-	dns_compress_init(&cctx, mctx, 0);
-
-	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
-
-    // always the same order
-    unsigned options = 0; //DNS_MESSAGERENDER_ORDERED; 
-    result = dns_message_rendersection(message, DNS_SECTION_QUESTION, options);
-    if (result != ISC_R_SUCCESS) {
-        printf("Could not render DNS_SECTION_QUESTION section, result: %d, buffer size: %u!\n", result, msg_size);
-        return result;
-    }
-    result = dns_message_rendersection(message, DNS_SECTION_ANSWER, options);
-    if (result != ISC_R_SUCCESS) {
-        printf("Could not render DNS_SECTION_ANSWER section, result: %d, buffer size: %u!\n", result, msg_size);
-        return result;
-    }
-    result = dns_message_rendersection(message, DNS_SECTION_AUTHORITY, options);
-    if (result != ISC_R_SUCCESS) {
-        printf("Could not render DNS_SECTION_AUTHORITY section, result: %d, buffer size: %u!\n", result, msg_size);
-        return result;
-    }
-    result = dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, options);
-    if (result != ISC_R_SUCCESS) {
-        printf("Could not render DNS_SECTION_ADDITIONAL section, result: %d, buffer size: %u!\n", result, msg_size);
-        return result;
-    }
-    message->flags &= ~DNS_MESSAGEFLAG_TC; // disable TC to trick renderend to render complete message
-	REQUIRE(dns_message_renderend(message) == ISC_R_SUCCESS);
-
-	dns_compress_invalidate(&cctx);
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-        "Finished rendering, stored %u bytes in msg->buffer", buffer->used); 
-    message->buffer = buffer;
-    dns_message_takebuffer(message, &buffer); // use buffer, the pointer will be set to NULL (message->buffer should still work)
-
-    message->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
-    *(unsigned short *)(message->buffer->base + 1) |=  DNS_MESSAGEFLAG_TC; // buffer was not updated, so do it here
-    return (result);
-}
 
 // TODO: remove mctx and use an array for name
 bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
@@ -168,11 +103,10 @@ unsigned calc_message_size(dns_message_t *msg,
     *total_sig_rr = 0;
     *total_dnskey_rr = 0;
     *savings = 0;
-    
+
     
     dns_name_t *name = NULL;
     dns_rdataset_t *rdataset = NULL;
-
     unsigned msgsize = 12; // ID (2B) + Flags (2B) + Counts (4x2B)
 
     // count question
@@ -182,14 +116,6 @@ unsigned calc_message_size(dns_message_t *msg,
     msgsize += name->length + 4; // 4: type (2B) + class (2B)
     counts[DNS_SECTION_QUESTION] = 1; 
 
-    // create a compression object to take care of compressed objects
-    dns_compress_t cctx;
-    dns_compress_init(&cctx, msg->mctx, 0);
-    // initialize tmp buffer
-    isc_buffer_t tmp_buffer;
-    uint8_t tmpmsgbuf[1024];
-    isc_buffer_init(&tmp_buffer, tmpmsgbuf, sizeof(tmpmsgbuf));
-    unsigned return_prefix = 0, return_coff = 0;
 
     // we already have the total size, now we determine the amount of dnskeys/signatures
     // skip question section
@@ -198,11 +124,6 @@ unsigned calc_message_size(dns_message_t *msg,
         for (isc_result_t result = dns_message_firstname(msg, section); result == ISC_R_SUCCESS;  result = dns_message_nextname(msg, section)) {
             name = NULL;
             dns_message_currentname(msg, section, &name);
-            return_prefix = 0;
-            return_coff = 0;
-            dns_compress_name(&cctx, &tmp_buffer, name, &return_prefix, &return_coff);
-            printf("return_prefix: %u, return_coff: %u\n", return_prefix, return_coff);
-            isc_buffer_first(&tmp_buffer);
             unsigned rr_header_size = 10; // 2 (TYPE) + 2 (CLASS) + 4 (TTL) + 2 (RDLENGTH), excluding name
             // usually names are compressed
             if (name->attributes.nocompress) { 
@@ -221,6 +142,9 @@ unsigned calc_message_size(dns_message_t *msg,
                     dns_rdata_t rdata = DNS_RDATA_INIT;
                     dns_rdataset_current(rdataset, &rdata);
                     unsigned rdata_size = rdata.length;
+                    if (rdata.wirelength != 0) {
+                        rdata_size = rdata.wirelength;
+                    }
                     if (rdata.type == RRSIG) {
                         *num_sig_rr += 1;
                         *total_sig_rr += (rdata_size - calc_rrsig_header_size(&rdata)); // exclude RRSIG header
@@ -228,21 +152,6 @@ unsigned calc_message_size(dns_message_t *msg,
                     else if (rdata.type == DNSKEY) {
                         *num_dnskey_rr += 1;
                         *total_dnskey_rr += (rdata_size - calc_dnskey_header_size()); // exclude DNSKEY header
-                    }
-                    // handle compressed NS data
-                    else if (rdata.type == dns_rdatatype_ns) {
-                        // convert string to name
-                        dns_name_t *tmp_name = NULL;                    
-                        dns_message_gettempname(msg, &tmp_name);
-                        dns_name_fromstring(tmp_name, (char *)rdata.data, NULL, 0, msg->mctx);
-                        tmp_name->attributes.absolute = true;
-
-                        // look up in cctx
-                        return_prefix = 0;
-                        return_coff = 0;
-                        dns_compress_name(&cctx, &tmp_buffer, tmp_name, &return_prefix, &return_coff);
-                        isc_buffer_first(&tmp_buffer);
-                        printf("return_prefix: %u, return_coff: %u\n", return_prefix, return_coff);
                     }
                     else {
                         *savings += rr_header_size + rdata_size;
@@ -267,7 +176,6 @@ unsigned calc_message_size(dns_message_t *msg,
         }
         counts[DNS_SECTION_ADDITIONAL]++; 
     }
-    dns_compress_invalidate(&cctx);
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
         "Calculated message size %u for message %u with %u bytes of DNSKEY and %u bytes of RRSIG", msgsize, msg->id, *total_dnskey_rr, *total_sig_rr); 
     return msgsize;
@@ -663,7 +571,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
         isc_result_t render_result = render_fragment(mctx, 1280, &frag); 
-        if (frag->buffer->used > 1232) { //if (render_result != ISC_R_SUCCESS) {
+        if (render_result != ISC_R_SUCCESS) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Failed to render the fragment!");  
             return render_result;

@@ -41,3 +41,13 @@ void printmessage(isc_mem_t *mctx, dns_message_t *msg);
 
 
 isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const unsigned section);
+
+// renders a fragment: 
+// allocates msg_size bytes 
+// for fragments usually 1232
+// for complete messages number of fragments * 1232
+// TODO:
+// 1. Better error handling
+// 2. Return proper result
+// 3. Fix issue with TC flag
+isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep);

@@ -203,3 +203,64 @@ bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment
     dns_message_detach(&msg);
     return res;
 }
+
+isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep) {
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+        "Rendering message %u with buffer size %u", (*messagep)->id, msg_size); 
+    // if already rendered
+    if ((*messagep)->buffer != NULL) {
+        return ISC_R_EXISTS;
+    }
+
+    // REQUIRE(..) // check if ready for rendering (do not know how...) 
+    // dynamic allocation, so we can attach to the message
+	isc_buffer_t *buffer = NULL;
+    isc_buffer_allocate(mctx, &buffer, msg_size);
+	isc_result_t result = ISC_R_SUCCESS;
+	dns_message_t *message = *messagep;
+	dns_compress_t cctx;
+
+	message->from_to_wire = DNS_MESSAGE_INTENTRENDER;
+	for (size_t i = 0; i < DNS_SECTION_MAX; i++) {
+		message->counts[i] = 0;
+	}
+
+	dns_compress_init(&cctx, mctx, 0);
+
+	REQUIRE(dns_message_renderbegin(message, &cctx, buffer) == ISC_R_SUCCESS);
+
+    // always the same order
+    unsigned options = 0; //DNS_MESSAGERENDER_ORDERED; 
+    result = dns_message_rendersection(message, DNS_SECTION_QUESTION, options);
+    if (result != ISC_R_SUCCESS) {
+        printf("Could not render DNS_SECTION_QUESTION section, result: %d, buffer size: %u!\n", result, msg_size);
+        return result;
+    }
+    result = dns_message_rendersection(message, DNS_SECTION_ANSWER, options);
+    if (result != ISC_R_SUCCESS) {
+        printf("Could not render DNS_SECTION_ANSWER section, result: %d, buffer size: %u!\n", result, msg_size);
+        return result;
+    }
+    result = dns_message_rendersection(message, DNS_SECTION_AUTHORITY, options);
+    if (result != ISC_R_SUCCESS) {
+        printf("Could not render DNS_SECTION_AUTHORITY section, result: %d, buffer size: %u!\n", result, msg_size);
+        return result;
+    }
+    result = dns_message_rendersection(message, DNS_SECTION_ADDITIONAL, options);
+    if (result != ISC_R_SUCCESS) {
+        printf("Could not render DNS_SECTION_ADDITIONAL section, result: %d, buffer size: %u!\n", result, msg_size);
+        return result;
+    }
+    message->flags &= ~DNS_MESSAGEFLAG_TC; // disable TC to trick renderend to render complete message
+	REQUIRE(dns_message_renderend(message) == ISC_R_SUCCESS);
+
+	dns_compress_invalidate(&cctx);
+    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+        "Finished rendering, stored %u bytes in msg->buffer", buffer->used); 
+    message->buffer = buffer;
+    dns_message_takebuffer(message, &buffer); // use buffer, the pointer will be set to NULL (message->buffer should still work)
+
+    message->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
+    *(unsigned short *)(message->buffer->base + 1) |=  DNS_MESSAGEFLAG_TC; // buffer was not updated, so do it here
+    return (result);
+}

@@ -275,6 +275,33 @@ ISC_RUN_TEST_IMPL(calc_message_size_test) {
     else {
         fprintf(stderr, "Could not find file: %s\n", filename);
     }
+
+    // this is a fragment
+    const char *filename2 = "testdata/message/NS-message-for-msgsize";
+    buffer = load_binary_file(filename2, &buffer_size);
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        isc_result_t res = dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+
+        // main test
+        unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
+        unsigned count[DNS_SECTION_MAX] = {0};
+        msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, count, DNS_SECTION_MAX);
+        printf("message size: %d\n", msgsize);
+        assert_int_equal(msgsize, 888);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
 }
 
 ISC_RUN_TEST_IMPL(estimate_message_size_test) {

@@ -690,6 +690,7 @@ dns_rdata_clone(const dns_rdata_t *src, dns_rdata_t *target) {
 
 	target->data = src->data;
 	target->length = src->length;
+	target->wirelength = src->wirelength;
 	target->rdclass = src->rdclass;
 	target->type = src->type;
 	target->flags = src->flags;
@@ -780,7 +781,6 @@ dns_rdata_fromregion(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	rdata->data = r->base;
 	rdata->length = r->length;
-	rdata->wirelength = r->length;
 	rdata->rdclass = rdclass;
 	rdata->type = type;
 	rdata->flags = 0;
@@ -858,6 +858,7 @@ dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		region.base = isc_buffer_used(&st);
 		region.length = length;
 		dns_rdata_fromregion(rdata, rdclass, type, &region);
+		rdata->wirelength = activelength; // store the original wirelength
 	}
 
 	if (result != ISC_R_SUCCESS) {

@@ -1676,7 +1676,7 @@ dns_name_towire(const dns_name_t *name, dns_compress_t *cctx,
 		}
 		// if ends in ?, assume it is a fragment nr
 		// name->ndata[name->length - 2] is the \0 byte
-		if(name->ndata[name->length - 2] == '?') {
+		if(name->length >= 2 && name->ndata[name->length - 2] == '?') {
 			isc_buffer_putuint8(target, 0x0);
 		}
 		else {
