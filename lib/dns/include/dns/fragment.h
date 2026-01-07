@@ -44,7 +44,7 @@ unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, un
 
 // for testing purposes
 // calculates the start and length for the given resource record
-void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned *start, unsigned *frag_len);
+void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned *start, unsigned *frag_len, double *remainder, unsigned *used_bytes);
 
 // fragments a given message msg
 // first fragment is returned in msg

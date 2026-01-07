@@ -684,7 +684,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 
 		// booleans for detecting if it is a fragment
 		bool is_fragment_resp = is_fragment(disp->mgr->mctx, msg);
-		bool is_first_fragment = is_any_fragment && !is_fragment_resp; // is_fragment_resp is false for the first fragment
+		//bool is_first_fragment = is_any_fragment && !is_fragment_resp; // is_fragment_resp is false for the first fragment
 
 		// create cache key
 		unsigned char key[64];

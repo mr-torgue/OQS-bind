@@ -162,7 +162,7 @@
 // returns the signature size for the given algorithm
 // inefficient: should be in a loop
 // requires some changes so leave like this for now
-static unsigned get_alg_sig_size(unsigned algorithm) {
+static inline unsigned get_alg_sig_size(unsigned algorithm) {
 	//printf("Algorithm (SIG): %u\n", algorithm);
 	if (algorithm == DNS_KEYALG_FALCON512) {
 		return DNS_SIG_FALCON512SIZE;
@@ -209,7 +209,7 @@ static unsigned get_alg_sig_size(unsigned algorithm) {
 // returns the public key size for the given algorithm
 // inefficient: should be in a loop
 // requires some changes so leave like this for now
-static unsigned get_alg_pk_size(unsigned algorithm) {
+static inline unsigned get_alg_pk_size(unsigned algorithm) {
 	//printf("Algorithm (PK): %u\n", algorithm);
 	if (algorithm == DNS_KEYALG_FALCON512) {
 		return DNS_KEY_FALCON512SIZE;
