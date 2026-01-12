@@ -1,11 +1,170 @@
+#include <stdint.h>
 #include <isc/result.h>
 #include <isc/types.h>
 #include <isc/util.h>
-#include <dns/fragment_helpers.h>
+#include <dns/udp_fragmentation.h>
 #include <dns/message.h>
 #include <dns/name.h>
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
+
+
+// TODO: remove mctx and use an array for name
+bool is__fragment_qname(isc_mem_t *mctx, dns_message_t *msg, bool force) {
+    // check if already done
+    if (msg->is_fragment && !force) {
+        return true;
+    }
+    // check if it has name in the question section
+    if(dns_message_firstname(msg, DNS_SECTION_QUESTION) != ISC_R_SUCCESS) {
+        return false;
+    }
+    // set default values
+    // will get overwritten if valid fragment
+    bool success = false;
+    msg->fragment_nr = 0;
+    msg->is_fragment = false;
+    // names are compressed use dns_name_tostring to get decompressed string
+    char *qname = NULL;
+    dns_name_tostring(msg->cursors[DNS_SECTION_QUESTION], &qname, mctx);
+
+    // should start with '?'
+    if (qname[0] == '?') {
+        int i = 1;
+        int qname_len = strlen(qname);
+        // find second '?'
+        for (; i < qname_len; i++) {
+            if (qname[i] == '?') {
+                break;
+            }
+        }
+
+        // second '?' not found
+        if (i == qname_len) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "not a valid fragment for qname %s", qname); 
+            success = false;
+        }
+        else {
+            // parse fragment number
+            char *frag_str = isc_mem_get(mctx, i * sizeof(char)); // include space for \0
+            strncpy(frag_str, qname + 1, i -1);
+            frag_str[i - 1] = '\0';
+            char* end;
+            unsigned long nr = strtoul(frag_str, &end, 10);
+            if (frag_str == end) {
+                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                    "fragment number could not be parsed for qname %s", qname); 
+                success = false;
+            }
+            else if (*end != '\0') {
+                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                    "incorrect fragment number ensure format is ?[nr]?[qname]"); 
+                success = false;
+            }
+            else {
+                // fragment found, set msg values
+                msg->fragment_nr = nr - 1;
+                msg->is_fragment = true;
+                // TODO: parse qname
+                success = true;
+            }
+            // free memory
+            isc_mem_put(mctx, frag_str, i * sizeof(char));
+        }
+    }
+    isc_mem_free(mctx, qname);
+    return success;
+}
+
+isc_result_t is_fragment_opt(dns_message_t *msg) {
+    if (msg->opt != NULL) {
+        dns_ednsopt_t ednsopt;
+        dns_rdata_t rdata;
+        isc_buffer_t optbuf;
+        isc_result_t result = dns_rdataset_first(msg->opt);
+        if (result == ISC_R_SUCCESS) {
+            dns_rdata_init(&rdata);
+            dns_rdataset_current(msg->opt, &rdata);        
+            isc_buffer_init(&optbuf, rdata.data, rdata.length);
+            isc_buffer_add(&optbuf, rdata.length);
+
+            // parse ednsopt
+            while (isc_buffer_remaininglength(&optbuf) >= 4) {
+                ednsopt.code = isc_buffer_getuint16(&optbuf);
+                ednsopt.length = isc_buffer_getuint16(&optbuf);
+                ednsopt.value = isc_buffer_current(&optbuf);
+                // check if this an OPTION for UDP fragmentation
+                // format:  | FRAGMENT NR. (6b) | NR. OF FRAGMENTS (6b) | FLAGS 4(b) | : 2 Bytes total
+                if (ednsopt.code == OPTION_CODE && ednsopt.length == OPTION_LENGTH) {
+                    uint16_t fragment_nr, nr_fragments, flags;
+                    unsigned value = ednsopt.value[0] << 8 | ednsopt.value[1];
+                    fragment_nr = value >> 10 & 0x3f;
+                    nr_fragments = value >> 4 & 0x3f;
+                    flags = value & 0xf;
+                    msg->is_fragment = true;
+                    msg->fragment_nr = fragment_nr;
+                    msg->nr_fragments = nr_fragments;
+                    msg->fragment_flags = flags;
+                    return ISC_R_SUCCESS;
+                }
+            }
+            return ISC_R_NOTFOUND; // OPTION 22 not found
+        }
+    }
+    return ISC_R_EMPTY; // no OPT record found
+}
+
+isc_result_t create_fragment_opt(dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments) {
+    // copy opt if exists, else create new one
+    isc_result_t result;
+    dns_rdataset_t *opt = NULL;
+    dns_rdata_t rdata;
+    isc_buffer_t optbuf;
+    dns_message_gettemprdataset(frag, &opt);
+    unsigned version = 0; // is this correct?
+    uint16_t udpsize = 65535; // max UDP size
+    unsigned flags = DNS_MESSAGEEXTFLAG_DO;
+    dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS + 1]; // we allow for a max of 9
+    size_t opts_count = 0;
+    // parse the old opt message
+    result = dns_rdataset_first(msg->opt);
+    if (result == ISC_R_SUCCESS) {
+        // copy buffer
+        dns_rdata_init(&rdata);
+        dns_rdataset_current(msg->opt, &rdata);
+        isc_buffer_init(&optbuf, rdata.data, rdata.length);
+        isc_buffer_add(&optbuf, rdata.length);
+
+        // parse count and ednsopts and add to array
+        while (isc_buffer_remaininglength(&optbuf) >= 4) {
+            REQUIRE(opts_count < DNS_EDNSOPTIONS);
+            ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+            opts_count++;
+        }
+
+        // copy values
+        version = msg->opt->ttl >> 16;
+        flags = msg->opt->ttl & 0xffff;
+        udpsize = msg->opt->rdclass;
+    }
+    // add the new opt data
+    ednsopts[opts_count].code = OPTION_CODE;
+    ednsopts[opts_count].length = 2;
+    // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
+    uint16_t data = (frag_nr << 10) | (nr_fragments << 4);
+    unsigned char value[2];
+    value[0] = (data >> 8);
+    value[1] = data & 0xff;
+    ednsopts[opts_count].value = value;
+
+    // build and set opt record
+    dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
+    return dns_message_setopt(frag, opt);
+}
+
 
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize) {
     REQUIRE(*keysize >= 64);

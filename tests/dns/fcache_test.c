@@ -752,7 +752,6 @@ ISC_LOOP_TEST_IMPL(test_fcache_expiry) {
     unsigned timeout = 5;
 
     fcache_init(&fcache_g, loopmgr, ttl, timeout);
-    assert_int_equal(fcache_g->max_ttl_timeout.seconds, timeout);
     // test case 1: 3 ttl and 5 second time-out
     unsigned buflen = 16;
     unsigned nr_fragments = 5;
@@ -822,7 +821,6 @@ ISC_LOOP_TEST_IMPL(test_fcache_expiry_advanced) {
     strcpy((char *)key5, "thisis5akey!");
 
     fcache_init(&fcache_g, loopmgr, ttl, timeout);
-    assert_int_equal(fcache_g->max_ttl_timeout.seconds, timeout);
     // keep reusing the same buffer and fragment
     unsigned buflen = 16;
     unsigned nr_fragments = 5;

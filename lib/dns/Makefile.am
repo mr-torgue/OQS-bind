@@ -76,8 +76,6 @@ libdns_la_HEADERS =			\
 	include/dns/fcache.h		\
 	include/dns/fixedname.h		\
 	include/dns/forward.h		\
-	include/dns/fragment_helpers.h		\
-	include/dns/fragment.h		\
 	include/dns/geoip.h		\
 	include/dns/ipkeylist.h		\
 	include/dns/iptable.h		\
@@ -104,6 +102,7 @@ libdns_la_HEADERS =			\
 	include/dns/peer.h		\
 	include/dns/private.h		\
 	include/dns/qp.h		\
+	include/dns/qbf.h		\
 	include/dns/rbt.h		\
 	include/dns/rcode.h		\
 	include/dns/rdata.h		\
@@ -135,6 +134,7 @@ libdns_la_HEADERS =			\
 	include/dns/ttl.h		\
 	include/dns/types.h		\
 	include/dns/update.h		\
+	include/dns/udp_fragmentation.h		\
 	include/dns/validator.h		\
 	include/dns/view.h		\
 	include/dns/xfrin.h		\
@@ -185,8 +185,6 @@ libdns_la_SOURCES =			\
 	fcache.c			\
 	fixedname.c			\
 	forward.c			\
-	fragment.c 		\
-	fragment_helpers.c 		\
 	gssapictx.c			\
 	hmac_link.c			\
 	ipkeylist.c			\
@@ -218,6 +216,7 @@ libdns_la_SOURCES =			\
 	peer.c				\
 	private.c			\
 	probes.d			\
+	qbf.c 				\
 	qp.c				\
 	qp_p.h				\
 	rbt.c				\
@@ -252,6 +251,7 @@ libdns_la_SOURCES =			\
 	tsig_p.h			\
 	ttl.c				\
 	update.c			\
+	udp_fragmentation.c \
 	validator.c			\
 	view.c				\
 	xfrin.c				\

@@ -1,4 +1,3 @@
-#include "include/dns/fragment.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -10,87 +9,17 @@
 #include <isc/util.h>
 #include <dns/compress.h>
 #include <dns/enumtype.h>
-#include <dns/fragment.h>
 #include <dns/message.h>
 #include <dns/name.h>
 #include <dns/rdatalist.h>
 #include <dns/types.h>
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
-#include "include/dns/fcache.h"
-#include "include/dns/fragment_helpers.h"
+#include <dns/qbf.h>
 
 
-// TODO: remove mctx and use an array for name
-bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force) {
-    // check if already done
-    if (msg->is_fragment && !force) {
-        return true;
-    }
-    // check if it has name in the question section
-    if(dns_message_firstname(msg, DNS_SECTION_QUESTION) != ISC_R_SUCCESS) {
-        return false;
-    }
-    // set default values
-    // will get overwritten if valid fragment
-    bool success = false;
-    msg->fragment_nr = 0;
-    msg->is_fragment = false;
-    // names are compressed use dns_name_tostring to get decompressed string
-    char *qname = NULL;
-    dns_name_tostring(msg->cursors[DNS_SECTION_QUESTION], &qname, mctx);
 
-    // should start with '?'
-    if (qname[0] == '?') {
-        int i = 1;
-        int qname_len = strlen(qname);
-        // find second '?'
-        for (; i < qname_len; i++) {
-            if (qname[i] == '?') {
-                break;
-            }
-        }
-
-        // second '?' not found
-        if (i == qname_len) {
-            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-                "not a valid fragment for qname %s", qname); 
-            success = false;
-        }
-        else {
-            // parse fragment number
-            char *frag_str = isc_mem_get(mctx, i * sizeof(char)); // include space for \0
-            strncpy(frag_str, qname + 1, i -1);
-            frag_str[i - 1] = '\0';
-            char* end;
-            unsigned long nr = strtoul(frag_str, &end, 10);
-            if (frag_str == end) {
-                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-                    "fragment number could not be parsed for qname %s", qname); 
-                success = false;
-            }
-            else if (*end != '\0') {
-                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-                    "incorrect fragment number ensure format is ?[nr]?[qname]"); 
-                success = false;
-            }
-            else {
-                // fragment found, set msg values
-                msg->fragment_nr = nr - 1;
-                msg->is_fragment = true;
-                // TODO: parse qname
-                success = true;
-            }
-            // free memory
-            isc_mem_put(mctx, frag_str, i * sizeof(char));
-        }
-    }
-    isc_mem_free(mctx, qname);
-    return success;
-}
-
-
-// TODO: don't rely on the buffers to calculate size
+// Note: calculates the maximum message size, so names are assumed to not be compressed
 // only support for question section with one question
 unsigned calc_message_size(dns_message_t *msg,
     unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
@@ -143,6 +72,8 @@ unsigned calc_message_size(dns_message_t *msg,
                     dns_rdata_t rdata = DNS_RDATA_INIT;
                     dns_rdataset_current(rdataset, &rdata);
                     unsigned rdata_size = rdata.length;
+                    //printf("rdata.length: %u, rdata.wirelength: %u\n", rdata.length, rdata.wirelength);
+                    // TODO: enable as soon as we don't change the qname anymore
                     if (rdata.wirelength != 0) {
                         rdata_size = rdata.wirelength;
                     }
@@ -324,6 +255,7 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
     }
     
     *remainder += modf(num_bytes_to_send, &tmp);
+    //printf("num_bytes_to_send: %u\n", (unsigned)num_bytes_to_send);
     // make sure it never exceeds the limit
     if (fragment_nr == nr_fragments - 1 || *start + *frag_len >= rdata_size) {
         *frag_len = rdata_size - *start;
@@ -343,6 +275,7 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
     else {
         REQUIRE(*used_bytes <= can_send);
     }
+    //printf("*frag_len: %u\n", *frag_len);
     
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Fragment %u split into [%u, %u)], max size: %u", fragment_nr, *start, *start + *frag_len, rdata_size);  
@@ -359,6 +292,9 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
     // calculate message size
     unsigned counts[DNS_SECTION_MAX] = {0};
     msgsize = calc_message_size(msg, &nr_sig_rr, &nr_dnskey_rr, &total_size_sig_rr, &total_size_dnskey_rr, &savings, counts, DNS_SECTION_MAX);
+    // due to compression issues the message can be larger than 1232
+    // for example ?2?example will not be compressed wrt ?2?test.example because ?2? is considered part of the name
+    // DIRTY FIX: decrease max_udp_size with 24
     if (msg->counts[0] != 0) {
         REQUIRE(msg->counts[0] == counts[0]);
     }
@@ -446,6 +382,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                     dns_message_currentname(msg, section_nr, &name);
                     dns_name_t *new_name = NULL;
                     dns_message_gettempname(frag, &new_name);
+                    unsigned new_section_count_name_snap = new_section_count; // to check if name 
                     
                     // change the name from x.com to ?fragment?x.com
                     // we don't do this for the first fragment
@@ -475,6 +412,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                         rdatalist->rdclass = rdataset->rdclass;
                         rdatalist->type = rdataset->type;
                         rdatalist->ttl = rdataset->ttl;
+                        unsigned new_section_count_rdata_snap = new_section_count;
 
                         for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
                             // get current rdata
@@ -537,7 +475,7 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
                         new_rdataset->attributes = rdataset->attributes; 
                         new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED; // reset this flag to render
                         ISC_LIST_APPEND(new_name->list, new_rdataset, link);
-	                    REQUIRE(DNS_RDATASET_VALID(new_rdataset));
+                        REQUIRE(DNS_RDATASET_VALID(new_rdataset));
                     } 
                     if (section_nr == DNS_SECTION_QUESTION) {
                         counter++;
@@ -585,7 +523,9 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             frag->counts[section_nr] = new_section_count;
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
-        isc_result_t render_result = render_fragment(mctx, 1280, &frag); 
+        isc_result_t render_result = render_fragment(mctx, 1500, &frag); 
+
+        REQUIRE(frag->buffer->used <= 1232);
         if (render_result != ISC_R_SUCCESS) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Failed to render the fragment!");  

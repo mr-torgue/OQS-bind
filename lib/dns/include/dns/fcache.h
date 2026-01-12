@@ -51,7 +51,6 @@ typedef struct fcache {
     isc_timer_t *expiry_timer;      // timer ensuring cache remains clean
     isc_time_t ttl;                 // specifies ttl in the cache for a cache entry
     isc_time_t loop_timeout;        // loop executes at most once every loop_timeout times (prevents that loop triggers too many times)
-    isc_time_t max_ttl_timeout;     // keeps track of MAX(ttl, loop_timeout)
 } fcache_t;
 
 

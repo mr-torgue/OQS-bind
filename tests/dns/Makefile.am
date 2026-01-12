@@ -19,7 +19,8 @@ LDADD +=				\
 
 check_PROGRAMS =		\
 	fcache_test		\
-	fragment_test		\
+	qbf_test		\
+	udp_fragmentation_test		\
 	acl_test		\
 	badcache_test		\
 	db_test			\

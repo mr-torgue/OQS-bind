@@ -338,9 +338,12 @@ struct dns_message {
 	dns_minttl_t minttl[DNS_SECTION_MAX];
 
 	// UDP Fragmentation
+	// TODO: datatypes can be optimized
 	bool use_UDP_fragmentation;
 	bool is_fragment;
 	unsigned long fragment_nr; // for strtol
+	unsigned nr_fragments;
+	unsigned fragment_flags;
 
 };
 

@@ -11,14 +11,6 @@
 #include <dns/fcache.h>
 #include "include/dns/fcache.h"
 
-// schedules a time event after interval seconds
-static void fcache_schedule_timer(fcache_t *fcache, isc_time_t *interval) {
-    REQUIRE(isc_time_seconds(interval) < 600); // to ensure that we don't get comically large timeouts
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-        "Setting timer at %u seconds...", isc_time_seconds(interval)); 
-    printf("Setting timer at %u seconds...\n", isc_time_seconds(interval));
-    isc_timer_start(fcache->expiry_timer, isc_timertype_once, interval);
-}
 
 // callback when a timer goes off
 static void fcache_timer_cb(void *arg) {
@@ -37,24 +29,6 @@ static void fcache_timer_cb(void *arg) {
         } else {
             break;  // remaining entries are not yet expired
         }
-    }
-
-    // reschedule the timer for the next expiry (if any)
-    if (ISC_LIST_HEAD(fcache->expiry_list) != NULL) {
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-        "Executing callback..."); 
-        fprintf(stderr, "Callback is rescheduling timer...\n");
-        isc_time_t delta;
-        isc_time_t new_time = ISC_LIST_HEAD(fcache->expiry_list)->expiry;
-        // new_time > now
-        REQUIRE(isc_time_compare(&new_time, &now) > 0);
-        // delta is the remaning valid time period for this entry
-        isc_time_subtract(&new_time, &now, &delta);
-        // check if delta is smaller than timeout
-        if (isc_time_compare(&delta, &fcache->loop_timeout) == -1) {
-            delta = fcache->loop_timeout;
-        }
-        fcache_schedule_timer(fcache, &delta);
     }
 }
 
@@ -75,18 +49,14 @@ void fcache_init(fcache_t **fcache, isc_loopmgr_t *loopmgr, unsigned ttl, unsign
     isc_time_set( &(*fcache)->ttl, ttl, 0); 
     (*fcache)->ht = NULL;
     isc_time_set(&(*fcache)->loop_timeout, loop_timeout, 0); 
-    // set max_ttl_timeout to MAX(ttl, loop_timeout)
-    (*fcache)->max_ttl_timeout = (*fcache)->ttl;
-    if (isc_time_compare(&(*fcache)->ttl, &(*fcache)->loop_timeout) == -1) {
-        (*fcache)->max_ttl_timeout = (*fcache)->loop_timeout;
-    }
     isc_ht_init(&(*fcache)->ht, (*fcache)->mctx, 16, 0); // use size 2^16, case sensitive 
     ISC_LIST_INIT((*fcache)->expiry_list);
     (*fcache)->expiry_timer = NULL;
     (*fcache)->loopmgr = loopmgr;
 
-
-    //isc_timer_create(isc_loop_current(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
+    // start a timer that runs every x seconds
+    isc_timer_create(isc_loop_current(loopmgr), fcache_timer_cb, *fcache, &(*fcache)->expiry_timer);
+    isc_timer_start((*fcache)->expiry_timer, isc_timertype_ticker, &(*fcache)->loop_timeout); 
 
     // initialize mutex
 	isc_mutex_init(&(*fcache)->lock);
@@ -130,17 +100,6 @@ isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, 
         isc_time_add(&now, &fcache->ttl, &(entry->expiry)); // set entry expiry time 
         isc_ht_add(fcache->ht, key, keysize, entry);             // add to hashtable
         ISC_LIST_APPEND(fcache->expiry_list, entry, link);          // add to linked list
-
-        // schedule a timer for this entry if it's the earliest
-        if (ISC_LIST_HEAD(fcache->expiry_list) == entry) {    
-            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-            "Schedule next timer in %d seconds\n", fcache->max_ttl_timeout.seconds);
-            // create if not exists
-            if (fcache->expiry_timer == NULL) {
-                isc_timer_create(isc_loop_current(fcache->loopmgr), fcache_timer_cb, fcache, &fcache->expiry_timer);
-            }
-            fcache_schedule_timer(fcache, &fcache->max_ttl_timeout);
-        }
         return ISC_R_SUCCESS;
     }
     return ISC_R_EXISTS;

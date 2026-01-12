@@ -58,9 +58,6 @@
 
 #include <dns/fixedname.h>
 #include <dns/types.h>
-#include <dns/fcache.h>
-#include <dns/fragment.h>
-#include <dns/fragment_helpers.h>
 
 #undef DNS_RESOLVER_TRACE
 

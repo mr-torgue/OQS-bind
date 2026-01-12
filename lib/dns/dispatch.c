@@ -39,9 +39,9 @@
 
 #include <dns/acl.h>
 #include <dns/dispatch.h>
-#include <dns/fragment.h>
+#include <dns/qbf.h>
 #include <dns/fcache.h>
-#include <dns/fragment_helpers.h>
+#include <dns/udp_fragmentation.h>
 #include <dns/log.h>
 #include <dns/message.h>
 #include <dns/stats.h>
@@ -49,7 +49,6 @@
 #include <dns/types.h>
 
 #include <dns/resolver.h>
-#include "include/dns/fcache.h"
 
 typedef ISC_LIST(dns_dispentry_t) dns_displist_t;
 

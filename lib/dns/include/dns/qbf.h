@@ -6,21 +6,13 @@
 #include <dns/message.h>
 #include <dns/request.h>
 #include <dns/fcache.h>
-#include <dns/fragment_helpers.h>
+#include <dns/udp_fragmentation.h>
 #include <dns/keyvalues.h>
 
 #define RRSIG 46
 #define DNSKEY 48
 #define MAXUDP 1232
 
-
-#define is_fragment(a, b) is__fragment(a, b, true) 
-#define is_fragment_noforce(a, b) is__fragment(a, b, false) 
-// checks if msg is a fragment
-// expected format: ?fragment_nr?name
-// sets the fragment number for msg if fragment
-// if force is set, the logic re-checks the msg regardless if msg->is_fragment is true
-bool is__fragment(isc_mem_t *mctx, dns_message_t *msg, bool force);
 
 // returns the number of fragments for a given message
 // max_msg_size is the maximum packet size

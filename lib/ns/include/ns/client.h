@@ -68,7 +68,7 @@
 #include <dns/db.h>
 #include <dns/ecs.h>
 #include <dns/fixedname.h>
-#include <dns/fragment.h>
+#include <dns/qbf.h>
 #include <dns/name.h>
 #include <dns/rdataclass.h>
 #include <dns/rdatatype.h>

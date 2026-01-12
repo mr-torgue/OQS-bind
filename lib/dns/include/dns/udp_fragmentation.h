@@ -13,6 +13,29 @@
 #include <dns/rdataset.h>
 #include <dns/types.h>
 
+/*
+udp_fragmentation.h contains all code related to UDP fragmentation for large DNS messages.
+It handles basic functionality that is shared between UDP fragmentation algorithms.
+Algorithm specific code are in:
+1. qbf.h and qbf.c for QBF
+2. raw.h and raw.c for RAW
+*/
+
+#define OPTION_CODE 22
+#define OPTION_LENGTH 2
+
+#define is_fragment(a, b) is__fragment_qname(a, b, true) 
+#define is_fragment_noforce(a, b) is__fragment_qname(a, b, false) 
+// checks if msg is a fragment
+// expected format: ?fragment_nr?name
+// sets the fragment number for msg if fragment
+// if force is set, the logic re-checks the msg regardless if msg->is_fragment is true
+bool is__fragment_qname(isc_mem_t *mctx, dns_message_t *msg, bool force);
+
+// checks if a message is a fragment based on whether the OPT record has option 22 set
+isc_result_t is_fragment_opt(dns_message_t *msg);
+
+isc_result_t create_fragment_opt(dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments);
 
 // key = id + client ip:port
 // overwrites keysize to match the string length
