@@ -20,7 +20,7 @@
 // total_sig_pk_bytes are all the signature and key bytes (only these RR's get fragmented)
 // savings indicates the amount of extra bytes fragments 2..n have, due to the fact that we can omit some data (AFAIK)
 // returns the number of fragments needed and the fragment sizes in bytes
-unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
+unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, const unsigned overhead, unsigned *can_send_first_msg, unsigned *can_send);
 
 
 // calculates all the sizes needed for fragmentation

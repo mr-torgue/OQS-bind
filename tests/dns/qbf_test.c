@@ -161,16 +161,17 @@ ISC_RUN_TEST_IMPL(calculate_start_end_test) {
 
 ISC_RUN_TEST_IMPL(get_nr_fragments_test) {
     unsigned max_msg_size, total_msg_size, total_sig_pk_bytes, savings, can_send_first_msg, can_send, result;
-    result = get_nr_fragments(1232, 1100, 900, 0, &can_send_first_msg, &can_send);
+    unsigned overhead = 6;
+    result = get_nr_fragments(1232, 1100, 900, 0, overhead, &can_send_first_msg, &can_send);
     assert_int_equal(result, 1);
-    result = get_nr_fragments(1232, 1300, 900, 0, &can_send_first_msg, &can_send);
+    result = get_nr_fragments(1232, 1300, 900, 0, overhead, &can_send_first_msg, &can_send);
     assert_int_equal(result, 2);
-    assert_int_equal(can_send_first_msg, 832); // 1300 - 900 = 400 of static bytes, 1232 - 400 = 832 that can be send in the first fragment
-    assert_int_equal(can_send, 828); // 832 + savings (0) - 4 = 828
-    result = get_nr_fragments(1232, 2500, 1900, 130, &can_send_first_msg, &can_send);
+    assert_int_equal(can_send_first_msg, 826); // 1300 - 900 = 400 of static bytes, 1232 - 400 - 6(savings) = 826 that can be send in the first fragment
+    assert_int_equal(can_send, 826); // 832 + savings (0) - 6 = 826
+    result = get_nr_fragments(1232, 2500, 1900, 130, overhead, &can_send_first_msg, &can_send);
     assert_int_equal(result, 3);
-    assert_int_equal(can_send_first_msg, 632); // 2500 - 1900 = 600 of static bytes, 1232 - 600 = 632 that can be send in the first fragment
-    assert_int_equal(can_send, 758); // 632 + 130 - 4 = 758
+    assert_int_equal(can_send_first_msg, 626); // 2500 - 1900 = 600 of static bytes, 1232 - 600 - 6 = 626 that can be send in the first fragment
+    assert_int_equal(can_send, 756); // 632 + 130 - 6 = 756
 }
 
 ISC_RUN_TEST_IMPL(calc_message_size_test) {
@@ -392,7 +393,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         reassemble_fragments(mctx, fcache, key, keysize, &out_msg);
         assert_true(out_msg != NULL);
         assert_true(out_msg->buffer != NULL);
-        assert_int_equal(out_msg->buffer->used, buffer_size);
+        assert_int_equal(out_msg->buffer->used, buffer_size + 6); // final message does not remove OPTION (we can but don't need to)
         // start at three, TC is not set in testcase...
         for (unsigned i = 3; i < buffer_size; i++) {
             assert_true(((char *)(buffer))[i] == ((char *)(out_msg->buffer->base))[i]);

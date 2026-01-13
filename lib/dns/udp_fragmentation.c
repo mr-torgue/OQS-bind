@@ -7,6 +7,7 @@
 #include <dns/name.h>
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
+#include "include/dns/udp_fragmentation.h"
 
 
 // TODO: remove mctx and use an array for name
@@ -93,20 +94,30 @@ isc_result_t is_fragment_opt(dns_message_t *msg) {
             while (isc_buffer_remaininglength(&optbuf) >= 4) {
                 ednsopt.code = isc_buffer_getuint16(&optbuf);
                 ednsopt.length = isc_buffer_getuint16(&optbuf);
-                ednsopt.value = isc_buffer_current(&optbuf);
-                // check if this an OPTION for UDP fragmentation
-                // format:  | FRAGMENT NR. (6b) | NR. OF FRAGMENTS (6b) | FLAGS 4(b) | : 2 Bytes total
-                if (ednsopt.code == OPTION_CODE && ednsopt.length == OPTION_LENGTH) {
-                    uint16_t fragment_nr, nr_fragments, flags;
-                    unsigned value = ednsopt.value[0] << 8 | ednsopt.value[1];
-                    fragment_nr = value >> 10 & 0x3f;
-                    nr_fragments = value >> 4 & 0x3f;
-                    flags = value & 0xf;
-                    msg->is_fragment = true;
-                    msg->fragment_nr = fragment_nr;
-                    msg->nr_fragments = nr_fragments;
-                    msg->fragment_flags = flags;
-                    return ISC_R_SUCCESS;
+                if (isc_buffer_remaininglength(&optbuf) >= ednsopt.length) {
+                    ednsopt.value = isc_buffer_current(&optbuf);
+                    isc_buffer_forward(&optbuf, ednsopt.length); 
+                    // check if this an OPTION for UDP fragmentation
+                    // format:  | FRAGMENT NR. (6b) | NR. OF FRAGMENTS (6b) | FLAGS 4(b) | : 2 Bytes total
+                    if (ednsopt.code == OPTION_CODE && ednsopt.length == OPTION_LENGTH) {
+                        uint16_t fragment_nr, nr_fragments, flags;
+                        unsigned value = ednsopt.value[0] << 8 | ednsopt.value[1];
+                        fragment_nr = value >> 10 & 0x3f;
+                        nr_fragments = value >> 4 & 0x3f;
+                        flags = value & 0xf;
+                        msg->is_fragment = true;
+                        msg->fragment_nr = fragment_nr;
+                        msg->nr_fragments = nr_fragments;
+                        msg->fragment_flags = flags;
+                        // frag nr check
+                        if (fragment_nr >= nr_fragments) {
+                            return ISC_R_FAILURE;
+                        }
+                        return ISC_R_SUCCESS;
+                    }
+                }
+                else {
+                    return ISC_R_FAILURE;
                 }
             }
             return ISC_R_NOTFOUND; // OPTION 22 not found
@@ -115,7 +126,7 @@ isc_result_t is_fragment_opt(dns_message_t *msg) {
     return ISC_R_EMPTY; // no OPT record found
 }
 
-void parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options) {
+isc_result_t parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options) {
     *opt_size = 0;
     *nr_options = 0;
     if (msg->opt != NULL) {
@@ -131,12 +142,20 @@ void parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options) {
             *opt_size = rdata.length + 11; // only 1 rdata for an OPT record but multiple options are possible
             while (isc_buffer_remaininglength(&optbuf) >= 4) {
                 isc_buffer_getuint16(&optbuf);
-                isc_buffer_getuint16(&optbuf);
-                isc_buffer_current(&optbuf);
+                unsigned option_length = isc_buffer_getuint16(&optbuf);
+                // check if enough space is available
+                if (isc_buffer_remaininglength(&optbuf) >= option_length) {
+                    isc_buffer_current(&optbuf);
+                    isc_buffer_forward(&optbuf, option_length); 
+                }
+                else {
+                    return ISC_R_FAILURE;
+                }
                 (*nr_options)++;
             }
         }
     }
+    return ISC_R_SUCCESS;
 }
 
 isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags) {
@@ -152,7 +171,9 @@ isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, con
     size_t opts_count = 0;
 
     // frag nr check
-    if (frag_nr >= )
+    if (frag_nr >= nr_fragments) {
+        return ISC_R_FAILURE;
+    }
 
     // parse the old opt message if exists
     if (msg->opt != NULL) {
@@ -169,7 +190,17 @@ isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, con
                 REQUIRE(opts_count < DNS_EDNSOPTIONS);
                 ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
                 ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
-                ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+                // test if enough buffer space is available
+                if (isc_buffer_remaininglength(&optbuf) >= ednsopts[opts_count].length) {
+                    ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+                    isc_buffer_forward(&optbuf, ednsopts[opts_count].length); 
+                }
+                else {
+                    return ISC_R_FAILURE;
+                }
+                if (ednsopts[opts_count].code  == OPTION_CODE) {
+                    continue; // skip this entry, we will overwrite it
+                }
                 opts_count++;
             }
 
@@ -183,7 +214,7 @@ isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, con
     ednsopts[opts_count].code = OPTION_CODE;
     ednsopts[opts_count].length = 2;
     // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
-    uint16_t data = (frag_nr << 10) | (nr_fragments << 4);
+    uint16_t data = ((frag_nr & 0x3f) << 10) | ((nr_fragments & 0x3f) << 4) | (fragment_flags & 0xf);
     unsigned char value[2];
     value[0] = (data >> 8);
     value[1] = data & 0xff;

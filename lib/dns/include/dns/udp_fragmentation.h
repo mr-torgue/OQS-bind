@@ -37,10 +37,11 @@ isc_result_t is_fragment_opt(dns_message_t *msg);
 
 // appends a new option to the opt record in msg
 // if no opt record exists, it will be added
-isc_result_t create_fragment_opt(dns_message_t *msg, unsigned frag_nr, unsigned nr_fragments, unsigned fragment_flags);
+isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags);
 
 // determines how many options a given msg->opt record has and what the overall size is
-void parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options);
+// returns ISC_R_FAILURE if it is malformed (should not happen)
+isc_result_t parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options);
 
 // key = id + client ip:port
 // overwrites keysize to match the string length

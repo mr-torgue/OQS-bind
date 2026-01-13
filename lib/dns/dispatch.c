@@ -49,6 +49,7 @@
 #include <dns/types.h>
 
 #include <dns/resolver.h>
+#include "include/dns/udp_fragmentation.h"
 
 typedef ISC_LIST(dns_dispentry_t) dns_displist_t;
 
@@ -678,99 +679,94 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		}
 		else {			
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-				"No name ofund in question"); 
+				"No name found in question"); 
 		}
 
 		// booleans for detecting if it is a fragment
-		bool is_fragment_resp = is_fragment(disp->mgr->mctx, msg);
-		//bool is_first_fragment = is_any_fragment && !is_fragment_resp; // is_fragment_resp is false for the first fragment
+		if (is_fragment_opt(msg) == ISC_R_SUCCESS) {
 
-		// create cache key
-		unsigned char key[64];
-		unsigned keysize = sizeof(key) / sizeof(key[0]);
-		fcache_create_key(id, to_addr_buf, key, &keysize); // chagne this ...
-
-		// determine the amount of fragments
-		unsigned total_sig_bytes, total_dnskey_bytes, savings, can_send_first_msg, can_send;
-		unsigned msg_size = estimate_message_size(msg, &total_sig_bytes, &total_dnskey_bytes, &savings);
-		unsigned total_sig_pk_bytes = total_sig_bytes + total_dnskey_bytes;
-		unsigned nr_fragments = get_nr_fragments(1232, msg_size, total_sig_pk_bytes, savings, &can_send_first_msg, &can_send);
-		//nr_fragments++; // to trigger a FORMERR
-		isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-			"Key %s has total message size %u and needs %u fragments...", key, msg_size, nr_fragments); 
-
-		fragment_cache_entry_t *out_ce = NULL;
-		// process incoming fragment
-		if (is_fragment_resp) {
+			// create cache key
+			unsigned char key[64];
+			unsigned keysize = sizeof(key) / sizeof(key[0]);
+			fcache_create_key(id, to_addr_buf, key, &keysize); 
+			unsigned nr_fragments = msg->nr_fragments;
+			
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-				"Response to fragment query %lu!", msg->fragment_nr); 
+				"Key %s needs %u fragments, this is fragment %u...", key, nr_fragments, msg->fragment_nr); 
 
-			result = fcache_add_fragment(fcache, key, keysize, msg);
-			if (result == ISC_R_SUCCESS) {
-				dns_message_t *out_msg = NULL;
-				isc_result_t reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
-				if (reassemble_result == ISC_R_SUCCESS) {
+			fragment_cache_entry_t *out_ce = NULL;
+			// process incoming fragment
+			if (msg->fragment_nr > 0) {
+				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+					"Response to fragment query %lu!", msg->fragment_nr); 
+
+				result = fcache_add_fragment(fcache, key, keysize, msg);
+				if (result == ISC_R_SUCCESS) {
+					dns_message_t *out_msg = NULL;
+					isc_result_t reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
+					if (reassemble_result == ISC_R_SUCCESS) {
+						isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+							"All fragments received! Message size: %u", out_msg->buffer->used); 
+						region->base = out_msg->buffer->base;
+						region->length = out_msg->buffer->used;
+						
+						goto done;
+					}
+					else if (reassemble_result != ISC_R_INPROGRESS) {
+						isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+							"Failure during reassembly!"); 						
+					}
+				}
+				else if (result == ISC_R_RANGE) {
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-						"All fragments received! Message size: %u", out_msg->buffer->used); 
-					region->base = out_msg->buffer->base;
-					region->length = out_msg->buffer->used;
-					
-					goto done;
+						"Could not add fragment to fragment cache because fragment number %lu is larger than the number of fragments!", msg->fragment_nr); 
 				}
-				else if (reassemble_result != ISC_R_INPROGRESS) {
+				else if (result == ISC_R_NOTFOUND) {
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-						"Failure during reassembly!"); 						
+						"Could not add fragment to fragment cache because could not find cache entry!"); 
+				}
+				else {
+					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+						"Could not add fragment to fragment cache because of unknown reason!"); 
 				}
 			}
-			else if (result == ISC_R_RANGE) {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Could not add fragment to fragment cache because fragment number %lu is larger than the number of fragments!", msg->fragment_nr); 
-			}
-			else if (result == ISC_R_NOTFOUND) {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Could not add fragment to fragment cache because could not find cache entry!"); 
-			}
+			// if it is not a fragment response, we assume it is a first fragment
+			// note that this is currently not well-defined
 			else {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Could not add fragment to fragment cache because of unknown reason!"); 
-			}
-		}
-		// if it is not a fragment response, we assume it is a first fragment
-		// note that this is currently not well-defined
-		else {
-			result = fcache_add_with_fragment(fcache, key, keysize, msg, nr_fragments);
-			if (result == ISC_R_SUCCESS) {
-				REQUIRE(fcache_get(fcache, key, keysize, &out_ce) == ISC_R_SUCCESS); // should never fail because we just added it
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Requesting %u additional fragments...", nr_fragments - 1); 
+				result = fcache_add_with_fragment(fcache, key, keysize, msg, nr_fragments);
+				if (result == ISC_R_SUCCESS) {
+					REQUIRE(fcache_get(fcache, key, keysize, &out_ce) == ISC_R_SUCCESS); // should never fail because we just added it
+					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+						"Requesting %u additional fragments...", nr_fragments - 1); 
 
-				for (unsigned i = 2; i <= nr_fragments; i++) {
+					for (unsigned i = 2; i <= nr_fragments; i++) {
 
-					isc_buffer_t frag_buf;
-					REQUIRE(region != NULL);
-					isc_buffer_init(&frag_buf, region->base, region->length);
-					isc_buffer_add(&frag_buf, region->length);
-					dns_message_t *new_query = NULL; 
-					isc_buffer_t *new_query_buffer = NULL;
-					isc_region_t new_query_region;
-		
-					get_fragment_query_raw(disp->mgr->mctx, &frag_buf, i, &new_query, &new_query_buffer);
-					isc_buffer_usedregion(new_query_buffer, &new_query_region);
-					dns_dispatch_send_fragment(resp, &new_query_region);
+						isc_buffer_t frag_buf;
+						REQUIRE(region != NULL);
+						isc_buffer_init(&frag_buf, region->base, region->length);
+						isc_buffer_add(&frag_buf, region->length);
+						dns_message_t *new_query = NULL; 
+						isc_buffer_t *new_query_buffer = NULL;
+						isc_region_t new_query_region;
+			
+						get_fragment_query_raw(disp->mgr->mctx, &frag_buf, i, &new_query, &new_query_buffer);
+						isc_buffer_usedregion(new_query_buffer, &new_query_region);
+						dns_dispatch_send_fragment(resp, &new_query_region);
+					}
+				}
+				else if (result == ISC_R_EXISTS) {
+					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+						"Could not add first fragment to fragment cache because entry already exists!"); 
+				}
+				else {
+					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+						"Could not add first fragment to fragment cache because of unkown reason!"); 
 				}
 			}
-			else if (result == ISC_R_EXISTS) {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Could not add first fragment to fragment cache because entry already exists!"); 
-			}
-			else {
-				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-					"Could not add first fragment to fragment cache because of unkown reason!"); 
-			}
+			// the complete response has not been received 
+			// make sure that the resolver does not return the data but waits for all the fragments
+			goto next;
 		}
-		// the complete response has not been received 
-		// make sure that the resolver does not return the data but waits for all the fragments
-		goto next;
 	}
 	// RAW Fragmentation
 	else if (udp_fragmentation_mode == 2) {
