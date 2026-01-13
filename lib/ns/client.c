@@ -589,7 +589,9 @@ ns_client_send(ns_client_t *client) {
 		// QBF
 		if (udp_fragmentation_mode == 1) {
 			// hardcoded 1232 since client->udpsize can be set to 512 as well..
+			client->message->opt = client->opt;
 			result = fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
+			client->message->opt = NULL; // just to make sure we don't break anything
 		}
 		// RAW
 		else if (udp_fragmentation_mode == 2) {				
