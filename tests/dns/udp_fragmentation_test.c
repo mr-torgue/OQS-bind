@@ -214,11 +214,54 @@ ISC_RUN_TEST_IMPL(test_is_fragment_opt) {
     // test case 6: message with OPT and option 22 and data length is set to 2 : success
 }
 
-
 // tests if OPT records are correctly created
 ISC_RUN_TEST_IMPL(test_create_fragment_opt) {
-    // test case 1: create a new OPTION in message without OPT record
-    // test case 2: create a new OPTION in message with existing OPT record
+    const char *filename = "testdata/udp_fragmentation/fragment_opt_test";
+    const char *src_address = "1.2.3.4";
+    buffer = load_binary_file(filename, &buffer_size);
+    isc_result_t result;
+
+    if(buffer != NULL) {
+        isc_buffer_t buf;
+        isc_buffer_init(&buf, buffer, buffer_size);
+        isc_buffer_add(&buf, buffer_size);
+        msg = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
+        dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+        msg->from_to_wire = 2;
+        msg->state = DNS_SECTION_ANY;
+        unsigned opt_size, nr_options;
+        unsigned new_opt_size, new_nr_options;
+
+        // test case 1: create a new OPTION in message without OPT record
+        dns_rdataset_t *tmp_opt = msg->opt;
+        msg->opt = NULL;
+        parse_opt(msg, &opt_size, &nr_options);
+        assert_int_equal(opt_size, 0);
+        assert_int_equal(nr_options, 0);
+        result = create_fragment_opt(msg, 1, 2, 0);
+        parse_opt(msg, &new_opt_size, &new_nr_options);
+        assert_true(result == ISC_R_SUCCESS);
+        assert_true(msg->opt != NULL);
+        assert_int_equal(new_opt_size, 17);
+        assert_int_equal(new_nr_options, 1);
+        dns_message_setopt(msg, tmp_opt);
+
+
+        // test case 2: create a new OPTION in message with existing OPT record without data
+        parse_opt(msg, &opt_size, &nr_options);
+        assert_int_equal(opt_size, 11);
+        assert_int_equal(nr_options, 0);
+        result = create_fragment_opt(msg, 1, 2, 0);
+
+        // clean up
+        dns_message_detach(&msg);
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+
     // test case 3: create a new OPTION in message that already has an OPTION 22
 }
 

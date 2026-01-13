@@ -115,40 +115,69 @@ isc_result_t is_fragment_opt(dns_message_t *msg) {
     return ISC_R_EMPTY; // no OPT record found
 }
 
-isc_result_t create_fragment_opt(dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments) {
+void parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options) {
+    *opt_size = 0;
+    *nr_options = 0;
+    if (msg->opt != NULL) {
+        dns_ednsopt_t ednsopt;
+        dns_rdata_t rdata;
+        isc_buffer_t optbuf;
+        isc_result_t result = dns_rdataset_first(msg->opt);
+        if (result == ISC_R_SUCCESS) {
+            dns_rdata_init(&rdata);
+            dns_rdataset_current(msg->opt, &rdata);        
+            isc_buffer_init(&optbuf, rdata.data, rdata.length);
+            isc_buffer_add(&optbuf, rdata.length);
+            *opt_size = rdata.length + 11; // only 1 rdata for an OPT record but multiple options are possible
+            while (isc_buffer_remaininglength(&optbuf) >= 4) {
+                isc_buffer_getuint16(&optbuf);
+                isc_buffer_getuint16(&optbuf);
+                isc_buffer_current(&optbuf);
+                (*nr_options)++;
+            }
+        }
+    }
+}
+
+isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags) {
     // copy opt if exists, else create new one
     isc_result_t result;
     dns_rdataset_t *opt = NULL;
     dns_rdata_t rdata;
     isc_buffer_t optbuf;
-    dns_message_gettemprdataset(frag, &opt);
     unsigned version = 0; // is this correct?
     uint16_t udpsize = 65535; // max UDP size
     unsigned flags = DNS_MESSAGEEXTFLAG_DO;
     dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS + 1]; // we allow for a max of 9
     size_t opts_count = 0;
-    // parse the old opt message
-    result = dns_rdataset_first(msg->opt);
-    if (result == ISC_R_SUCCESS) {
-        // copy buffer
-        dns_rdata_init(&rdata);
-        dns_rdataset_current(msg->opt, &rdata);
-        isc_buffer_init(&optbuf, rdata.data, rdata.length);
-        isc_buffer_add(&optbuf, rdata.length);
 
-        // parse count and ednsopts and add to array
-        while (isc_buffer_remaininglength(&optbuf) >= 4) {
-            REQUIRE(opts_count < DNS_EDNSOPTIONS);
-            ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
-            ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
-            ednsopts[opts_count].value = isc_buffer_current(&optbuf);
-            opts_count++;
+    // frag nr check
+    if (frag_nr >= )
+
+    // parse the old opt message if exists
+    if (msg->opt != NULL) {
+        result = dns_rdataset_first(msg->opt);
+        if (result == ISC_R_SUCCESS) {
+            // copy buffer
+            dns_rdata_init(&rdata);
+            dns_rdataset_current(msg->opt, &rdata);
+            isc_buffer_init(&optbuf, rdata.data, rdata.length);
+            isc_buffer_add(&optbuf, rdata.length);
+
+            // parse count and ednsopts and add to array
+            while (isc_buffer_remaininglength(&optbuf) >= 4) {
+                REQUIRE(opts_count < DNS_EDNSOPTIONS);
+                ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
+                ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
+                ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+                opts_count++;
+            }
+
+            // copy values
+            version = msg->opt->ttl >> 16;
+            flags = msg->opt->ttl & 0xffff;
+            udpsize = msg->opt->rdclass;
         }
-
-        // copy values
-        version = msg->opt->ttl >> 16;
-        flags = msg->opt->ttl & 0xffff;
-        udpsize = msg->opt->rdclass;
     }
     // add the new opt data
     ednsopts[opts_count].code = OPTION_CODE;
@@ -159,10 +188,14 @@ isc_result_t create_fragment_opt(dns_message_t *msg, dns_message_t *frag, unsign
     value[0] = (data >> 8);
     value[1] = data & 0xff;
     ednsopts[opts_count].value = value;
+    opts_count++;
 
     // build and set opt record
-    dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
-    return dns_message_setopt(frag, opt);
+    result = dns_message_buildopt(msg, &opt, version, udpsize, flags, ednsopts, opts_count);
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+    return dns_message_setopt(msg, opt);
 }
 
 

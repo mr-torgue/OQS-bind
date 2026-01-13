@@ -35,7 +35,12 @@ bool is__fragment_qname(isc_mem_t *mctx, dns_message_t *msg, bool force);
 // checks if a message is a fragment based on whether the OPT record has option 22 set
 isc_result_t is_fragment_opt(dns_message_t *msg);
 
-isc_result_t create_fragment_opt(dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments);
+// appends a new option to the opt record in msg
+// if no opt record exists, it will be added
+isc_result_t create_fragment_opt(dns_message_t *msg, unsigned frag_nr, unsigned nr_fragments, unsigned fragment_flags);
+
+// determines how many options a given msg->opt record has and what the overall size is
+void parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_options);
 
 // key = id + client ip:port
 // overwrites keysize to match the string length
