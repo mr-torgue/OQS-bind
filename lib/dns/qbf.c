@@ -582,7 +582,7 @@ isc_result_t fragment2(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, ch
     }
     result = ISC_R_SUCCESS;
 cleanup:
-    for(unsigned i = 0; i < nr_fragments; i++) {
+    for(unsigned i = 0; i < fragment_nr; i++) {
         if(frags[i] != NULL) {
             dns_message_detach(&(frags[i]));     
         }
