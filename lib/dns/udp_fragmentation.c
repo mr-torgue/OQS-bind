@@ -158,14 +158,14 @@ isc_result_t parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_opti
     return ISC_R_SUCCESS;
 }
 
-isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags) {
+isc_result_t create__fragment_opt(dns_message_t *msg, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags, bool skip) {
     // copy opt if exists, else create new one
     isc_result_t result;
     dns_rdataset_t *opt = NULL;
     dns_rdata_t rdata;
     isc_buffer_t optbuf;
     unsigned version = 0; // is this correct?
-    uint16_t udpsize = 65535; // max UDP size
+    uint16_t udpsize = 1232; // max UDP packet size
     unsigned flags = DNS_MESSAGEEXTFLAG_DO;
     dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS + 1]; // we allow for a max of 9
     size_t opts_count = 0;
@@ -210,16 +210,18 @@ isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, con
             udpsize = msg->opt->rdclass;
         }
     }
-    // add the new opt data
-    ednsopts[opts_count].code = OPTION_CODE;
-    ednsopts[opts_count].length = 2;
-    // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
-    uint16_t data = ((frag_nr & 0x3f) << 10) | ((nr_fragments & 0x3f) << 4) | (fragment_flags & 0xf);
-    unsigned char value[2];
-    value[0] = (data >> 8);
-    value[1] = data & 0xff;
-    ednsopts[opts_count].value = value;
-    opts_count++;
+    if (!skip) {
+        // add the new opt data
+        ednsopts[opts_count].code = OPTION_CODE;
+        ednsopts[opts_count].length = 2;
+        // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
+        uint16_t data = ((frag_nr & 0x3f) << 10) | ((nr_fragments & 0x3f) << 4) | (fragment_flags & 0xf);
+        unsigned char value[2];
+        value[0] = (data >> 8);
+        value[1] = data & 0xff;
+        ednsopts[opts_count].value = value;
+        opts_count++;
+    }
 
     // build and set opt record
     result = dns_message_buildopt(msg, &opt, version, udpsize, flags, ednsopts, opts_count);
@@ -228,7 +230,6 @@ isc_result_t create_fragment_opt(dns_message_t *msg, const unsigned frag_nr, con
     }
     return dns_message_setopt(msg, opt);
 }
-
 
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize) {
     REQUIRE(*keysize >= 64);

@@ -452,6 +452,16 @@ ISC_RUN_TEST_IMPL(test_create_fragment_opt) {
         }
         dns_message_setopt(msg, tmp_opt);
 
+        // test case 7: delete OPTION
+        result = create_fragment_opt(msg, 1, 33, 1);
+        assert_true(result == ISC_R_SUCCESS);
+        result = parse_opt(msg, &opt_size, &nr_options);
+        result = delete_fragment_opt(msg);
+        assert_true(result == ISC_R_SUCCESS);
+        parse_opt(msg, &new_opt_size, &new_nr_options);
+        assert_int_equal(new_opt_size, opt_size - 6);
+        assert_int_equal(new_nr_options, nr_options - 1);
+
         // clean up
         dns_message_detach(&msg);
         isc_mem_put(mctx, buffer, buffer_size);

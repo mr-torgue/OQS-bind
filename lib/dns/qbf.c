@@ -280,10 +280,314 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
     REQUIRE(fragment_nr != nr_fragments - 1 || *frag_len + *start == rdata_size);
 }
  
+
+
+isc_result_t fragment2(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
+    REQUIRE(msg != NULL);
+    REQUIRE(mctx != NULL);
+    REQUIRE(DNS_MESSAGE_VALID(msg));
+
+    // create cache key
+    unsigned char key[69];
+    unsigned keysize = sizeof(key) / sizeof(key[0]);
+    fcache_create_key(msg->id, client_address, key, &keysize);
+
+    // create an fcache entry
+    if (fcache_exists(fcache, key, keysize)) {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Cannot fragment response because it is already fragmented!");  
+        return ISC_R_EXISTS;        
+    }
+
+    dns_name_t *name = NULL;
+    unsigned fragment_nr = 0;
+    bool done = false;
+    unsigned offsets[64] = {0};
+    dns_message_t *frags[64] = {NULL}; // we need to pre-store because we don't know the number of fragments yet
+    isc_result_t result;
+
+    // add second clause to prevent infinite loops
+    while (!done && fragment_nr < 64) {
+
+        // pre-render:
+        // for first fragment: render all except the RDATA of the DNSKEY's and RRSIG records
+        // for other fragments: render question, opt, and headers of the RDATA and DNSKEY records
+        dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &(frags[fragment_nr]));
+
+        // set metadata
+        frags[fragment_nr]->id = msg->id;
+        frags[fragment_nr]->flags = msg->flags;
+        frags[fragment_nr]->rcode = msg->rcode;
+        frags[fragment_nr]->opcode = msg->opcode;
+        frags[fragment_nr]->rdclass = msg->rdclass;
+        // set fragmentation metadata
+        frags[fragment_nr]->is_fragment = true;
+        frags[fragment_nr]->fragment_nr = fragment_nr;
+
+        unsigned total_sig_pk_bytes = 0;
+        for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
+            if (msg->counts[section_nr] > 0) {
+                for (isc_result_t name_result = dns_message_firstname(msg, section_nr); name_result == ISC_R_SUCCESS;  name_result = dns_message_nextname(msg, section_nr)) {
+                    name = NULL;
+                    dns_message_currentname(msg, section_nr, &name);
+                    dns_name_t *new_name = NULL;
+                    dns_message_gettempname(frags[fragment_nr], &new_name);
+                    dns_name_copy(name, new_name);
+
+                    for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+                        dns_rdataset_t *new_rdataset = NULL;
+                        dns_message_gettemprdataset(frags[fragment_nr], &new_rdataset);
+                        dns_rdatalist_t *rdatalist = NULL;
+                        dns_message_gettemprdatalist(frags[fragment_nr], &rdatalist);
+
+                        // copy values
+                        rdatalist->rdclass = rdataset->rdclass;
+                        rdatalist->type = rdataset->type;
+                        rdatalist->ttl = rdataset->ttl;
+
+                        for (isc_result_t rdata_result = dns_rdataset_first(rdataset); rdata_result == ISC_R_SUCCESS; rdata_result = dns_rdataset_next(rdataset)) {
+                            // get current rdata
+                            dns_rdata_t rdata = DNS_RDATA_INIT;
+                            dns_rdataset_current(rdataset, &rdata);
+                            isc_region_t rdata_region;
+                            dns_rdata_toregion(&rdata, &rdata_region);
+
+                            // prepare new rdata
+                            dns_rdata_t *new_rdata = NULL;
+                            dns_message_gettemprdata(frags[fragment_nr], &new_rdata);
+                            isc_region_t new_rdata_region;
+
+                            if (rdata.type == DNSKEY || rdata.type == RRSIG) {
+                                // at the moment, we include the RRSIG and DNSKEY header in all messages
+                                // this is not strictly necessary but ensures that each fragment is well-formed
+                                unsigned header_size = 0;
+                                if(rdata.type == DNSKEY) {
+                                    header_size = calc_dnskey_header_size();
+                                }
+                                // RRSIG
+                                else {
+                                    header_size = calc_rrsig_header_size(&rdata);
+                                }
+                                unsigned rdsize_no_header = rdata.length - header_size; 
+                                total_sig_pk_bytes += rdsize_no_header;
+                                // create a new RDATA with just the header
+                                isc_buffer_t *buf = NULL;
+                                isc_buffer_allocate(mctx, &buf, header_size); // allocate
+                                isc_buffer_putmem(buf, rdata_region.base, header_size); // copy rdata header
+                                isc_buffer_usedregion(buf, &new_rdata_region); 
+                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                dns_message_takebuffer(msg, &buf);
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link); // append to list
+                            }
+                            else if (fragment_nr == 0) {
+                                isc_buffer_t *buf = NULL;
+                                isc_buffer_allocate(mctx, &buf, rdata_region.length); // allocate
+                                isc_buffer_putmem(buf, rdata_region.base, rdata_region.length); // copy rdata
+                                isc_buffer_usedregion(buf, &new_rdata_region); 
+                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                REQUIRE(new_rdata_region.length == rdata_region.length);
+                                dns_message_takebuffer(msg, &buf);
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+                            }
+                        }
+                        // convert to rdataset and link to new name
+                        dns_rdatalist_tordataset(rdatalist, new_rdataset);
+                        new_rdataset->attributes = rdataset->attributes; 
+                        new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED; // reset this flag to render
+                        ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+                        REQUIRE(DNS_RDATASET_VALID(new_rdataset));
+                    }
+                    dns_message_addname(frags[fragment_nr], new_name, section_nr);
+                }
+            }
+        }
+        //if (msg->opt != NULL) {
+	    //    dns_rdataset_t *opt = NULL;
+        //    dns_message_gettemprdataset(frags[fragment_nr], &opt);
+        //    dns_rdataset_clone(msg->opt, opt);
+        //    dns_message_setopt(frags[fragment_nr], opt);
+        //}
+        result = create_fragment_opt(frags[fragment_nr], fragment_nr, 64, 0);
+        if (result != ISC_R_SUCCESS) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not set OPT, return code %d!", result);
+            goto cleanup;
+        }
+
+	    REQUIRE(DNS_MESSAGE_VALID(frags[fragment_nr]));
+        result = render_fragment(mctx, max_udp_size, &(frags[fragment_nr])); 
+        if (result != ISC_R_SUCCESS) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Pre-parsing unsuccesful, return code %d!", result);  
+            goto cleanup;
+        }
+
+        // add RDATA and render
+        // we already have the fragment set up, now we need to change the RDATA
+        unsigned bytes_available = max_udp_size - frags[fragment_nr]->buffer->used;
+        // reset fragment since we only needed it for an accurate size
+        dns_message_detach(&(frags[fragment_nr]));        
+        frags[fragment_nr] = NULL;
+        dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &(frags[fragment_nr]));
+        // set metadata
+        frags[fragment_nr]->id = msg->id;
+        frags[fragment_nr]->flags = msg->flags;
+        frags[fragment_nr]->rcode = msg->rcode;
+        frags[fragment_nr]->opcode = msg->opcode;
+        frags[fragment_nr]->rdclass = msg->rdclass;
+        // set fragmentation metadata
+        frags[fragment_nr]->is_fragment = true;
+        frags[fragment_nr]->fragment_nr = fragment_nr;
+
+        double remainder = 0.0, tmp;
+        done = true;
+        unsigned counter = 0; // note, we assume that the order is always the same!
+        for (unsigned section_nr = 0; section_nr < DNS_SECTION_MAX; section_nr++) {
+            if (msg->counts[section_nr] > 0) {
+                for (isc_result_t name_result = dns_message_firstname(msg, section_nr); name_result == ISC_R_SUCCESS;  name_result = dns_message_nextname(msg, section_nr)) {
+                    name = NULL;
+                    dns_message_currentname(msg, section_nr, &name);
+                    dns_name_t *new_name = NULL;
+                    dns_message_gettempname(frags[fragment_nr], &new_name);
+                    dns_name_copy(name, new_name);
+                    for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
+                        dns_rdataset_t *new_rdataset = NULL;
+                        dns_message_gettemprdataset(frags[fragment_nr], &new_rdataset);
+                        dns_rdatalist_t *rdatalist = NULL;
+                        dns_message_gettemprdatalist(frags[fragment_nr], &rdatalist);
+
+                        // copy values
+                        rdatalist->rdclass = rdataset->rdclass;
+                        rdatalist->type = rdataset->type;
+                        rdatalist->ttl = rdataset->ttl;
+                        for (isc_result_t rdata_result = dns_rdataset_first(rdataset); rdata_result == ISC_R_SUCCESS; rdata_result = dns_rdataset_next(rdataset)) {
+                            // get current rdata
+                            dns_rdata_t rdata = DNS_RDATA_INIT;
+                            dns_rdataset_current(rdataset, &rdata);
+                            isc_region_t rdata_region;
+                            dns_rdata_toregion(&rdata, &rdata_region);
+
+                            // prepare new rdata
+                            dns_rdata_t *new_rdata = NULL;
+                            dns_message_gettemprdata(frags[fragment_nr], &new_rdata);
+                            isc_region_t new_rdata_region;
+
+                            if (rdata.type == DNSKEY || rdata.type == RRSIG) {
+                                unsigned header_size = 0;
+                                if(rdata.type == DNSKEY) {
+                                    header_size = calc_dnskey_header_size();
+                                }
+                                // RRSIG
+                                else {
+                                    header_size = calc_rrsig_header_size(&rdata);
+                                }
+                                unsigned rdsize_no_header = rdata.length - header_size; 
+                                REQUIRE(offsets[counter] <= rdsize_no_header);
+                                // calculate the fraction and spend that much based on how much you can send
+                                unsigned new_rdata_len = ((double)rdsize_no_header / total_sig_pk_bytes) * bytes_available;
+                                remainder += modf(new_rdata_len, &tmp);
+
+                                // we can add a new byte!
+                                if (remainder >= 1) {
+                                    new_rdata_len++;
+                                    remainder--;
+                                }
+
+                                // this rdata is completed
+                                if (offsets[counter] + new_rdata_len >= rdsize_no_header) {
+                                    new_rdata_len = rdsize_no_header - offsets[counter];
+                                }
+                                else  {
+                                    done = false;
+                                }
+                                if (offsets[counter] < rdsize_no_header) {
+                                    isc_buffer_t *buf = NULL;
+                                    isc_buffer_allocate(mctx, &buf, new_rdata_len + header_size); // allocate
+                                    isc_buffer_putmem(buf, rdata_region.base, header_size); // copy rdata header
+                                    isc_buffer_putmem(buf, rdata_region.base + header_size + offsets[counter], new_rdata_len); // copy rdata data
+                                    isc_buffer_usedregion(buf, &new_rdata_region); 
+                                    dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                    REQUIRE(new_rdata_region.length == new_rdata_len + header_size);
+                                    dns_message_takebuffer(msg, &buf);
+                                    ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link); // append to list
+                                    offsets[counter] += new_rdata_len;
+                                }
+
+                                counter++;
+                            }
+                            else if (fragment_nr == 0) {
+                                isc_buffer_t *buf = NULL;
+                                isc_buffer_allocate(mctx, &buf, rdata_region.length); // allocate
+                                isc_buffer_putmem(buf, rdata_region.base, rdata_region.length); // copy rdata
+                                isc_buffer_usedregion(buf, &new_rdata_region); 
+                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); // create new rdata
+                                REQUIRE(new_rdata_region.length == rdata_region.length);
+                                dns_message_takebuffer(msg, &buf);
+                                ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+                            }
+                        }
+                        // convert to rdataset and link to new name
+                        dns_rdatalist_tordataset(rdatalist, new_rdataset);
+                        new_rdataset->attributes = rdataset->attributes; 
+                        new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED; // reset this flag to render
+                        ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+                        REQUIRE(DNS_RDATASET_VALID(new_rdataset));
+                    }
+                    dns_message_addname(frags[fragment_nr], new_name, section_nr);
+                }
+            }
+        }        
+        fragment_nr++;
+    }
+    unsigned nr_fragments = fragment_nr;
+    REQUIRE(nr_fragments != 64); // should not happen
+    // add all fragments to fcache
+    result = fcache_add(fcache, key, keysize, nr_fragments);
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+            "Could not create a fragment entry in cache...");
+        goto cleanup;
+    }
+    for(unsigned i = 0; i < nr_fragments; i++) {
+        // first create the OPT record now we know the nr of fragments
+        result = create_fragment_opt(frags[i], i, nr_fragments, 0);
+        if (result != ISC_R_SUCCESS) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not add OPT record, result: %d...", result);
+            goto cleanup;
+        }
+        // render complete fragment
+        result = render_fragment(mctx, max_udp_size + 100, &(frags[i])); 
+        REQUIRE(frags[i]->buffer->used <= max_udp_size);
+        if (result != ISC_R_SUCCESS) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not render fragment, result: %d...", result);
+            goto cleanup;
+        }
+        // add fragment and detach
+        result = fcache_add_fragment(fcache, key, keysize, frags[i]);
+        dns_message_detach(&(frags[i]));     
+        if (result != ISC_R_SUCCESS) { 
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not add fragment to cache...");
+            goto cleanup;
+        }
+    }
+    result = ISC_R_SUCCESS;
+cleanup:
+    for(unsigned i = 0; i < nr_fragments; i++) {
+        if(frags[i] != NULL) {
+            dns_message_detach(&(frags[i]));     
+        }
+    }
+    return result;
+}
+
 // todo, reduce size
 isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
     REQUIRE(msg != NULL);
     REQUIRE(mctx != NULL);
+    REQUIRE(DNS_MESSAGE_VALID(msg));
     //msg->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
     //REQUIRE(msg->flags & DNS_MESSAGEFLAG_TC); // truncated flag should be set
     unsigned msgsize, total_size_sig_rr, total_size_dnskey_rr, savings, nr_sig_rr, nr_dnskey_rr;
@@ -476,7 +780,12 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
         }
 	    REQUIRE(DNS_MESSAGE_VALID(frag));
         isc_result_t render_result = render_fragment(mctx, 1500, &frag); 
-        REQUIRE(frag->buffer->used <= 1232);
+        
+        //REQUIRE(frag->buffer->used <= 1232);
+        if (frag->buffer->used > 1232) {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Too large!");  
+        }
         if (render_result != ISC_R_SUCCESS) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Failed to render the fragment!");  
@@ -661,7 +970,9 @@ isc_result_t reassemble_fragments(isc_mem_t *mctx, fcache_t *fcache, unsigned ch
         dns_message_detach(&frag);
     }
     (*out_msg)->from_to_wire = DNS_MESSAGE_INTENTRENDER;
-    result = render_fragment(mctx, entry->nr_fragments * 1232, out_msg); // slightly larger than max UDP
+    (*out_msg)->state = DNS_SECTION_ANY;
+    delete_fragment_opt(*out_msg); // delete the option
+    result = render_fragment(mctx, entry->nr_fragments * 1232, out_msg); 
     if (result != ISC_R_SUCCESS) {
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
             "Failed to render the reassembled message!");  

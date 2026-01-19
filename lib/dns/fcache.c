@@ -243,6 +243,11 @@ unsigned fcache_count(fcache_t *fcache) {
     return isc_ht_count(fcache->ht);
 }
 
+bool fcache_exists(fcache_t *fcache, unsigned char *key, unsigned keysize) {
+    fragment_cache_entry_t *out_cache_entry = NULL;
+    return isc_ht_find(fcache->ht, key, keysize, (void **)&out_cache_entry) == ISC_R_SUCCESS;
+}
+
 void fcache_free_entry(fcache_t *fcache, fragment_cache_entry_t *entry) {
     ISC_LIST_UNLINK(fcache->expiry_list, entry, link);
     for (unsigned i = 0; i < entry->nr_fragments; i++) {

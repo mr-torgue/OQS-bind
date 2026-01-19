@@ -110,5 +110,7 @@ isc_result_t fcache_purge(fcache_t *fcache);
 // return the number of elements in the cache
 unsigned fcache_count(fcache_t *fcache);
 
+bool fcache_exists(fcache_t *fcache, unsigned char *key, unsigned keysize);
+
 // frees a cache entry
 void fcache_free_entry(fcache_t *fcache, fragment_cache_entry_t *entry);
