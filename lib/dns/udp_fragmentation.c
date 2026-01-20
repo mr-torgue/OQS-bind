@@ -130,7 +130,7 @@ isc_result_t parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_opti
     *opt_size = 0;
     *nr_options = 0;
     if (msg->opt != NULL) {
-        dns_ednsopt_t ednsopt;
+        //dns_ednsopt_t ednsopt;
         dns_rdata_t rdata;
         isc_buffer_t optbuf;
         isc_result_t result = dns_rdataset_first(msg->opt);
@@ -145,7 +145,6 @@ isc_result_t parse_opt(dns_message_t *msg, unsigned *opt_size, unsigned *nr_opti
                 unsigned option_length = isc_buffer_getuint16(&optbuf);
                 // check if enough space is available
                 if (isc_buffer_remaininglength(&optbuf) >= option_length) {
-                    isc_buffer_current(&optbuf);
                     isc_buffer_forward(&optbuf, option_length); 
                 }
                 else {

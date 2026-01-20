@@ -13,31 +13,6 @@
 #define DNSKEY 48
 #define MAXUDP 1232
 
-
-// returns the number of fragments for a given message
-// max_msg_size is the maximum packet size
-// total_msg_size is the size of the complete DNS message
-// total_sig_pk_bytes are all the signature and key bytes (only these RR's get fragmented)
-// savings indicates the amount of extra bytes fragments 2..n have, due to the fact that we can omit some data (AFAIK)
-// returns the number of fragments needed and the fragment sizes in bytes
-unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, const unsigned overhead, unsigned *can_send_first_msg, unsigned *can_send);
-
-
-// calculates all the sizes needed for fragmentation
-// returns the total message size in bytes 
-// num_sig_rr / num_dnskey_rr contain the number of resource records for signatures and keys
-// total_sig_rr / total_dnskey_rr contains the total size in bytes
-unsigned calc_message_size(dns_message_t *msg,
-                       unsigned *num_sig_rr, unsigned *num_dnskey_rr, 
-                       unsigned *total_sig_rr, unsigned *total_dnskey_rr, unsigned *savings, unsigned *counts, const unsigned count_size);
-
-// estimates the size of the complete message based on a fragment
-unsigned estimate_message_size(dns_message_t *msg, unsigned *total_sig_bytes, unsigned *total_dnskey_bytes, unsigned *savings);
-
-// for testing purposes
-// calculates the start and length for the given resource record
-void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned offset, unsigned rdata_size, unsigned can_send_first_fragment, unsigned can_send, unsigned total_pk_sig_bytes_per_frag, unsigned *start, unsigned *frag_len, double *remainder, unsigned *used_bytes);
-
 // fragments a given message msg
 // first fragment is returned in msg
 // remaining fragments are added to cache
@@ -45,7 +20,6 @@ void calculate_start_end(unsigned fragment_nr, unsigned nr_fragments, unsigned o
 // TODO: currently has to pass through all rr's twice --> reduce to 1 pass
 isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size);
 
-isc_result_t fragment2(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size);
 
 // reassembles a given entry into a new dns_message_t
 // checks if all fragments are in the entry --> otherwise returns false

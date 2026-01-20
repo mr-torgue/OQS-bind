@@ -442,7 +442,7 @@ openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		unsigned long err = ERR_get_error(); // Retrieve the most recent error
 		char err_buf[256];
 		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-		fprintf(stderr, "EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1 failed!\nSignature needs at least: %d bytes, tbsreg.length: %d\nError msg: %s\n", siglen, tbsreg.length, err_buf);
+		fprintf(stderr, "EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base, tbsreg.length) != 1 failed!\nSignature needs at least: %ld bytes, tbsreg.length: %d\nError msg: %s\n", siglen, tbsreg.length, err_buf);
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
@@ -571,7 +571,7 @@ openssloqs_todns(const dst_key_t *key, isc_buffer_t *data) {
 		unsigned long err = ERR_get_error(); // Retrieve the most recent error
 		char err_buf[256];
 		ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-		fprintf(stderr, "EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1 failed!\nPublic key needs at least: %d bytes, r.length: %d\nError msg: %s\n", len, r.length, err_buf);
+		fprintf(stderr, "EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1 failed!\nPublic key needs at least: %ld bytes, r.length: %d\nError msg: %s\n", len, r.length, err_buf);
 
 		return (dst__openssl_toresult(ISC_R_FAILURE));
 	}
@@ -641,7 +641,7 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 			unsigned long err = ERR_get_error(); // Retrieve the most recent error
 			char err_buf[256];
 			ERR_error_string(err, err_buf); // Convert error code to a human-readable string
-			fprintf(stderr, "EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1 failed!\nPrivate key needs at least: %d bytes\nError msg: %s\n", privlen, err_buf);
+			fprintf(stderr, "EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf, &privlen) != 1 failed!\nPrivate key needs at least: %ld bytes\nError msg: %s\n", privlen, err_buf);
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
 		priv.elements[i].tag = alginfo->tags.private_key_tag;
@@ -787,8 +787,8 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (ret != ISC_R_SUCCESS) {
 		DST_RET(ret);
 	}
-	fprintf(stdout, "priv_len: %lu, alginfo->priv_key_size: %d\n", priv_len, alginfo->priv_key_size);
-	fprintf(stdout, "pub_len: %lu, alginfo->key_size: %d\n", pub_len, alginfo->key_size);
+	//fprintf(stdout, "priv_len: %lu, alginfo->priv_key_size: %d\n", priv_len, alginfo->priv_key_size);
+	//fprintf(stdout, "pub_len: %lu, alginfo->key_size: %d\n", pub_len, alginfo->key_size);
 	INSIST(priv_len == alginfo->priv_key_size);
 	INSIST(pub_len == alginfo->key_size);
 	if (pkey == NULL) {

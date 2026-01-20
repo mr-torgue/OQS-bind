@@ -25,7 +25,10 @@ static void fcache_timer_cb(void *arg) {
         next = ISC_LIST_NEXT(entry, link);
         // remove if expired
         if (isc_time_compare(&(entry->expiry), &now) <= 0) {
-            isc_result_t result = fcache_remove(fcache, entry->key, entry->keysize);
+            if(fcache_remove(fcache, entry->key, entry->keysize) != ISC_R_SUCCESS) {
+                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+                    "Could not remove cache entry in timer cb..."); 
+            }
         } else {
             break;  // remaining entries are not yet expired
         }
@@ -198,7 +201,7 @@ isc_result_t fcache_get(fcache_t *fcache, unsigned char *key, unsigned keysize, 
 }
 
 
-isc_result_t fcache_get_fragment_from_entry(fcache_t *fcache, fragment_cache_entry_t *entry, unsigned fragment_nr, isc_buffer_t **out_frag) {
+isc_result_t fcache_get_fragment_from_entry(fragment_cache_entry_t *entry, unsigned fragment_nr, isc_buffer_t **out_frag) {
     if(entry->bitmap & (1 << fragment_nr)) {
         *out_frag = entry->fragments[fragment_nr];
         (*out_frag)->current = 0; // in case it is not set to the beginning
@@ -215,7 +218,7 @@ isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned 
         "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        return fcache_get_fragment_from_entry(fcache, entry, fragment_nr, out_frag);
+        return fcache_get_fragment_from_entry(entry, fragment_nr, out_frag);
     }
     isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Could not find cache entry!");

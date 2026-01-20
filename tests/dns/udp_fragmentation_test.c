@@ -526,12 +526,70 @@ ISC_RUN_TEST_IMPL(test_create_and_is_fragment_opt) {
 }
 
 
+ISC_RUN_TEST_IMPL(test_query_creation) {
+
+    /*
+    Name: response1-falcon512 
+    Original PCAP file: /home/dev/qbf_src/data/resolver/mode 1/FALCON512.pcap
+    Source: root NS (172.20.0.3)
+    Destination: resolver (172.20.0.2)
+    Size: 3244 bytes
+    Nr. of fragments: 3
+    */
+    const char *filename = "testdata/message/response1-falcon512";
+    const char *src_address = "172.20.0.3";
+    buffer = load_binary_file(filename, &buffer_size);
+
+    // outputs
+    bool res;
+    if(buffer != NULL) {
+
+        isc_buffer_t input_buffer;
+        isc_region_t region;
+        region.base = buffer;
+        region.length = buffer_size;
+		isc_buffer_init(&input_buffer, region.base, region.length);
+		isc_buffer_add(&input_buffer, region.length);
+
+        // main test
+        dns_message_t *query = NULL; 
+        isc_buffer_t *query_buffer = NULL;
+        isc_region_t *query_region = NULL;
+        res = get_fragment_query_raw(mctx, &input_buffer, 3, &query, &query_buffer); 
+
+        size_t exp_buffer_size;
+        const char *exp_filename = "testdata/message/response1-falcon512-query3";
+        unsigned char *expected_buffer = load_binary_file(exp_filename, &exp_buffer_size);
+        assert_true(expected_buffer != NULL);
+        if (expected_buffer != NULL) {
+            assert_int_equal(exp_buffer_size, query_buffer->used);
+            for (unsigned i = 0; i < exp_buffer_size; i++) {
+                assert_true(((char *)(expected_buffer))[i] == ((char *)(query_buffer->base))[i]);
+            }
+            isc_mem_put(mctx, expected_buffer, exp_buffer_size);
+        }
+
+        // clean up
+        if (query != NULL) {
+            dns_message_detach(&query);
+        }
+        if (query_buffer != NULL) {
+            isc_buffer_free(&query_buffer);
+        }
+        isc_mem_put(mctx, buffer, buffer_size);
+    }
+    else {
+        fprintf(stderr, "Could not find file: %s\n", filename);
+    }
+}
+
 
 ISC_TEST_LIST_START
 ISC_TEST_ENTRY(test_is_fragment)
 ISC_TEST_ENTRY(test_is_fragment_opt)
 ISC_TEST_ENTRY(test_create_fragment_opt)
 ISC_TEST_ENTRY(test_create_and_is_fragment_opt)
+ISC_TEST_ENTRY(test_query_creation)
 ISC_TEST_LIST_END
 
 ISC_TEST_MAIN

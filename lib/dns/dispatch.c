@@ -692,7 +692,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 			unsigned nr_fragments = msg->nr_fragments;
 			
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-				"Key %s needs %u fragments, this is fragment %u...", key, nr_fragments, msg->fragment_nr); 
+				"Key %s needs %u fragments, this is fragment %lu...", key, nr_fragments, msg->fragment_nr); 
 
 			fragment_cache_entry_t *out_ce = NULL;
 			// process incoming fragment
