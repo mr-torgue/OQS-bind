@@ -167,6 +167,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // main test
         assert_int_equal(fcache_count(fcache), 0);
         res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS); 
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -234,6 +235,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // main test
         assert_int_equal(fcache_count(fcache), 0);
         res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS); 
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -296,6 +298,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // main test
         assert_int_equal(fcache_count(fcache), 0);
         res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS); 
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -360,6 +363,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
         // main test
         assert_int_equal(fcache_count(fcache), 0);
         res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS); 
         assert_int_equal(fcache_count(fcache), 1); // one cache entry
 
         out_ce = NULL;
@@ -385,6 +389,7 @@ ISC_LOOP_TEST_IMPL(fragment_and_reassemble) {
 
         // increase nr_fragments and check if we get a ISC_R_INPROGRESS result
         res = fragment(mctx, fcache, msg, src_address, max_udp_size);
+        assert_true(res == ISC_R_SUCCESS); 
         dns_message_t *out_msg2 = NULL;
         out_ce->nr_fragments++;
         result = reassemble_fragments(mctx, fcache, key, keysize, &out_msg2);
