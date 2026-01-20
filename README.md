@@ -57,3 +57,11 @@ of writing Beta1 just was released, so it is recommended to not use OpenSSL 3.2 
 primary system-wide instalation of OpenSSL. Instead, installed OpenSSL 3.2 in a special
 location. You can then specify the location of OpenSSL 3.2 using the `--with-openssl=<OPENSSL3.2DIR>`.
 Then simply follow the regular Bind9 build instructions found [here](https://github.com/Martyrshot/OQS-bind/blob/main/doc/arm/build.inc.rst).
+
+# 2.0 release features
+- Fully implement and test RAW
+- Use `rcodes` and `flags` to indicate fragments
+- Remove DNSKEY/RRSIG header duplicates
+- Improve render function and don't attach buffer to object
+- Add more unit tests
+- Improve performance

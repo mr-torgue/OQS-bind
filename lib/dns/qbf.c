@@ -309,7 +309,6 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
         }
         // add fragment and detach
         result = fcache_add_fragment(fcache, key, keysize, frags[i]);
-        dns_message_detach(&(frags[i]));     
         if (result != ISC_R_SUCCESS) { 
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                 "Could not add fragment to cache...");
