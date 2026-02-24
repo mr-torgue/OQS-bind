@@ -156,8 +156,8 @@ isc_result_t fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, cha
             goto cleanup;
         }
         // check if it fits within the packet
-        printf("DNSMessage does not need UDP fragmentation: total_sig_pk_bytes: %u, msg_size: %u, max_udp_size: %u!\n",
-                    total_sig_pk_bytes, frags[fragment_nr]->buffer->used, max_udp_size);
+        //printf("DNSMessage does not need UDP fragmentation: total_sig_pk_bytes: %u, msg_size: %u, max_udp_size: %u!\n",
+        //            total_sig_pk_bytes, frags[fragment_nr]->buffer->used, max_udp_size);
         if (fragment_nr == 0 && total_sig_pk_bytes + frags[fragment_nr]->buffer->used <= max_udp_size) {
             isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
                     "DNSMessage does not need UDP fragmentation: total_sig_pk_bytes: %u, msg_size: %u, max_udp_size: %u!",

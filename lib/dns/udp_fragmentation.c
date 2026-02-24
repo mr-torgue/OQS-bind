@@ -7,6 +7,7 @@
 #include <dns/name.h>
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
+#include "include/dns/types.h"
 #include "include/dns/udp_fragmentation.h"
 
 
@@ -326,11 +327,65 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
     return ret;
 }
 
-bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, dns_message_t **question, isc_buffer_t **question_buffer) {
-    REQUIRE(question != NULL && *question == NULL);
+/*
+Creates a fragment query for fragment fragment_nr using an OPT OPTION
+*/
+isc_result_t create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, uint nr_fragments, isc_buffer_t **question_buffer) {
     REQUIRE(question_buffer != NULL && *question_buffer == NULL);
+    
+    // parse buffer into question
+    dns_message_t *question = NULL;
+    dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &question);
+    isc_buffer_first(buffer); // start from 0
+    isc_result_t result = dns_message_parse(question, buffer, 0);
+    question->opcode = dns_opcode_fragment;
+    if (result == ISC_R_SUCCESS) {
+        // set OPT record
+        result = create_fragment_opt(question, fragment_nr, nr_fragments, 0);
+        if (result == ISC_R_SUCCESS) {
+            // parsing: only question and additional (OPT)
+            dns_compress_t cctx;
+            isc_buffer_allocate(mctx, question_buffer, 1232); // no need to allocate more
+            dns_compress_init(&cctx, mctx, 0);
+            result = dns_message_renderbegin(question, &cctx, *question_buffer);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_rendersection(question, DNS_SECTION_QUESTION, 0);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_rendersection(question, DNS_SECTION_ADDITIONAL, 0);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_renderend(question);
+            if (result != ISC_R_SUCCESS) 
+                goto done;
+            }
+            dns_compress_invalidate(&cctx);
+        }
+        else {
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not attach OPT record in create_fragment_query_opt!");
+            goto done;
+        }
+    }
+    else {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+            "Could not parse message in create_fragment_query_opt!");
+        goto done;
+    }
+done:
+    dns_message_detach(&question);
+    return result;
+}
 
-    bool res = false;
+/*
+Creates a fragment query by chaning the qname (LEGACY)
+*/
+isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, isc_buffer_t **question_buffer) {
+    REQUIRE(question_buffer != NULL && *question_buffer == NULL);
 
     // parse buffer into dns_message_t
     dns_message_t *msg = NULL;
@@ -405,26 +460,42 @@ bool get_fragment_query_raw(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment
             dns_compress_t cctx;
             isc_buffer_allocate(mctx, question_buffer, 1232); // no need to allocate more
             dns_compress_init(&cctx, mctx, 0);
-            REQUIRE(dns_message_renderbegin(*question, &cctx, *question_buffer) == ISC_R_SUCCESS);
-	        REQUIRE(dns_message_rendersection(*question, DNS_SECTION_QUESTION, 0) == ISC_R_SUCCESS);
-	        REQUIRE(dns_message_rendersection(*question, DNS_SECTION_ADDITIONAL, 0) == ISC_R_SUCCESS);
-            REQUIRE(dns_message_renderend(*question) == ISC_R_SUCCESS);
-	        dns_compress_invalidate(&cctx);
+            result = dns_message_renderbegin(question, &cctx, *question_buffer);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_rendersection(question, DNS_SECTION_QUESTION, 0);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_rendersection(question, DNS_SECTION_ADDITIONAL, 0);
+            if (result != ISC_R_SUCCESS) {
+                goto done;
+            }
+            result = dns_message_renderend(question);
+            if (result != ISC_R_SUCCESS) 
+                goto done;
+            }
+            dns_compress_invalidate(&cctx);
 
             // free memory
             isc_mem_free(mctx, name_str);
-
-            res = true;
         }   
         else {
-            fprintf(stderr, "Could not find name in QUESTION section...\n");
+            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+                "Could not attach OPT record in create_fragment_query_qname!");
+            goto done;
         }
     }
     else {
-        fprintf(stderr, "Could not convert buffer into question...\n");
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+            "Could not parse message in create_fragment_query_qname!");
+        goto done;
     }
+    result = ISC_R_SUCCESS;
+done:
     dns_message_detach(&msg);
-    return res;
+    return result;
 }
 
 isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t **messagep) {

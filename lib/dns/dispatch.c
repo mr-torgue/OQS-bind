@@ -745,13 +745,19 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 						REQUIRE(region != NULL);
 						isc_buffer_init(&frag_buf, region->base, region->length);
 						isc_buffer_add(&frag_buf, region->length);
-						dns_message_t *new_query = NULL; 
 						isc_buffer_t *new_query_buffer = NULL;
 						isc_region_t new_query_region;
 			
-						get_fragment_query_raw(disp->mgr->mctx, &frag_buf, i, &new_query, &new_query_buffer);
-						isc_buffer_usedregion(new_query_buffer, &new_query_region);
-						dns_dispatch_send_fragment(resp, &new_query_region);
+						// create and send a fragment query
+						result = create_fragment_query_opt(disp->mgr->mctx, &frag_buf, i, nr_fragments, &new_query_buffer);
+						if (result == ISC_R_SUCCESS) {
+							isc_buffer_usedregion(new_query_buffer, &new_query_region);
+							dns_dispatch_send_fragment(resp, &new_query_region);
+						}
+						else {
+							isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+								"Could not create a fragment query for fragment %d!", i);
+						}
 					}
 				}
 				else if (result == ISC_R_EXISTS) {

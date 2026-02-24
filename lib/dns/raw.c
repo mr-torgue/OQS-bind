@@ -112,7 +112,7 @@ isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *
     return dns_message_setopt(frag, opt);
 }
 
-bool raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
+isc_result_t raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
 
     isc_result_t result;
     unsigned msgsize = msg->buffer->used;
@@ -132,8 +132,8 @@ bool raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
     unsigned start = 0;
     for (unsigned section = DNS_SECTION_ANSWER; section < DNS_SECTION_MAX; section++) {
         for (isc_result_t result = dns_message_firstname(msg, section); 
-             result == ISC_R_SUCCESS;  
-             result = dns_message_nextname(msg, section)) {
+            result == ISC_R_SUCCESS;  
+            result = dns_message_nextname(msg, section)) {
             dns_name_t *name = NULL;
             dns_message_currentname(msg, section, &name);
             dns_name_t *new_name = NULL;
