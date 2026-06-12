@@ -117,6 +117,15 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 
     isc_result_t result;
     unsigned msgsize = msg->buffer->used;
+
+    unsigned char key[69];
+    unsigned keysize = sizeof(key) / sizeof(key[0]);
+    fcache_create_key(msg->id, client_address, key, &keysize);
+
+    if (fcache_exists(fcache, key, keysize)) {
+        return ISC_R_EXISTS;
+    }
+
     
     // calculate header and question size
     unsigned header_size = DNS_HEADER_SIZE;
@@ -170,7 +179,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         dns_message_gettempname(frag, &new_name);       
                         dns_name_clone(name, new_name);   
 
-                        fcache_add(key, keysize, frag);
+                        result = fcache_add_fragment(fcache, key, keysize, frag);
                         // reset frag
                         start = 0;
                         frag_nr++;
