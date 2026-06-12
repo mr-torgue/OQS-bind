@@ -7,6 +7,7 @@
 #include <isc/util.h>
 #include <dns/message.h>
 #include <dns/rdata.h>
+#include <dns/fcache.h>
 #include <dns/rdatalist.h>
 #include <dns/rdataset.h>
 #include <dns/raw_fragmentation.h>
@@ -112,7 +113,7 @@ isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *
     return dns_message_setopt(frag, opt);
 }
 
-isc_result_t raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_address) {
+isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
 
     isc_result_t result;
     unsigned msgsize = msg->buffer->used;
@@ -121,7 +122,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, dns_message_t *msg, char *client_addr
     unsigned header_size = DNS_HEADER_SIZE;
     unsigned question_size = 0; // TODO
     unsigned opt_size = 0; // TODO
-    unsigned nr_fragments = get_nr_fragments(1232, msgsize, header_size, question_size, opt_size);
+    unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, header_size, question_size, opt_size);
     unsigned available_per_fragment = msgsize - header_size - question_size - opt_size;
 
     // create fragment

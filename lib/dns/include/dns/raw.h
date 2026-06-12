@@ -26,6 +26,12 @@ Advantages:
 2. Simple and effective: we do not require changes to resource records
 */
 
+#include <isc/result.h>
+#include <isc/types.h>
+#include <dns/message.h>
+#include <dns/fcache.h>
+
+
 // chosen based on https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml
 #define RAW_OPCODE 7
 #define RAW_RCODE 12
@@ -37,7 +43,9 @@ Advantages:
 
 unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
 
-
+isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache,
+                          dns_message_t *msg, char *client_address,
+                          const unsigned max_udp_size);
 
 recombine:
     unsigned offset = 0;
