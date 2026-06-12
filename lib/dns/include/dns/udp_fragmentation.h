@@ -24,8 +24,8 @@ Algorithm specific code are in:
 #define OPTION_CODE 22
 #define OPTION_LENGTH 2
 
-#define is_fragment(a, b) is__fragment_qname(a, b, true) 
-#define is_fragment_noforce(a, b) is__fragment_qname(a, b, false) 
+#define is_fragment_qname(a, b) is__fragment_qname(a, b, true) 
+#define is_fragment_qname_noforce(a, b) is__fragment_qname(a, b, false) 
 // checks if msg is a fragment
 // expected format: ?fragment_nr?name
 // sets the fragment number for msg if fragment
