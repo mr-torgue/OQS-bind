@@ -47,6 +47,7 @@
 #include <dns/stats.h>
 #include <dns/transport.h>
 #include <dns/types.h>
+#include <dns/raw.h>
 
 #include <dns/resolver.h>
 #include "include/dns/udp_fragmentation.h"
@@ -647,8 +648,14 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	 * 1. efficiency: quite a bit of parsing and rendering --> reduce
 	 * 2. hardcoded 1232: use variable name instead
 	 */
+	
 	uint8_t udp_fragmentation_mode = disp->mgr->udp_fragmentation_mode;
-	bool is_any_fragment = (flags & DNS_MESSAGEFLAG_TC) != 0;
+
+	unsigned int rcode = flags & 0x000f;
+
+	bool is_any_fragment =
+        ((flags & DNS_MESSAGEFLAG_TC) != 0) ||
+        (rcode == RAW_RCODE);
 	// QBF fragmentation
 	if (udp_fragmentation_mode == 1 && is_any_fragment) {
 
