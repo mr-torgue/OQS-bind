@@ -10,6 +10,7 @@
 #include <dns/fcache.h>
 #include <dns/rdatalist.h>
 #include <dns/rdataset.h>
+#include <dns/udp_fragmentation.h>
 #include <dns/raw_fragmentation.h>
 
 /*
@@ -179,8 +180,14 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         dns_message_gettempname(frag, &new_name);       
                         dns_name_clone(name, new_name);   
 
-                        result = fcache_add_fragment(fcache, key, keysize, frag);
-                        // reset frag
+                        
+			result = fcache_add_fragment(fcache, key, keysize, frag);
+                        if (result != ISC_R_SUCCESS) {
+                        	return result;
+                        }
+			
+
+			// reset frag
                         start = 0;
                         frag_nr++;
                         frag = NULL;
