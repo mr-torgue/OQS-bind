@@ -657,7 +657,7 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
         ((flags & DNS_MESSAGEFLAG_TC) != 0) ||
         (rcode == RAW_RCODE);
 	// QBF fragmentation
-	if (udp_fragmentation_mode == 1 && is_any_fragment) {
+	if ((udp_fragmentation_mode == 1 || udp_fragmentation_mode == 2) && is_any_fragment) {
 
 		fcache_t *fcache = disp->mgr->fcache;
 		// get source address
@@ -783,7 +783,11 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	}
 	// RAW Fragmentation
 	else if (udp_fragmentation_mode == 2) {
-		perror("RAW has not been implemented yet!");
+		perror("else if (udp_fragmentation_mode == 2) {
+        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION,
+                      DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+                      "RAW mode enabled, but response is not marked as fragmented");
+	}RAW has not been implemented yet!");
 		exit(0);
 	}
 
