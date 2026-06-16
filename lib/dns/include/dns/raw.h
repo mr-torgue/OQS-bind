@@ -47,16 +47,5 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache,
                           dns_message_t *msg, char *client_address,
                           const unsigned max_udp_size);
 
-recombine:
-    unsigned offset = 0;
-    for(unsigned i = 0; i < entry->nr_fragments; i++) {
-        isc_region_t region;
-        region.base = entry->fragments[i]->base;
-        region.length = entry->fragments[i]->used;
-        isc_buffer_copyregion(msg_buf + offset, &region);
-        offset += entry->fragments[i]->used;
-    }
-    REQUIRE(offset == entry->size);
-    // set ignore TC flag
-    unsigned options = DNS_MESSAGEPARSE_IGNORETRUNCATION;
-    dns_message_parse(out_msg, msg_buf, options);
+
+    

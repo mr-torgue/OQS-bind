@@ -779,18 +779,15 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 			// the complete response has not been received 
 			// make sure that the resolver does not return the data but waits for all the fragments
 			goto next;
-		}
-	}
-	// RAW Fragmentation
-	else if (udp_fragmentation_mode == 2) {
-		perror("else if (udp_fragmentation_mode == 2) {
-        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION,
-                      DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
-                      "RAW mode enabled, but response is not marked as fragmented");
-	}RAW has not been implemented yet!");
-		exit(0);
-	}
+			}
 
+		}
+        // RAW Fragmentation
+        else if (udp_fragmentation_mode == 2) {
+                isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION,
+                              DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
+                              "RAW mode enabled, but response is not marked as fragmented");
+        	}
 	/*
 	 * We have the right resp, so call the caller back.
 	 */
