@@ -233,7 +233,12 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                 
         }
     }
-    return true;
+        result = fcache_add_fragment(fcache, key, keysize, frag);
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+
+    return ISC_R_SUCCESS;
 }
 
 
