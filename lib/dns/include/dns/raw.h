@@ -49,3 +49,6 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache,
 
 
     
+isc_result_t raw_reassemble_fragments(isc_mem_t *mctx,
+                                      fragment_cache_entry_t *entry,
+                                      dns_message_t **out_msg);
