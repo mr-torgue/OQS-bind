@@ -710,7 +710,18 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				result = fcache_add_fragment(fcache, key, keysize, msg);
 				if (result == ISC_R_SUCCESS) {
 					dns_message_t *out_msg = NULL;
-					isc_result_t reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
+					isc_result_t reassemble_result;
+if (udp_fragmentation_mode == 2) {
+        fragment_cache_entry_t *entry = NULL;
+        result = fcache_get(fcache, key, keysize, &entry);
+        if (result != ISC_R_SUCCESS) {
+                reassemble_result = result;
+        } else {
+                reassemble_result = raw_reassemble_fragments(disp->mgr->mctx, entry, &out_msg);
+        }
+} else {
+        reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
+}
 					if (reassemble_result == ISC_R_SUCCESS) {
 						isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 							"All fragments received! Message size: %u", out_msg->buffer->used); 
