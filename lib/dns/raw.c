@@ -133,7 +133,12 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     unsigned question_size = 0; // TODO
     unsigned opt_size = 0; // TODO
     unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, header_size, question_size, opt_size);
-    unsigned available_per_fragment = msgsize - header_size - question_size - opt_size;
+        result = fcache_add(fcache, key, keysize, nr_fragments);
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+
+	unsigned available_per_fragment = msgsize - header_size - question_size - opt_size;
 
     // create fragment
     unsigned frag_nr = 0;
