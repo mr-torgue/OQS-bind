@@ -290,7 +290,7 @@ flow:
 isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *entry, dns_message_t **out_msg) {
     REQUIRE(entry != NULL);
     REQUIRE(out_msg != NULL && *out_msg == NULL);
-
+    isc_result_t result;
     // check if all fragments are in cache
     if (entry->bitmap != (1u << entry->nr_fragments) - 1) {    
         perror("Not all fragments have been received for entry %s (bitmap: %lx)", entry->key, entry->bitmap);  
@@ -300,21 +300,21 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
     isc_buffer_t *out_buf = NULL;
     isc_buffer_allocate(mctx, &out_buf, entry->nr_fragments * 1232);
     bool is_truncated = false;
-    bool prev_is_truncated = false;
-    unsigned truncated_rdlength_index, truncated_rdlength;
-    unsigned rdlength_index, rdlength; // keeps track of the rr's truncated rdlength and index relative to frag buffer
+    //bool prev_is_truncated = false;
+    //unsigned truncated_rdlength_index, truncated_rdlength;
+    //unsigned rdlength_index, rdlength; // keeps track of the rr's truncated rdlength and index relative to frag buffer
     for(unsigned frag_nr = 0; frag_nr < entry->nr_fragments; frag_nr++) {
         // get isc_buffer_t from cache
         isc_buffer_t *frag_buf = entry->fragments[frag_nr];
         unsigned opt_offset, opt_size, body_offset, body_size, first_rr_offset, last_rr_offset;
-        get_sizes_offsets(frag_buf, &body_offset, &body_size, &opt_offset, &opt_size, &first_rr_offset, &last_rr_offset, &is_truncated);
+        raw_get_sizes_offsets(frag_buf, &body_offset, &body_size, &opt_offset, &opt_size, &first_rr_offset, &last_rr_offset, &is_truncated);
         
         // copy question if first fragment
         if (frag_nr == 0) {
             isc_buffer_putmem(out_buf, frag_buf->base, body_offset); 
         }
     
-        // it is possible that one RR needs multiple fragments
+ /*        // it is possible that one RR needs multiple fragments
         if (is_truncated && prev_is_truncated) {
             rdlength_index = last_rr_offset + x;
             rdlength = (((unsigned char*)(frag_buf->base))[rdlength_index] << 8 | ((unsigned char*)(frag_buf->base))[rdlength_index + 1]);
@@ -337,8 +337,17 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
         }
         else { // I don't think we need this clause
             prev_is_truncated = false;
-        }
+        }*/
         isc_buffer_putmem(out_buf, frag_buf->base + body_offset, body_size); 
     }
-    // recreate and attach OPT
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
+isc_buffer_first(out_buf);
+result = dns_message_parse(*out_msg, out_buf, DNS_MESSAGEPARSE_IGNORETRUNCATION);
+if (result != ISC_R_SUCCESS) {
+    dns_message_detach(out_msg);
+    return result;
 }
+
+return ISC_R_SUCCESS;
+}
+
