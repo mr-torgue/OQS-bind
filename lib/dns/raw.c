@@ -318,6 +318,8 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
     isc_buffer_t *out_buf = NULL;
     isc_buffer_allocate(mctx, &out_buf, entry->nr_fragments * 1232);
     bool is_truncated = false;
+    unsigned char *saved_opt_base = NULL;
+    unsigned saved_opt_size = 0;
     //bool prev_is_truncated = false;
     //unsigned truncated_rdlength_index, truncated_rdlength;
     //unsigned rdlength_index, rdlength; // keeps track of the rr's truncated rdlength and index relative to frag buffer
@@ -326,7 +328,12 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
         isc_buffer_t *frag_buf = entry->fragments[frag_nr];
         unsigned opt_offset, opt_size, body_offset, body_size, first_rr_offset, last_rr_offset;
         raw_get_sizes_offsets(frag_buf, &body_offset, &body_size, &opt_offset, &opt_size, &first_rr_offset, &last_rr_offset, &is_truncated);
-        
+         
+        /* Save the OPT record from the first fragment. */
+if (frag_nr == 0 && opt_size > 0) {
+    saved_opt_base = ((unsigned char *)frag_buf->base) + opt_offset;
+    saved_opt_size = opt_size;
+}        
         // copy question if first fragment
         if (frag_nr == 0) {
             isc_buffer_putmem(out_buf, frag_buf->base, body_offset); 
@@ -358,6 +365,13 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
         }*/
         isc_buffer_putmem(out_buf, ((unsigned char *)frag_buf->base) + body_offset, body_size); 
     }
+
+        /* Reattach the OPT record after reconstructing the body. */
+if (saved_opt_base != NULL && saved_opt_size > 0) {
+    isc_buffer_putmem(out_buf, saved_opt_base, saved_opt_size);
+}
+
+
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
 isc_buffer_first(out_buf);
 result = dns_message_parse(*out_msg, out_buf, DNS_MESSAGEPARSE_IGNORETRUNCATION);
