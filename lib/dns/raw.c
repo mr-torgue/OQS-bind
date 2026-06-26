@@ -218,6 +218,13 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                             unsigned new_rdata_length = available_per_fragment - start;
                             unsigned remaining = rdata.length - new_rdata_length;
 
+			    /*
+ * TODO: Carry the remaining RDATA bytes into the next RAW fragment.
+ * For now, fail clearly rather than silently dropping bytes.
+ */
+if (remaining > 0) {
+    return ISC_R_NOTIMPLEMENTED;
+}
                             new_rdata->length = new_rdata_length;
                             // do we need to copy?
                             if (new_rdata_length > 0) {
