@@ -217,6 +217,7 @@ libdns_la_SOURCES =			\
 	private.c			\
 	probes.d			\
 	qbf.c 				\
+	raw.c                           \
 	qp.c				\
 	qp_p.h				\
 	rbt.c				\

@@ -41,7 +41,7 @@ Advantages:
 #define RR_HEADER_SIZE 10
 #define QUESTION_HEADER_SIZE 4
 
-unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned total_sig_pk_bytes, const unsigned savings, unsigned *can_send_first_msg, unsigned *can_send);
+unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_size, const unsigned header_size, const unsigned question_size, const unsigned opt_size);
 
 isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache,
                           dns_message_t *msg, char *client_address,

@@ -331,7 +331,7 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
 Creates a fragment query for fragment fragment_nr using an OPT OPTION
 */
 isc_result_t create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, uint nr_fragments, isc_buffer_t **question_buffer) {
-    REQUIRE(question_buffer != NULL && *question_buffer == NULL);
+    REQUIRE(question_buffer != NULL && question_buffer == NULL);
     
     // parse buffer into question
     dns_message_t *question = NULL;
@@ -360,7 +360,7 @@ isc_result_t create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer, ui
                 goto done;
             }
             result = dns_message_renderend(question);
-            if (result != ISC_R_SUCCESS) 
+            if (result != ISC_R_SUCCESS){ 
                 goto done;
             }
             dns_compress_invalidate(&cctx);
@@ -385,10 +385,11 @@ done:
 Creates a fragment query by chaning the qname (LEGACY)
 */
 isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, isc_buffer_t **question_buffer) {
-    REQUIRE(question_buffer != NULL && *question_buffer == NULL);
+    REQUIRE(question_buffer != NULL && question_buffer == NULL);
 
     // parse buffer into dns_message_t
     dns_message_t *msg = NULL;
+	dns_message_t *question = NULL;
     dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &msg);
     isc_buffer_first(buffer); // start from 0
     isc_result_t result = dns_message_parse(msg, buffer, 0);
@@ -408,12 +409,12 @@ isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, 
             REQUIRE(rdataset != NULL);
 
             // set up question
-            dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, question);
+            dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &question);
             dns_name_t *qname = NULL;
             dns_rdataset_t *qrdataset = NULL;
             
-            dns_message_gettempname(*question, &qname);
-            dns_message_gettemprdataset(*question, &qrdataset);
+            dns_message_gettempname(question, &qname);
+            dns_message_gettemprdataset(question, &qrdataset);
             dns_name_fromstring(qname, new_name_str, NULL, 0, mctx);
             dns_rdataset_makequestion(qrdataset, rdataset->rdclass, rdataset->type);
             ISC_LIST_APPEND(qname->list, qrdataset, link); 
@@ -421,15 +422,15 @@ isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, 
             // add name and set id
             //dns_messageid_t id;
             // unsigned flags;
-            dns_message_addname(*question, qname, DNS_SECTION_QUESTION);
+            dns_message_addname(question, qname, DNS_SECTION_QUESTION);
             //dns_message_peekheader(buffer, &id, &flags);
-            (*question)->id = msg->id;
+            question->id = msg->id;
             
             // set opt
             if (msg->opt != NULL) {
                 REQUIRE(dns_rdataset_count(msg->opt) == 1);
                 dns_rdataset_t *new_opt_rdataset = NULL;
-                dns_message_gettemprdataset(*question, &new_opt_rdataset);
+                dns_message_gettemprdataset(question, &new_opt_rdataset);
 
                 // get first rdata from msg->opt
                 REQUIRE(dns_rdataset_first(msg->opt) == ISC_R_SUCCESS); // there should be one resource record
@@ -440,20 +441,20 @@ isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, 
 
                 // prepare new rdata
                 dns_rdata_t *new_opt_rdata = NULL;
-                dns_message_gettemprdata(*question, &new_opt_rdata);
+                dns_message_gettemprdata(question, &new_opt_rdata);
                 isc_region_t new_opt_rdata_region;
                 dns_rdata_fromregion(new_opt_rdata, rdata.rdclass, rdata.type, &rdata_region); 
 
                 // add to new rdataset
                 dns_rdatalist_t *rdatalist = NULL;
-                dns_message_gettemprdatalist(*question, &rdatalist);
+                dns_message_gettemprdatalist(question, &rdatalist);
                 ISC_LIST_APPEND(rdatalist->rdata, new_opt_rdata, link);
                 // copy values
                 rdatalist->rdclass = msg->opt->rdclass;
                 rdatalist->type = msg->opt->type;
                 rdatalist->ttl = msg->opt->ttl; 
                 dns_rdatalist_tordataset(rdatalist, new_opt_rdataset);
-                REQUIRE(dns_message_setopt(*question, new_opt_rdataset) == ISC_R_SUCCESS);
+                REQUIRE(dns_message_setopt(question, new_opt_rdataset) == ISC_R_SUCCESS);
             }
             
             // parsing: only question and additional
@@ -473,7 +474,7 @@ isc_result_t create_fragment_query_qname(isc_mem_t *mctx, isc_buffer_t *buffer, 
                 goto done;
             }
             result = dns_message_renderend(question);
-            if (result != ISC_R_SUCCESS) 
+            if (result != ISC_R_SUCCESS) {
                 goto done;
             }
             dns_compress_invalidate(&cctx);

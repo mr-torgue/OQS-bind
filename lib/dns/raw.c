@@ -11,7 +11,15 @@
 #include <dns/rdatalist.h>
 #include <dns/rdataset.h>
 #include <dns/udp_fragmentation.h>
-#include <dns/raw_fragmentation.h>
+#include <dns/raw.h>
+
+static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments);
+static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments);
+static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size,
+                                          unsigned *opt_offset, unsigned *opt_size,
+                                          unsigned *first_rr_offset, unsigned *last_rr_offset,
+                                          bool *is_truncated);
+
 
 /*
 every fragment needs a header, question, and opt record (maybe some other fields?)
@@ -32,7 +40,7 @@ creates and initializes a fragment response by including the following:
 3. copy question from message
 4. set opt
 */
-isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments) {
+static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments) {
     REQUIRE(frag != NULL && *frag == NULL);
     dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, frag);
     isc_result_t result;
@@ -64,7 +72,7 @@ isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, d
 }
 
 
-isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments) {
+static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments) {
     // copy opt if exists, else create new one
     isc_result_t result;
     dns_rdataset_t *opt = NULL;
@@ -248,34 +256,29 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 
 
 //
-isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size, 
-                                unsigned *opt_offset, unsigned *opt_size, 
+static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size,
+                                unsigned *opt_offset, unsigned *opt_size,
                                 unsigned *first_rr_offset, unsigned *last_rr_offset, bool *is_truncated) {
     isc_region_t frag_region;
     isc_buffer_usedregion(frag_buf, &frag_region);
-    unsigned qdcount = frag_region.base[4] << 8 | frag_region.base[5];
-    unsigned ancount = frag_region.base[6] << 8 | frag_region.base[7];
-    unsigned nscount = frag_region.base[8] << 8 | frag_region.base[9];
-    unsigned arcount = frag_region.base[10] << 8 | frag_region.base[11];
-    unsigned rdlength;
 
-    // calculate question
+    unsigned qdcount = frag_region.base[4] << 8 | frag_region.base[5];
     unsigned msg_size = DNS_HEADER_SIZE;
-    for(unsigned i = 0; i < qdcount; i++) {
+
+    for (unsigned i = 0; i < qdcount; i++) {
         msg_size += calc_name_size(frag_region.base + msg_size, (frag_region.length - msg_size));
         msg_size += QUESTION_HEADER_SIZE;
     }
+
     *body_offset = msg_size;
+    *body_size = (frag_region.length > msg_size) ? (frag_region.length - msg_size) : 0;
+    *opt_offset = 0;
+    *opt_size = 0;
+    *first_rr_offset = msg_size;
+    *last_rr_offset = frag_region.length;
+    *is_truncated = false;
 
-    for (unsigned section = DNS_SECTION_ANSWER; section < DNS_SECTION_MAX; section++) {
-        msg_size += calc_name_size(frag_region.base + msg_size, (frag_region.length - msg_size));
-        msg_size += RR_HEADER_SIZE;
-        rdlength = frag_region.base[msg_size - 2] << 8 | frag_region.base[msg_size - 1];
-        msg_size += rdlength;
-        if (section == DNS_SECTION_ADDITIONAL && )
-    }
-
-
+    return ISC_R_SUCCESS;
 }
 
 /*
@@ -293,8 +296,7 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
     isc_result_t result;
     // check if all fragments are in cache
     if (entry->bitmap != (1u << entry->nr_fragments) - 1) {    
-        perror("Not all fragments have been received for entry %s (bitmap: %lx)", entry->key, entry->bitmap);  
-        return ISC_R_FAILURE;
+    return ISC_R_INPROGRESS;
     }
 
     isc_buffer_t *out_buf = NULL;
@@ -338,7 +340,7 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
         else { // I don't think we need this clause
             prev_is_truncated = false;
         }*/
-        isc_buffer_putmem(out_buf, frag_buf->base + body_offset, body_size); 
+        isc_buffer_putmem(out_buf, ((unsigned char *)frag_buf->base) + body_offset, body_size); 
     }
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
 isc_buffer_first(out_buf);
