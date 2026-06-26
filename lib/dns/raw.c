@@ -258,24 +258,40 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 //
 static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size,
                                 unsigned *opt_offset, unsigned *opt_size,
-                                unsigned *first_rr_offset, unsigned *last_rr_offset, bool *is_truncated) {
+                                unsigned *first_rr_offset, unsigned *last_rr_offset, bool *is_truncated) 
+
+{
     isc_region_t frag_region;
     isc_buffer_usedregion(frag_buf, &frag_region);
 
     unsigned qdcount = frag_region.base[4] << 8 | frag_region.base[5];
+    unsigned arcount = frag_region.base[10] << 8 | frag_region.base[11];
     unsigned msg_size = DNS_HEADER_SIZE;
 
     for (unsigned i = 0; i < qdcount; i++) {
-        msg_size += calc_name_size(frag_region.base + msg_size, (frag_region.length - msg_size));
+        msg_size += calc_name_size(frag_region.base + msg_size,
+                                   frag_region.length - msg_size);
         msg_size += QUESTION_HEADER_SIZE;
     }
 
     *body_offset = msg_size;
-    *body_size = (frag_region.length > msg_size) ? (frag_region.length - msg_size) : 0;
-    *opt_offset = 0;
-    *opt_size = 0;
-    *first_rr_offset = msg_size;
-    *last_rr_offset = frag_region.length;
+
+    if (arcount > 0 && frag_region.length >= 11) {
+        *opt_size = 11;
+        *opt_offset = frag_region.length - *opt_size;
+        *body_size = (*opt_offset > *body_offset)
+                         ? (*opt_offset - *body_offset)
+                         : 0;
+    } else {
+        *opt_offset = 0;
+        *opt_size = 0;
+        *body_size = (frag_region.length > *body_offset)
+                         ? (frag_region.length - *body_offset)
+                         : 0;
+    }
+
+    *first_rr_offset = *body_offset;
+    *last_rr_offset = *body_offset + *body_size;
     *is_truncated = false;
 
     return ISC_R_SUCCESS;
