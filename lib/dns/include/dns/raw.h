@@ -36,7 +36,7 @@ Advantages:
 #define RAW_OPCODE 7
 #define RAW_RCODE 12
 #define RAW_OPT_OPTION 22
-
+#define RAW_FLAG_RRTR 1
 #define DNS_HEADER_SIZE 12
 #define RR_HEADER_SIZE 10
 #define QUESTION_HEADER_SIZE 4
