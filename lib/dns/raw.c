@@ -119,8 +119,13 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
     opts_count++;
 
     // build and set opt record
-    dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
-    return dns_message_setopt(frag, opt);
+    result = dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
+    	
+	if (result != ISC_R_SUCCESS) {
+    return result;
+}
+
+	return dns_message_setopt(frag, opt);
 }
 
 isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
