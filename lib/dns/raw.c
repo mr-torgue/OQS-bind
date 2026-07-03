@@ -151,6 +151,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     // create fragment
     unsigned frag_nr = 0;
     dns_message_t *frag = NULL;
+    unsigned fragment_flags = 0;
     raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
 
     unsigned start = 0;
@@ -226,6 +227,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         if (start + rdata.length > available_per_fragment) {
                             unsigned new_rdata_length = available_per_fragment - start;
                             unsigned remaining = rdata.length - new_rdata_length;
+			    fragment_flags = RAW_FLAG_RRTR;
 
 			    /*
  * TODO: Carry the remaining RDATA bytes into the next RAW fragment.
