@@ -13,8 +13,8 @@
 #include <dns/udp_fragmentation.h>
 #include <dns/raw.h>
 
-static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments);
-static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments);
+static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags);
+static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments, unsigned fragment_flags);
 static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size,
                                           unsigned *opt_offset, unsigned *opt_size,
                                           unsigned *first_rr_offset, unsigned *last_rr_offset,
@@ -40,7 +40,7 @@ creates and initializes a fragment response by including the following:
 3. copy question from message
 4. set opt
 */
-static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments) {
+static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags) {
     REQUIRE(frag != NULL && *frag == NULL);
     dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, frag);
     isc_result_t result;
@@ -63,7 +63,7 @@ static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t 
         perror("Could not clone DNS_QUESTION_SECTION!\n");
         return result;
     }
-    result = raw_create_opt(mctx, msg, *frag, frag_nr, nr_fragments);
+    result = raw_create_opt(mctx, msg, *frag, frag_nr, nr_fragments, fragment_flags);
     if (result != ISC_R_SUCCESS) {
         perror("Could not create OPT record!\n");
         return result;
@@ -72,7 +72,7 @@ static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t 
 }
 
 
-static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments) {
+static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_message_t *frag, unsigned frag_nr, unsigned nr_fragments, unsigned fragment_flags) {
     // copy opt if exists, else create new one
     isc_result_t result;
     dns_rdataset_t *opt = NULL;
@@ -111,7 +111,7 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
     ednsopts[opts_count].code = RAW_OPT_OPTION;
     ednsopts[opts_count].length = 2;
     // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
-    uint16_t data = (frag_nr << 10) | (nr_fragments << 4);
+    uint16_t data = (frag_nr << 10) | (nr_fragments << 4) | (fragment_flags & 0xf);
     unsigned char value[2];
     value[0] = (data >> 8);
     value[1] = data & 0xff;
@@ -151,7 +151,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     // create fragment
     unsigned frag_nr = 0;
     dns_message_t *frag = NULL;
-    raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments);
+    raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
 
     unsigned start = 0;
     for (unsigned section = DNS_SECTION_ANSWER; section < DNS_SECTION_MAX; section++) {
@@ -204,7 +204,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         start = 0;
                         frag_nr++;
                         frag = NULL;
-                        raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments);
+                        raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
                         
 
 			new_name = NULL;
@@ -253,7 +253,7 @@ if (remaining > 0) {
                             start = 0;
                             frag_nr++;
                             frag = NULL;
-                            raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments);
+                            raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
                         }
                         tresult = dns_rdataset_next(rdataset);
                     }
