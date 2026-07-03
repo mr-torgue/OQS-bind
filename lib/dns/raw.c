@@ -116,6 +116,7 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
     value[0] = (data >> 8);
     value[1] = data & 0xff;
     ednsopts[opts_count].value = value;
+    opts_count++;
 
     // build and set opt record
     dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
