@@ -409,7 +409,24 @@ if (frag_nr == 0 && opt_size > 0) {
         // copy question if first fragment
         if (frag_nr == 0) {
             isc_buffer_putmem(out_buf, frag_buf->base, body_offset); 
+
         }
+
+	if (is_truncated && prev_is_truncated) {
+    rdlength_index = last_rr_offset;
+    rdlength = (((unsigned char *)(frag_buf->base))[rdlength_index] << 8) |
+               ((unsigned char *)(frag_buf->base))[rdlength_index + 1];
+    truncated_rdlength += rdlength;
+}
+else if (is_truncated) {
+    rdlength_index = last_rr_offset;
+    rdlength = (((unsigned char *)(frag_buf->base))[rdlength_index] << 8) |
+               ((unsigned char *)(frag_buf->base))[rdlength_index + 1];
+    truncated_rdlength_index = rdlength_index;
+    truncated_rdlength = rdlength;
+    prev_is_truncated = true;
+}
+
  /*   
          // it is possible that one RR needs multiple fragments
         if (is_truncated && prev_is_truncated) {
