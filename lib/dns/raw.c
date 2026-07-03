@@ -310,7 +310,38 @@ static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body
     }
 
     *first_rr_offset = *body_offset;
-    *last_rr_offset = *body_offset + *body_size;
+*last_rr_offset = *body_offset;
+
+unsigned scan = *body_offset;
+unsigned body_end = *body_offset + *body_size;
+bool found_rr = false;
+
+while (scan < body_end) {
+    unsigned rr_start = scan;
+    unsigned name_size = calc_name_size(frag_region.base + scan,
+                                        frag_region.length - scan);
+
+    if (scan + name_size + RR_HEADER_SIZE > body_end) {
+        break;
+    }
+
+    unsigned rdlength_index = scan + name_size + 8;
+    unsigned rdlength = (frag_region.base[rdlength_index] << 8) |
+                        frag_region.base[rdlength_index + 1];
+
+    unsigned rr_end = scan + name_size + RR_HEADER_SIZE + rdlength;
+    if (rr_end > body_end) {
+        break;
+    }
+
+    if (!found_rr) {
+        *first_rr_offset = rr_start;
+        found_rr = true;
+    }
+
+    *last_rr_offset = rdlength_index;
+    scan = rr_end;
+}
     *is_truncated = false;
 
     if (*opt_size >= 11) {
