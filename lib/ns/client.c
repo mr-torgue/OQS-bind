@@ -39,6 +39,7 @@
 #include <isc/timer.h>
 #include <isc/util.h>
 
+#include <dns/raw.h>
 #include <dns/adb.h>
 #include <dns/badcache.h>
 #include <dns/cache.h>
@@ -594,12 +595,13 @@ ns_client_send(ns_client_t *client) {
 			client->message->opt = NULL; // just to make sure we don't break anything
 		}
 		// RAW
-		else if (udp_fragmentation_mode == 2) {				
-			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					"RAW is not implemented yet!");
-			exit(0);
-		}
 
+
+		else if (udp_fragmentation_mode == 2) {
+        client->message->opt = client->opt;
+        result = raw_fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
+        client->message->opt = NULL;
+}
 		// succesfully fragmented
 		if (result == ISC_R_SUCCESS) {
 			// get first fragment from cache and set it as client->message
