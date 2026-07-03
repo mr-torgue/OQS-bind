@@ -623,6 +623,7 @@ ns_client_send(ns_client_t *client) {
 			else {				
 				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
 					"Could not find first fragment!");
+				goto cleanup;
 			}
 		}
 		else {				
