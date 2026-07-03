@@ -78,7 +78,7 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
     dns_rdataset_t *opt = NULL;
     dns_rdata_t rdata;
     isc_buffer_t optbuf;
-    dns_message_gettemprdataset(frag, &opt);
+  //  dns_message_gettemprdataset(frag, &opt);
     unsigned version = 0; // is this correct?
     uint16_t udpsize = 65535; // max UDP size
     unsigned flags = DNS_MESSAGEEXTFLAG_DO;
