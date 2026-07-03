@@ -427,6 +427,22 @@ else if (is_truncated) {
     prev_is_truncated = true;
 }
 
+else if (prev_is_truncated) {
+    rdlength_index = first_rr_offset;
+    rdlength = (((unsigned char *)(frag_buf->base))[rdlength_index] << 8) |
+               ((unsigned char *)(frag_buf->base))[rdlength_index + 1];
+
+    truncated_rdlength += rdlength;
+
+    ((unsigned char *)(out_buf->base))[truncated_rdlength_index] =
+        truncated_rdlength >> 8;
+    ((unsigned char *)(out_buf->base))[truncated_rdlength_index + 1] =
+        truncated_rdlength & 0xff;
+
+    prev_is_truncated = false;
+}
+
+
  /*   
          // it is possible that one RR needs multiple fragments
         if (is_truncated && prev_is_truncated) {
