@@ -384,8 +384,14 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
     isc_buffer_t *out_buf = NULL;
     isc_buffer_allocate(mctx, &out_buf, entry->nr_fragments * 1232);
     bool is_truncated = false;
-    unsigned char *saved_opt_base = NULL;
-    unsigned saved_opt_size = 0;
+bool prev_is_truncated = false;
+unsigned truncated_rdlength_index = 0;
+unsigned truncated_rdlength = 0;
+unsigned rdlength_index = 0;
+unsigned rdlength = 0;
+unsigned char *saved_opt_base = NULL;
+unsigned saved_opt_size = 0;
+
     //bool prev_is_truncated = false;
     //unsigned truncated_rdlength_index, truncated_rdlength;
     //unsigned rdlength_index, rdlength; // keeps track of the rr's truncated rdlength and index relative to frag buffer
