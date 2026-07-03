@@ -63,7 +63,7 @@ static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t 
         perror("Could not clone DNS_QUESTION_SECTION!\n");
         return result;
     }
-    result = raw_create_opt(mctx, msg, *frag, frag_nr, nr_fragments, fragment_flags);
+    result = create__fragment_opt(*frag, frag_nr, nr_fragments, fragment_flags, false);
     if (result != ISC_R_SUCCESS) {
         perror("Could not create OPT record!\n");
         return result;
