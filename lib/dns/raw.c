@@ -124,8 +124,17 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
 
 isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
 
+
     isc_result_t result;
-    unsigned msgsize = msg->buffer->used;
+
+    if (msg->buffer == NULL) {
+    result = render_fragment(mctx, max_udp_size * 64, &msg);
+    if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+        return result;
+    }
+}
+
+    unsigned msgsize = msg->buffer -> used;
 
     unsigned char key[69];
     unsigned keysize = sizeof(key) / sizeof(key[0]);
