@@ -608,7 +608,7 @@ ns_client_send(ns_client_t *client) {
 			isc_buffer_t *out_frag = NULL;
 			dns_message_t *msg = NULL;
 			// create key
-			unsigned char key[64];
+			unsigned char key[69];
 			unsigned keysize = sizeof(key) / sizeof(key[0]);
 			fcache_create_key(client->message->id, addr_buf, key, &keysize);
 	
