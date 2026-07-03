@@ -205,7 +205,16 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         frag_nr++;
                         frag = NULL;
                         raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments);
-                        reset = true;
+                        
+
+			new_name = NULL;
+			dns_message_gettempname(frag, &new_name);
+			dns_name_clone(name, new_name);
+	
+			new_rdataset = NULL;
+			dns_message_gettemprdataset(frag, &new_rdataset);
+
+			reset = true;
                         // don't go to next rdata
                     }
                     else {
