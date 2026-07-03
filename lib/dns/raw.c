@@ -313,6 +313,22 @@ static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body
     *last_rr_offset = *body_offset + *body_size;
     *is_truncated = false;
 
+    if (*opt_size >= 11) {
+    unsigned char *opt = frag_region.base + *opt_offset;
+    unsigned rdlen = (opt[9] << 8) | opt[10];
+
+    if (rdlen >= 6) {
+        unsigned char *option = opt + 11;
+        unsigned option_code = (option[0] << 8) | option[1];
+        unsigned option_len = (option[2] << 8) | option[3];
+
+        if (option_code == RAW_OPT_OPTION && option_len == 2) {
+            unsigned value = (option[4] << 8) | option[5];
+            unsigned flags = value & 0xf;
+            *is_truncated = ((flags & RAW_FLAG_RRTR) != 0);
+        }
+    }
+}
     return ISC_R_SUCCESS;
 }
 
