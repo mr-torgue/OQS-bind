@@ -283,6 +283,17 @@ if (remaining > 0) {
                 
         }
     }
+
+
+	result = render_fragment(mctx, max_udp_size, &frag);
+if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+    return result;
+}
+
+result = fcache_add_fragment(fcache, key, keysize, frag);
+
+
+
         result = fcache_add_fragment(fcache, key, keysize, frag);
     if (result != ISC_R_SUCCESS) {
         return result;
