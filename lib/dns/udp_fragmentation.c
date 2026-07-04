@@ -331,7 +331,7 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
 Creates a fragment query for fragment fragment_nr using an OPT OPTION
 */
 isc_result_t create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, uint nr_fragments, isc_buffer_t **question_buffer) {
-    REQUIRE(question_buffer != NULL && question_buffer == NULL);
+    REQUIRE(question_buffer != NULL && *question_buffer == NULL);
     
     // parse buffer into question
     dns_message_t *question = NULL;
