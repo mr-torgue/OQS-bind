@@ -551,7 +551,7 @@ ns_client_send(ns_client_t *client) {
 
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
-			unsigned char key[64];
+			unsigned char key[69];
 			unsigned keysize = sizeof(key) / sizeof(key[0]);
 			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
