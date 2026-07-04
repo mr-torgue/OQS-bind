@@ -549,6 +549,10 @@ ns_client_send(ns_client_t *client) {
 	if (udp_fragmentation_enabled) {
 		fcache_t *fcache = client->manager->sctx->fcache;
 
+
+		if (udp_fragmentation_mode == 2) {
+        is_fragment_opt(client->message);
+}
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
 			unsigned char key[69];
