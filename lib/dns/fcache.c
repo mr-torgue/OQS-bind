@@ -148,7 +148,14 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
 isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag) {
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry); 
-    if (result == ISC_R_SUCCESS) {   
+	fprintf(stderr,
+        "FCACHE ADD: key=%.*s frag=%lu keysize=%u\n",
+        (int)keysize,
+        key,
+        frag->fragment_nr,
+        keysize);   
+
+ if (result == ISC_R_SUCCESS) {   
         return fcache_add_fragment_with_entry(fcache, entry, frag);
     }
     return ISC_R_NOTFOUND;
@@ -214,7 +221,15 @@ isc_result_t fcache_get_fragment_from_entry(fragment_cache_entry_t *entry, unsig
 
 
 isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+    
+	fprintf(stderr,
+        "FCACHE GET: key=%.*s frag=%u keysize=%u\n",
+        (int)keysize,
+        key,
+        fragment_nr,
+        keysize);	
+
+isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
