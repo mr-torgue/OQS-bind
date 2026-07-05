@@ -552,6 +552,17 @@ ns_client_send(ns_client_t *client) {
 
 		if (udp_fragmentation_mode == 2) {
         is_fragment_opt(client->message);
+	ns_client_log(client,
+              NS_LOGCATEGORY_CLIENT,
+              NS_LOGMODULE_CLIENT,
+              ISC_LOG_ERROR,
+              "RAW: is_fragment=%d fragment_nr=%lu opt=%p",
+              client->message->is_fragment,
+              client->message->fragment_nr,
+              client->message->opt);
+
+
+
 }
 		// send a cached fragment if fragment request
 		if(client->message->is_fragment) {
