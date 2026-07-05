@@ -552,7 +552,13 @@ ns_client_send(ns_client_t *client) {
 
 		if (udp_fragmentation_mode == 2) {
         is_fragment_opt(client->message);
-	ns_client_log(client,
+	
+	fprintf(stderr, "RAW DEBUG: is_fragment=%d fragment_nr=%lu nr_fragments=%lu opt=%p\n",
+        client->message->is_fragment,
+        client->message->fragment_nr,
+        client->message->nr_fragments,
+        client->message->opt);
+	   ns_client_log(client,
               NS_LOGCATEGORY_CLIENT,
               NS_LOGMODULE_CLIENT,
               ISC_LOG_ERROR,
