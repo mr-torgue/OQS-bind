@@ -530,6 +530,33 @@ ns_client_send(ns_client_t *client) {
 		}
 	}
 
+	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
+bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
+
+	if (udp_fragmentation_enabled && udp_fragmentation_mode == 2) {
+        is_fragment_opt(client->message);
+
+        if (client->message->is_fragment) {
+                fcache_t *fcache = client->manager->sctx->fcache;
+                unsigned char key[69];
+                unsigned keysize = sizeof(key) / sizeof(key[0]);
+                char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+                isc_buffer_t *out_frag = NULL;
+
+                isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+                fcache_create_key(client->message->id, addr_buf, key, &keysize);
+
+                if (fcache_get_fragment(fcache, key, keysize,
+                                        client->message->fragment_nr,
+                                        &out_frag) == ISC_R_SUCCESS)
+                {
+                        buffer = *out_frag;
+                        goto sendbuffer;
+                }
+        }
+}
+
+
 	/*
 	 * Create an OPT for our reply.
 	 */
@@ -544,8 +571,6 @@ ns_client_send(ns_client_t *client) {
 	// UDP fragmentation
 	// fragment request get detected before rendering
 	// first fragment detection happens after renering because we depend on the TC flag
-	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
-	bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 	if (udp_fragmentation_enabled) {
 		fcache_t *fcache = client->manager->sctx->fcache;
 
