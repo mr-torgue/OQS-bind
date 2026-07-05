@@ -5616,14 +5616,28 @@ ns__query_start(query_ctx_t *qctx) {
 	qctx->rpz = false;
 
 	// UDP Fragmentation triggers if enabled and the incoming request is a fragment request
-	if (qctx->client->manager->sctx->udp_fragmentation_mode != 0 && (is_fragment_qname(qctx->client->manager->mctx, qctx->client->message) || is_fragment_opt(qctx->client->message) == ISC_R_SUCCESS)) {
-		ns_client_log(qctx->client, NS_LOGCATEGORY_CLIENT,
-				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
-				      "[NS] received a fragment query...");
-		ns_client_send(qctx->client); 
-		return (ns_query_done(qctx)); 
-	}
+	if (qctx->client->manager->sctx->udp_fragmentation_mode != 0 &&
+    (is_fragment_qname(qctx->client->manager->mctx, qctx->client->message) ||
+     is_fragment_opt(qctx->client->message) == ISC_R_SUCCESS)) {
 
+        ns_client_log(qctx->client,
+                      NS_LOGCATEGORY_CLIENT,
+                      NS_LOGMODULE_CLIENT,
+                      ISC_LOG_ERROR,
+                      "RAW: query.c fragment path entered is_fragment=%d fragment_nr=%lu opt=%p",
+                      qctx->client->message->is_fragment,
+                      qctx->client->message->fragment_nr,
+                      qctx->client->message->opt);
+
+        ns_client_log(qctx->client, NS_LOGCATEGORY_CLIENT,
+                      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
+                      "[NS] received a fragment query...");
+        ns_client_send(qctx->client);
+        return (ns_query_done(qctx));
+}
+
+
+	
 	CALL_HOOK(NS_QUERY_START_BEGIN, qctx);
 
 	/*
