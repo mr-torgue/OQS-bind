@@ -133,6 +133,9 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 
 
     isc_result_t result;
+    fprintf(stderr, "RAW TRACE: entered raw_fragment id=%u max_udp=%u\n",
+        msg->id, max_udp_size);
+
 
     if (msg->buffer == NULL) {
     result = render_fragment(mctx, max_udp_size * 64, &msg);
@@ -142,13 +145,18 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 }
 
     unsigned msgsize = msg->buffer -> used;
-
+	fprintf(stderr, "RAW TRACE: msgsize=%u\n", msgsize);
     unsigned char key[69];
     unsigned keysize = sizeof(key) / sizeof(key[0]);
     fcache_create_key(msg->id, client_address, key, &keysize);
+    fprintf(stderr, "RAW TRACE: key=%.*s keysize=%u client=%s\n",
+        (int)keysize, key, keysize, client_address);
+
 
     if (fcache_exists(fcache, key, keysize)) {
-        return ISC_R_EXISTS;
+        fprintf(stderr, "RAW TRACE: cache already exists\n");
+
+	return ISC_R_EXISTS;
     }
 
     
@@ -157,7 +165,8 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     unsigned question_size = 0; // TODO
     unsigned opt_size = 0; // TODO
     unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, header_size, question_size, opt_size);
-        result = fcache_add(fcache, key, keysize, nr_fragments);
+        fprintf(stderr, "RAW TRACE: nr_fragments=%u\n", nr_fragments);
+	result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result != ISC_R_SUCCESS) {
         return result;
     }
@@ -209,13 +218,18 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
                         new_name = NULL;
                         dns_message_gettempname(frag, &new_name);       
                         dns_name_clone(name, new_name);   
-
+			fprintf(stderr, "RAW TRACE: before final render frag_nr=%lu\n", frag->fragment_nr);
                         result = render_fragment(mctx, max_udp_size, &frag);
+			fprintf(stderr, "RAW TRACE: final render result=%d frag_buffer=%p\n",
+        result, frag->buffer);
 if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
-    return result;
+    fprintf(stderr, "RAW TRACE: final render failed result=%d\n", result);
+	return result;
 }
+			fprintf(stderr, "RAW TRACE: before final fcache_add frag_nr=%lu\n", frag->fragment_nr);
 			result = fcache_add_fragment(fcache, key, keysize, frag);
-                        if (result != ISC_R_SUCCESS) {
+                        fprintf(stderr, "RAW TRACE: final fcache_add result=%d\n", result);
+			if (result != ISC_R_SUCCESS) {
                         	return result;
                         }
 			
@@ -291,7 +305,6 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
 
-result = fcache_add_fragment(fcache, key, keysize, frag);
 
 
 
