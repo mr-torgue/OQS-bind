@@ -533,29 +533,30 @@ ns_client_send(ns_client_t *client) {
 	uint8_t udp_fragmentation_mode = client->manager->sctx->udp_fragmentation_mode;
 bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 
-	if (udp_fragmentation_enabled && udp_fragmentation_mode == 2) {
-        is_fragment_opt(client->message);
+	        if (udp_fragmentation_enabled && udp_fragmentation_mode == 2) {
+                is_fragment_opt(client->message);
 
-        if (client->message->is_fragment) {
-                fcache_t *fcache = client->manager->sctx->fcache;
-                unsigned char key[69];
-                unsigned keysize = sizeof(key) / sizeof(key[0]);
-                char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-                isc_buffer_t *out_frag = NULL;
+                if (client->message->is_fragment) {
+                        fcache_t *fcache = client->manager->sctx->fcache;
+                        unsigned char key[69];
+                        unsigned keysize = sizeof(key) / sizeof(key[0]);
+                        char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+                        isc_buffer_t *out_frag = NULL;
 
-                isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-                fcache_create_key(client->message->id, addr_buf, key, &keysize);
+                        isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+                        fcache_create_key(client->message->id, addr_buf, key, &keysize);
 
-                if (fcache_get_fragment(fcache, key, keysize,
-                                        client->message->fragment_nr,
-                                        &out_frag) == ISC_R_SUCCESS)
-                {
-                        buffer = *out_frag;
-                        goto sendbuffer;
+                        if (fcache_get_fragment(fcache, key, keysize,
+                                                client->message->fragment_nr,
+                                                &out_frag) == ISC_R_SUCCESS)
+                        {
+                                buffer = *out_frag;
+                                goto sendbuffer;
+                        }
+
+                        goto cleanup;
                 }
         }
-}
-
 
 	/*
 	 * Create an OPT for our reply.
@@ -575,65 +576,12 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 		fcache_t *fcache = client->manager->sctx->fcache;
 
 
-		if (udp_fragmentation_mode == 2) {
-        is_fragment_opt(client->message);
-	
-	fprintf(stderr, "RAW DEBUG: is_fragment=%d fragment_nr=%lu nr_fragments=%lu opt=%p\n",
-        client->message->is_fragment,
-        client->message->fragment_nr,
-        client->message->nr_fragments,
-        client->message->opt);
-	   ns_client_log(client,
-              NS_LOGCATEGORY_CLIENT,
-              NS_LOGMODULE_CLIENT,
-              ISC_LOG_ERROR,
-              "RAW: is_fragment=%d fragment_nr=%lu opt=%p",
-              client->message->is_fragment,
-              client->message->fragment_nr,
-              client->message->opt);
 
 
 
-}
 		// send a cached fragment if fragment request
 
 		// send a cached fragment if fragment request
-if (client->message->is_fragment) {
-        unsigned char key[69];
-        unsigned keysize = sizeof(key) / sizeof(key[0]);
-        char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-        isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-        fcache_create_key(client->message->id, addr_buf, key, &keysize);
-
-        ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-                      "Sending fragment %lu to %s (key %s)",
-                      client->message->fragment_nr, addr_buf, key);
-
-        isc_buffer_t *out_frag = NULL;
-        unsigned long frag_nr = client->message->fragment_nr;
-
-        if (fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag) == ISC_R_SUCCESS) {
-                ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-                              "Sending fragment from fcache!");
-
-                if (client->opt != NULL) {
-                        dns_message_puttemprdataset(client->message, &client->opt);
-                        client->opt = NULL;
-                }
-
-                buffer = *out_frag;
-                goto sendbuffer;
-        } else {
-                ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-                              "Fragment not found, sending FORMERR!");
-                client->message->rcode = dns_rcode_formerr;
-                client->message->flags |= DNS_MESSAGEFLAG_TC;
-                client->formerrcache.addr = client->peeraddr;
-                client->formerrcache.time = isc_time_seconds(&client->requesttime);
-                client->formerrcache.id = client->message->id;
-        }
-}
-
 
 		// try to fragment: fragment will tell us if it is needed or not
 		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
