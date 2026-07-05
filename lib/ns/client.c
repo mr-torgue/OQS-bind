@@ -2371,6 +2371,12 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		CTRACE("iquery");
 		ns_client_error(client, DNS_R_NOTIMP);
 		break;
+	case dns_opcode_fragment:
+                CTRACE("fragment");
+                ns_query_start(client, handle);
+                break;
+
+
 	default:
 		CTRACE("unknown opcode");
 		ns_client_error(client, DNS_R_NOTIMP);
