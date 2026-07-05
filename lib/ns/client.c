@@ -571,40 +571,45 @@ ns_client_send(ns_client_t *client) {
 
 }
 		// send a cached fragment if fragment request
-		if(client->message->is_fragment) {
-			unsigned char key[69];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			char addr_buf[ISC_SOCKADDR_FORMATSIZE];
-			isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
 
-			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
-					 "Sending fragment %lu to %s (key %s)", client->message->fragment_nr, addr_buf, key);
+		// send a cached fragment if fragment request
+if (client->message->is_fragment) {
+        unsigned char key[69];
+        unsigned keysize = sizeof(key) / sizeof(key[0]);
+        char addr_buf[ISC_SOCKADDR_FORMATSIZE];
+        isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
+        fcache_create_key(client->message->id, addr_buf, key, &keysize);
 
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			unsigned long frag_nr = client->message->fragment_nr;
-			if(fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag) == ISC_R_SUCCESS) {
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					 "Sending fragment from fcache!");
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				//dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				//client->message = msg;	
-				//client->message->from_to_wire = 2;
-				// remove fragment here
-				goto sendbuffer; // skip render
-			}
-			else {
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					 "Fragment not found, sending FORMERR!");
-				client->message->rcode = dns_rcode_formerr;
-				client->message->flags |= DNS_MESSAGEFLAG_TC; // set TC so resolver detects it as fragment
-				client->formerrcache.addr = client->peeraddr;
-				client->formerrcache.time = isc_time_seconds(&client->requesttime);
-				client->formerrcache.id = client->message->id;
-			}
-		}
+        ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+                      "Sending fragment %lu to %s (key %s)",
+                      client->message->fragment_nr, addr_buf, key);
+
+        isc_buffer_t *out_frag = NULL;
+        unsigned long frag_nr = client->message->fragment_nr;
+
+        if (fcache_get_fragment(fcache, key, keysize, frag_nr, &out_frag) == ISC_R_SUCCESS) {
+                ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+                              "Sending fragment from fcache!");
+
+                if (client->opt != NULL) {
+                        dns_message_puttemprdataset(client->message, &client->opt);
+                        client->opt = NULL;
+                }
+
+                buffer = *out_frag;
+                goto sendbuffer;
+        } else {
+                ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+                              "Fragment not found, sending FORMERR!");
+                client->message->rcode = dns_rcode_formerr;
+                client->message->flags |= DNS_MESSAGEFLAG_TC;
+                client->formerrcache.addr = client->peeraddr;
+                client->formerrcache.time = isc_time_seconds(&client->requesttime);
+                client->formerrcache.id = client->message->id;
+        }
+}
+
+
 		// try to fragment: fragment will tell us if it is needed or not
 		char addr_buf[ISC_SOCKADDR_FORMATSIZE];
 		isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
