@@ -2356,11 +2356,17 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		ns_client_error(client, DNS_R_NOTIMP);
 		break;
 	case dns_opcode_fragment:
-                CTRACE("fragment");
-                 is_fragment_opt(client->message);
-		ns_client_send(client);
-                break;
-
+        fprintf(stderr, "OPCODE TRACE: fragment opcode received id=%u opt=%p\n",
+                client->message->id,
+                client->message->opt);
+        CTRACE("fragment");
+        is_fragment_opt(client->message);
+        fprintf(stderr, "OPCODE TRACE: after is_fragment_opt is_fragment=%d frag=%lu nr=%lu\n",
+                client->message->is_fragment,
+                client->message->fragment_nr,
+                client->message->nr_fragments);
+        ns_client_send(client);
+        break;
 
 	default:
 		CTRACE("unknown opcode");
