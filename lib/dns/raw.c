@@ -222,7 +222,10 @@ rdatalist->ttl = rdataset->ttl;
                     else {
                         start += name->length;
                     }
-                    // if does not fit, go to next fragment
+                    fprintf(stderr,
+        "RAW LOOP: frag=%u start=%u avail=%u rdata=%u\n",
+        frag_nr, start, available_per_fragment, rdata.length);
+			// if does not fit, go to next fragment
                     if (start > available_per_fragment) {
                         REQUIRE(!reset); // loop detection
                         dns_message_addname(frag, new_name, section);
