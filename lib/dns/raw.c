@@ -267,7 +267,12 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
  * For now, fail clearly rather than silently dropping bytes.
  */
 if (remaining > 0) {
-    return ISC_R_NOTIMPLEMENTED;
+ fprintf(stderr,
+            "RAW TRACE: RR split needed remaining=%u frag_nr=%u\n",
+            remaining,
+            frag_nr);    
+
+return ISC_R_NOTIMPLEMENTED;
 }
                             new_rdata->length = new_rdata_length;
                             // do we need to copy?
