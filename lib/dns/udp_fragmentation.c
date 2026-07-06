@@ -233,7 +233,15 @@ isc_result_t create__fragment_opt(dns_message_t *msg, const unsigned frag_nr, co
 
 void fcache_create_key(dns_messageid_t id, char *client_address, unsigned char *key, unsigned *keysize) {
     REQUIRE(*keysize >= 64);
-    int tmp = snprintf((char *)key, *keysize, "%x-%s", id, client_address);
+
+	char addr_only[ISC_SOCKADDR_FORMATSIZE];
+    strlcpy(addr_only, client_address, sizeof(addr_only));
+
+    char *port = strchr(addr_only, '#');
+    if (port != NULL) {
+        *port = '\0';
+    }
+    int tmp = snprintf((char *)key, *keysize, "%x-%s", id, addr_only);
     *keysize = tmp > 0 ? (unsigned)tmp : *keysize; // set keysize to string length
 }
 
