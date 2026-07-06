@@ -296,7 +296,10 @@ return ISC_R_NOTIMPLEMENTED;
                             raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, fragment_flags);
 			    fragment_flags = 0;
                         }
-                        tresult = dns_rdataset_next(rdataset);
+                        
+			ISC_LIST_APPEND(new_rdataset->rdlist.list->rdata, new_rdata, link);
+dns_message_addname(frag, new_name, section);	
+			tresult = dns_rdataset_next(rdataset);
                     }
                 }
             }      
