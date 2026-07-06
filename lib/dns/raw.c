@@ -193,9 +193,22 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
             
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 bool reset = false;
-                dns_rdataset_t *new_rdataset = NULL;
-                dns_message_gettemprdataset(frag, &new_rdataset);   
-                //ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+
+
+		dns_rdataset_t *new_rdataset = NULL;
+dns_rdatalist_t *rdatalist = NULL;
+
+dns_message_gettemprdataset(frag, &new_rdataset);
+dns_message_gettemprdatalist(frag, &rdatalist);
+
+rdatalist->rdclass = rdataset->rdclass;
+rdatalist->type = rdataset->type;
+rdatalist->ttl = rdataset->ttl;
+
+
+
+
+           //ISC_LIST_APPEND(new_name->list, new_rdataset, link);
 
                 isc_result_t tresult = dns_rdataset_first(rdataset);
                 while (tresult == ISC_R_SUCCESS) {
@@ -272,7 +285,7 @@ if (remaining > 0) {
             remaining,
             frag_nr);    
 
-return ISC_R_NOTIMPLEMENTED;
+//return ISC_R_NOTIMPLEMENTED;
 }
                             new_rdata->length = new_rdata_length;
                             // do we need to copy?
@@ -287,8 +300,7 @@ return ISC_R_NOTIMPLEMENTED;
                                 dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); 
                                 dns_message_takebuffer(msg, &new_rdata_buf);
                             }
-                            ISC_LIST_APPEND(new_rdataset->rdlist.list->rdata, new_rdata, link); 
-                            dns_message_addname(frag, new_name, section);
+                            ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link); 
                             // reset frag
                             start = 0;
                             frag_nr++;
