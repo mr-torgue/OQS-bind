@@ -311,7 +311,10 @@ if (remaining > 0) {
                             raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, fragment_flags);
 			    fragment_flags = 0;
                         }
-                        
+			else {
+    ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+    start += rdata.length;
+}                        
 			tresult = dns_rdataset_next(rdataset);
                     }
                 }
