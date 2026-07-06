@@ -2357,7 +2357,8 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		break;
 	case dns_opcode_fragment:
                 CTRACE("fragment");
-                ns_client_send(client);
+                 is_fragment_opt(client->message);
+		ns_client_send(client);
                 break;
 
 
