@@ -171,7 +171,7 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
         return result;
     }
 
-	unsigned available_per_fragment = msgsize - header_size - question_size - opt_size;
+	unsigned available_per_fragment = max_udp_size - header_size - question_size - opt_size;
 
     // create fragment
     unsigned frag_nr = 0;
