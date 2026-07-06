@@ -288,7 +288,7 @@ if (remaining > 0) {
             remaining,
             frag_nr);    
 
-//return ISC_R_NOTIMPLEMENTED;
+return ISC_R_NOTIMPLEMENTED;
 }
                             new_rdata->length = new_rdata_length;
                             // do we need to copy?
