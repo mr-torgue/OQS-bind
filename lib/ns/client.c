@@ -546,17 +546,21 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
                         isc_sockaddr_format(&(client->peeraddr), addr_buf, sizeof(addr_buf));
                         fcache_create_key(client->message->id, addr_buf, key, &keysize);
 
-                        if (fcache_get_fragment(fcache, key, keysize,
-                                                client->message->fragment_nr,
-                                                &out_frag) == ISC_R_SUCCESS)
-                        {
-                                buffer = *out_frag;
-                                fprintf(stderr, "CLIENT TRACE: sending cached fragment frag=%lu size=%u\n",
-        client->message->fragment_nr,
-        buffer.used);
-				goto sendbuffer;
-                        }
+			isc_result_t get_result = fcache_get_fragment(fcache, key, keysize,
+                                              client->message->fragment_nr,
+                                              &out_frag);
 
+fprintf(stderr, "CLIENT TRACE: fcache_get_fragment result=%d out_frag=%p\n",
+        get_result, out_frag);
+
+if (get_result == ISC_R_SUCCESS)
+{
+        buffer = *out_frag;
+        fprintf(stderr, "CLIENT TRACE: sending cached fragment frag=%lu size=%u\n",
+                client->message->fragment_nr,
+                buffer.used);
+        goto sendbuffer;
+}
                         goto cleanup;
                 }
         }
