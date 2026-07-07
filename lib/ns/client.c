@@ -551,7 +551,10 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
                                                 &out_frag) == ISC_R_SUCCESS)
                         {
                                 buffer = *out_frag;
-                                goto sendbuffer;
+                                fprintf(stderr, "CLIENT TRACE: sending cached fragment frag=%lu size=%u\n",
+        client->message->fragment_nr,
+        buffer.used);
+				goto sendbuffer;
                         }
 
                         goto cleanup;
