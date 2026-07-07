@@ -757,7 +757,7 @@ if (udp_fragmentation_mode == 2) {
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 						"Requesting %u additional fragments...", nr_fragments - 1); 
 
-					for (unsigned i = 2; i <= nr_fragments; i++) {
+					for (unsigned i = 1; i <= nr_fragments; i++) {
 
 						isc_buffer_t frag_buf;
 						REQUIRE(region != NULL);
