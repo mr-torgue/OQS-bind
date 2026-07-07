@@ -30,7 +30,7 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     REQUIRE(max_msg_size > fixed_size);
     unsigned body_size = total_msg_size - fixed_size; // amount of bytes to send
     unsigned payload_size = max_msg_size - fixed_size;
-return (body_size + payload_size - 1) / payload_size;
+return ((body_size + payload_size - 1) / payload_size)+1;
 }
 
 
