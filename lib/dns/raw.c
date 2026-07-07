@@ -273,48 +273,50 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
                         dns_message_gettemprdata(frag, &new_rdata);
                         dns_rdata_clone(&rdata, new_rdata);
                         // not enough space, truncate
-                        if (start + rdata.length > available_per_fragment) {
-                            unsigned new_rdata_length = available_per_fragment - start;
-                            unsigned remaining = rdata.length - new_rdata_length;
-			    fragment_flags = RAW_FLAG_RRTR;
+			if (start + rdata.length > available_per_fragment) {
+    dns_message_addname(frag, new_name, section);
 
-			    /*
- * TODO: Carry the remaining RDATA bytes into the next RAW fragment.
- * For now, fail clearly rather than silently dropping bytes.
- */
-if (remaining > 0) {
- fprintf(stderr,
-            "RAW TRACE: RR split needed remaining=%u frag_nr=%u\n",
-            remaining,
-            frag_nr);    
+    result = render_fragment(mctx, max_udp_size, &frag);
+    if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+        return result;
+    }
 
-return ISC_R_NOTIMPLEMENTED;
+    result = fcache_add_fragment(fcache, key, keysize, frag);
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+
+    start = 0;
+    frag_nr++;
+    frag = NULL;
+    raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
+
+    new_name = NULL;
+    dns_message_gettempname(frag, &new_name);
+    dns_name_clone(name, new_name);
+
+    new_rdataset = NULL;
+    rdatalist = NULL;
+    dns_message_gettemprdataset(frag, &new_rdataset);
+    dns_message_gettemprdatalist(frag, &rdatalist);
+
+    rdatalist->rdclass = rdataset->rdclass;
+    rdatalist->type = rdataset->type;
+    rdatalist->ttl = rdataset->ttl;
+
+    start += RR_HEADER_SIZE;
+    if (!name->attributes.nocompress) {
+        start += 2;
+    } else {
+        start += name->length;
+    }
 }
-                            new_rdata->length = new_rdata_length;
-                            // do we need to copy?
-                            if (new_rdata_length > 0) {
-                                isc_region_t rdata_region;
-                                dns_rdata_toregion(&rdata, &rdata_region);
-                                isc_region_t new_rdata_region;
-                                isc_buffer_t *new_rdata_buf = NULL;
-                                isc_buffer_allocate(mctx, &new_rdata_buf, new_rdata_length);
-                                isc_buffer_putmem(new_rdata_buf, rdata_region.base, new_rdata_length); 
-                                isc_buffer_usedregion(new_rdata_buf, &new_rdata_region); 
-                                dns_rdata_fromregion(new_rdata, rdata.rdclass, rdata.type, &new_rdata_region); 
-                                dns_message_takebuffer(msg, &new_rdata_buf);
-                            }
-                            ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link); 
-                            // reset frag
-                            start = 0;
-                            frag_nr++;
-                            frag = NULL;
-                            raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, fragment_flags);
-			    fragment_flags = 0;
-                        }
-			else {
-    ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
-    start += rdata.length;
-}                        
+
+ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
+start += rdata.length;
+
+
+
 			tresult = dns_rdataset_next(rdataset);
                     }
                 }
