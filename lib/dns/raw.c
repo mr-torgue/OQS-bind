@@ -325,7 +325,7 @@ start += rdata.length;
         }
     }
 
-	if (frag_nr >= nr_fragments) {
+	if (frag_nr + 1 >= nr_fragments) {
     return ISC_R_SUCCESS;
 }
 
