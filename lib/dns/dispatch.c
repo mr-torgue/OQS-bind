@@ -2324,7 +2324,9 @@ send_done_fragment(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	REQUIRE(VALID_DISPATCH(disp));
 
 	dispentry_log(resp, LVL(90), "sent fragment: %s", isc_result_totext(result));
-
+	fprintf(stderr,
+        "DISPATCH TRACE: send_done_fragment result=%s\n",
+        isc_result_totext(result));
 	if (result != ISC_R_SUCCESS) {
 		dispentry_cancel(resp, result);
 	}
@@ -2447,6 +2449,9 @@ dns_dispatch_send_fragment(dns_dispentry_t *resp, isc_region_t *r) {
 	}
 
 	dns_dispentry_ref(resp); /* DISPENTRY007 */
+	fprintf(stderr,
+        "DISPATCH TRACE: dns_dispatch_send_fragment len=%u\n",
+        r->length);
 	isc_nm_send(sendhandle, r, send_done_fragment, resp);
 }
 
