@@ -770,6 +770,10 @@ if (udp_fragmentation_mode == 2) {
 						result = create_fragment_query_opt(disp->mgr->mctx, &frag_buf, i, nr_fragments, &new_query_buffer);
 						if (result == ISC_R_SUCCESS) {
 							isc_buffer_usedregion(new_query_buffer, &new_query_region);
+							fprintf(stderr,
+        "DISPATCH TRACE: sending fragment request %u of %u\n",
+        i,
+        nr_fragments);
 							dns_dispatch_send_fragment(resp, &new_query_region);
 						}
 						else {
