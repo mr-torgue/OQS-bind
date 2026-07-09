@@ -160,7 +160,11 @@ isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned 
         key,
         frag->fragment_nr,
         keysize);   
-
+	fprintf(stderr, "FCACHE ADD KEY HEX:");
+for (unsigned i = 0; i < keysize; i++) {
+    fprintf(stderr, " %02x", key[i]);
+}
+fprintf(stderr, "\n");
  if (result == ISC_R_SUCCESS) {   
         return fcache_add_fragment_with_entry(fcache, entry, frag);
     }
@@ -240,7 +244,11 @@ isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned 
         key,
         fragment_nr,
         keysize);	
-
+	fprintf(stderr, "FCACHE GET KEY HEX:");
+for (unsigned i = 0; i < keysize; i++) {
+    fprintf(stderr, " %02x", key[i]);
+}
+fprintf(stderr, "\n");
 isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
     fragment_cache_entry_t *entry = NULL;
