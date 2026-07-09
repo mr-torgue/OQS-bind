@@ -142,6 +142,12 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
     // Store the fragment
     entry->fragments[frag->fragment_nr] = frag_buf;
     entry->bitmap |= (1 << frag->fragment_nr);
+    fprintf(stderr,
+        "FCACHE ADD DONE: frag=%lu bitmap=0x%x nr=%u buf=%p\n",
+        frag->fragment_nr,
+        entry->bitmap,
+        entry->nr_fragments,
+        entry->fragments[frag->fragment_nr]);
     return ISC_R_SUCCESS;
 }
 
@@ -186,7 +192,13 @@ isc_result_t fcache_remove_fragment(fcache_t *fcache, unsigned char *key, unsign
         "Removing fragment %u with key %s...", fragment_nr, (char *)key); 
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        if(entry->bitmap & (1 << fragment_nr)) {
+        fprintf(stderr,
+        "FCACHE GET ENTRY: request=%u bitmap=0x%x nr=%u buf=%p\n",
+        fragment_nr,
+        entry->bitmap,
+        entry->nr_fragments,
+        entry->fragments[fragment_nr]);
+	if(entry->bitmap & (1 << fragment_nr)) {
             isc_buffer_free(&(entry->fragments[fragment_nr]));
             entry->bitmap &= ~(1 << fragment_nr);
             return ISC_R_SUCCESS;
