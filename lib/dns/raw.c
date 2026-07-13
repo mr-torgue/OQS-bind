@@ -133,7 +133,6 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 
 
     isc_result_t result;
-        msg->id, max_udp_size);
 
 
     if (msg->buffer == NULL) {
