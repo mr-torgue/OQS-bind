@@ -155,11 +155,13 @@ isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned 
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry); 
 	fprintf(stderr,
-        "FCACHE ADD: key=%.*s frag=%lu keysize=%u\n",
+        "FCACHE ADD: fcache=%p ht=%p key=%.*s frag=%lu keysize=%u\n",
+        (void *)fcache,
+        (void *)fcache->ht,
         (int)keysize,
         key,
         frag->fragment_nr,
-        keysize);   
+        keysize);
 	fprintf(stderr, "FCACHE ADD KEY HEX:");
 for (unsigned i = 0; i < keysize; i++) {
     fprintf(stderr, " %02x", key[i]);
@@ -237,13 +239,14 @@ isc_result_t fcache_get_fragment_from_entry(fragment_cache_entry_t *entry, unsig
 
 
 isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-    
 	fprintf(stderr,
-        "FCACHE GET: key=%.*s frag=%u keysize=%u\n",
+        "FCACHE GET: fcache=%p ht=%p key=%.*s frag=%u keysize=%u\n",
+        (void *)fcache,
+        (void *)fcache->ht,
         (int)keysize,
         key,
         fragment_nr,
-        keysize);	
+        keysize);    
 	fprintf(stderr, "FCACHE GET KEY HEX:");
 for (unsigned i = 0; i < keysize; i++) {
     fprintf(stderr, " %02x", key[i]);
