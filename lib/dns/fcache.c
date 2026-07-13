@@ -101,7 +101,7 @@ isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, 
         entry->keysize = keysize;
 
         isc_time_add(&now, &fcache->ttl, &(entry->expiry)); // set entry expiry time 
-        isc_ht_add(fcache->ht, key, keysize, entry);             // add to hashtable
+        isc_ht_add(fcache->ht, key_copy, keysize, entry);             // add to hashtable
         ISC_LIST_APPEND(fcache->expiry_list, entry, link);          // add to linked list
         return ISC_R_SUCCESS;
     }
