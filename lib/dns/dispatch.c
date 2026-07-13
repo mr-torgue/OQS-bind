@@ -770,10 +770,6 @@ if (udp_fragmentation_mode == 2) {
 						result = create_fragment_query_opt(disp->mgr->mctx, &frag_buf, i, nr_fragments, &new_query_buffer);
 						if (result == ISC_R_SUCCESS) {
 							isc_buffer_usedregion(new_query_buffer, &new_query_region);
-							fprintf(stderr,
-        "DISPATCH TRACE: sending fragment request %u of %u\n",
-        i,
-        nr_fragments);
 							dns_dispatch_send_fragment(resp, &new_query_region);
 						}
 						else {
@@ -2324,9 +2320,6 @@ send_done_fragment(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	REQUIRE(VALID_DISPATCH(disp));
 
 	dispentry_log(resp, LVL(90), "sent fragment: %s", isc_result_totext(result));
-	fprintf(stderr,
-        "DISPATCH TRACE: send_done_fragment result=%s\n",
-        isc_result_totext(result));
 	if (result != ISC_R_SUCCESS) {
 		dispentry_cancel(resp, result);
 	}
@@ -2449,9 +2442,6 @@ dns_dispatch_send_fragment(dns_dispentry_t *resp, isc_region_t *r) {
 	}
 
 	dns_dispentry_ref(resp); /* DISPENTRY007 */
-	fprintf(stderr,
-        "DISPATCH TRACE: dns_dispatch_send_fragment len=%u\n",
-        r->length);
 	isc_nm_send(sendhandle, r, send_done_fragment, resp);
 }
 

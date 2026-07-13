@@ -550,15 +550,10 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
                                               client->message->fragment_nr,
                                               &out_frag);
 
-fprintf(stderr, "CLIENT TRACE: fcache_get_fragment result=%d out_frag=%p\n",
-        get_result, out_frag);
 
 if (get_result == ISC_R_SUCCESS)
 {
         buffer = *out_frag;
-        fprintf(stderr, "CLIENT TRACE: sending cached fragment frag=%lu size=%u\n",
-                client->message->fragment_nr,
-                buffer.used);
         goto sendbuffer;
 }
                         goto cleanup;
@@ -2363,15 +2358,8 @@ ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		ns_client_error(client, DNS_R_NOTIMP);
 		break;
 	case dns_opcode_fragment:
-        fprintf(stderr, "OPCODE TRACE: fragment opcode received id=%u opt=%p\n",
-                client->message->id,
-                client->message->opt);
         CTRACE("fragment");
         is_fragment_opt(client->message);
-        fprintf(stderr, "OPCODE TRACE: after is_fragment_opt is_fragment=%d frag=%lu nr=%lu\n",
-                client->message->is_fragment,
-                client->message->fragment_nr,
-                client->message->nr_fragments);
         ns_client_send(client);
         break;
 

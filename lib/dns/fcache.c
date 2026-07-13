@@ -142,27 +142,12 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
     // Store the fragment
     entry->fragments[frag->fragment_nr] = frag_buf;
     entry->bitmap |= (1 << frag->fragment_nr);
-    fprintf(stderr,
-        "FCACHE ADD DONE: frag=%lu bitmap=0x%x nr=%u buf=%p\n",
-        frag->fragment_nr,
-        entry->bitmap,
-        entry->nr_fragments,
-        entry->fragments[frag->fragment_nr]);
     return ISC_R_SUCCESS;
 }
 
 isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag) {
     fragment_cache_entry_t *entry = NULL;
     isc_result_t result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry); 
-	fprintf(stderr,
-        "FCACHE ADD: fcache=%p ht=%p key=%.*s frag=%lu keysize=%u\n",
-        (void *)fcache,
-        (void *)fcache->ht,
-        (int)keysize,
-        key,
-        frag->fragment_nr,
-        keysize);
-	fprintf(stderr, "FCACHE ADD KEY HEX:");
 for (unsigned i = 0; i < keysize; i++) {
     fprintf(stderr, " %02x", key[i]);
 }
@@ -198,12 +183,6 @@ isc_result_t fcache_remove_fragment(fcache_t *fcache, unsigned char *key, unsign
         "Removing fragment %u with key %s...", fragment_nr, (char *)key); 
     fragment_cache_entry_t *entry = NULL;
     if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        fprintf(stderr,
-        "FCACHE GET ENTRY: request=%u bitmap=0x%x nr=%u buf=%p\n",
-        fragment_nr,
-        entry->bitmap,
-        entry->nr_fragments,
-        entry->fragments[fragment_nr]);
 	if(entry->bitmap & (1 << fragment_nr)) {
             isc_buffer_free(&(entry->fragments[fragment_nr]));
             entry->bitmap &= ~(1 << fragment_nr);
@@ -239,15 +218,6 @@ isc_result_t fcache_get_fragment_from_entry(fragment_cache_entry_t *entry, unsig
 
 
 isc_result_t fcache_get_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned fragment_nr, isc_buffer_t **out_frag) {
-	fprintf(stderr,
-        "FCACHE GET: fcache=%p ht=%p key=%.*s frag=%u keysize=%u\n",
-        (void *)fcache,
-        (void *)fcache->ht,
-        (int)keysize,
-        key,
-        fragment_nr,
-        keysize);    
-	fprintf(stderr, "FCACHE GET KEY HEX:");
 for (unsigned i = 0; i < keysize; i++) {
     fprintf(stderr, " %02x", key[i]);
 }
