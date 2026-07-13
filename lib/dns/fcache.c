@@ -254,13 +254,33 @@ for (unsigned i = 0; i < keysize; i++) {
 fprintf(stderr, "\n");
 isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
         "Getting fragment %u with key %s... (%u)", fragment_nr, (char *)key, keysize);
-    fragment_cache_entry_t *entry = NULL;
-    if (isc_ht_find(fcache->ht, key, keysize, (void **)&entry) == ISC_R_SUCCESS) {
-        return fcache_get_fragment_from_entry(entry, fragment_nr, out_frag);
-    }
-    isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
-        "Could not find cache entry!");
-    return ISC_R_NOTFOUND; 
+
+
+fragment_cache_entry_t *entry = NULL;
+isc_result_t result;
+
+LOCK(&fcache->lock);
+
+result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry);
+if (result == ISC_R_SUCCESS) {
+    result = fcache_get_fragment_from_entry(entry, fragment_nr, out_frag);
+}
+
+UNLOCK(&fcache->lock);
+
+if (result == ISC_R_SUCCESS) {
+    return ISC_R_SUCCESS;
+}
+
+isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
+    "Could not find cache entry or fragment!");
+
+return result;
+
+
+
+
+
 }
 
 isc_result_t fcache_purge(fcache_t *fcache) {
