@@ -46,7 +46,7 @@ ns_server_initfcache(ns_server_t *sctx, isc_loopmgr_t *loopmgr) {
 	fcache_t *fcache = NULL;
 	// records stay for 10 seconds, trigger manual clean up every 30 seconds
 	// TODO: turn into settings
-	fcache_init(&fcache, loopmgr, 10, 30); 
+	fcache_init(&fcache, loopmgr, 300, 30); 
 	sctx->fcache = fcache;
 }
 
