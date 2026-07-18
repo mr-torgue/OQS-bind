@@ -563,7 +563,5 @@ isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t *
     message->buffer = buffer;
     dns_message_takebuffer(message, &buffer); // use buffer, the pointer will be set to NULL (message->buffer should still work)
 
-    message->flags |= DNS_MESSAGEFLAG_TC; // quick fix: somehow the flag is not always set
-    *(unsigned short *)(message->buffer->base + 1) |=  DNS_MESSAGEFLAG_TC; // buffer was not updated, so do it here
     return (result);
 }
