@@ -67,6 +67,12 @@ void fcache_deinit(fcache_t **fcache);
 //   ISC_R_SUCCESS if added
 //   result of fcache_add_fragment_with_entry
 isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, unsigned nr_fragments);
+isc_result_t fcache_update_fragment_count(
+    fcache_t *fcache,
+    unsigned char *key,
+    unsigned keysize,
+    unsigned nr_fragments);
+
 isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments);
 
 // adds a new fragment to an existing entry

@@ -123,6 +123,13 @@ struct dns_dispentry {
 	ISC_LINK(dns_dispentry_t) rlink;
 };
 
+typedef struct {
+        dns_dispentry_t *resp;
+        isc_buffer_t *buffer;
+        isc_sockaddr_t local;
+        isc_sockaddr_t peer;
+} fragment_send_ctx_t;
+
 struct dns_dispatch {
 	/* Unlocked. */
 	unsigned int magic; /*%< magic */
@@ -224,6 +231,11 @@ static void
 udp_startrecv(isc_nmhandle_t *handle, dns_dispentry_t *resp);
 static void
 udp_dispatch_connect(dns_dispatch_t *disp, dns_dispentry_t *resp);
+static void
+fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg);
+
+static void
+fragment_send_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg);
 static void
 tcp_startrecv(dns_dispatch_t *disp, dns_dispentry_t *resp);
 static void
@@ -757,20 +769,33 @@ if (udp_fragmentation_mode == 2) {
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 						"Requesting %u additional fragments...", nr_fragments - 1); 
 
-					for (unsigned i = 1; i <= nr_fragments; i++) {
+					for (unsigned i = 1; i < nr_fragments; i++) {
 
 						isc_buffer_t frag_buf;
 						REQUIRE(region != NULL);
 						isc_buffer_init(&frag_buf, region->base, region->length);
 						isc_buffer_add(&frag_buf, region->length);
 						isc_buffer_t *new_query_buffer = NULL;
-						isc_region_t new_query_region;
+						fragment_send_ctx_t *ctx = NULL;
 			
 						// create and send a fragment query
 						result = create_fragment_query_opt(disp->mgr->mctx, &frag_buf, i, nr_fragments, &new_query_buffer);
 						if (result == ISC_R_SUCCESS) {
-							isc_buffer_usedregion(new_query_buffer, &new_query_region);
-							dns_dispatch_send_fragment(resp, &new_query_region);
+							ctx = isc_mem_get(disp->mgr->mctx, sizeof(*ctx));
+                                                        *ctx = (fragment_send_ctx_t){
+                                                                .resp = NULL,
+                                                                .buffer = new_query_buffer,
+                                                                .local = resp->local,
+                                                                .peer = resp->peer,
+                                                        };
+                                                        isc_sockaddr_setport(&ctx->local, 0);
+                                                        dns_dispentry_attach(resp, &ctx->resp);
+                                                        isc_nm_udpconnect(disp->mgr->nm,
+                                                                          &ctx->local,
+                                                                          &ctx->peer,
+                                                                          fragment_connected,
+                                                                          ctx,
+                                                                          resp->timeout);
 						}
 						else {
 							isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
@@ -2128,6 +2153,24 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 }
 
 static void
+fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
+        fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
+        dns_dispentry_t *resp = ctx->resp;
+        isc_mem_t *mctx = resp->disp->mgr->mctx;
+        isc_region_t region;
+
+        if (eresult != ISC_R_SUCCESS) {
+                isc_buffer_free(&ctx->buffer);
+                dns_dispentry_detach(&resp);
+                isc_mem_put(mctx, ctx, sizeof(*ctx));
+                return;
+        }
+
+        isc_buffer_usedregion(ctx->buffer, &region);
+        isc_nm_send(handle, &region, fragment_send_done, ctx);
+}
+
+static void
 udp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 	dns_dispentry_t *resp = (dns_dispentry_t *)arg;
 	dns_dispatch_t *disp = resp->disp;
@@ -2307,6 +2350,25 @@ dns_dispatch_connect(dns_dispentry_t *resp) {
 	default:
 		UNREACHABLE();
 	}
+}
+
+static void
+fragment_send_done(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
+        fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)cbarg;
+        dns_dispentry_t *resp = ctx->resp;
+        isc_mem_t *mctx = resp->disp->mgr->mctx;
+
+        dispentry_log(resp, LVL(90), "sent fragment on temporary socket: %s",
+                      isc_result_totext(result));
+
+        if (result != ISC_R_SUCCESS) {
+                dispentry_cancel(resp, result);
+        }
+
+        isc_buffer_free(&ctx->buffer);
+        dns_dispentry_detach(&resp);
+        isc_mem_put(mctx, ctx, sizeof(*ctx));
+        isc_nmhandle_detach(&handle);
 }
 
 static void

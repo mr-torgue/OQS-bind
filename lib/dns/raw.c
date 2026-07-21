@@ -30,7 +30,7 @@ unsigned get_nr_fragments(const unsigned max_msg_size, const unsigned total_msg_
     REQUIRE(max_msg_size > fixed_size);
     unsigned body_size = total_msg_size - fixed_size; // amount of bytes to send
     unsigned payload_size = max_msg_size - fixed_size;
-return ((body_size + payload_size - 1) / payload_size)+1;
+return ((body_size + payload_size - 1) / payload_size);
 }
 
 
@@ -59,6 +59,9 @@ static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t 
     // copy question
     dns_rdataset_t *question = NULL;
     dns_message_gettemprdataset(*frag, &question);
+    fprintf(stderr,
+        "DEBUG: source question count=%u\n",
+        msg->counts[DNS_SECTION_QUESTION]);
     result = section_clone(msg, *frag, DNS_SECTION_QUESTION);
     if (result != ISC_R_SUCCESS) {
         perror("Could not clone DNS_QUESTION_SECTION!\n");
@@ -159,6 +162,13 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     unsigned question_size = 0; // TODO
     unsigned opt_size = 0; // TODO
     unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, header_size, question_size, opt_size);
+	fprintf(stderr,
+        "DEBUG: msgsize=%u max_udp_size=%u nr_fragments=%u\n",
+        msgsize,
+        max_udp_size,
+        nr_fragments);
+
+
 	result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result != ISC_R_SUCCESS) {
         return result;
@@ -171,7 +181,22 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
     dns_message_t *frag = NULL;
     unsigned fragment_flags = 0;
     raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
+	result = render_fragment(mctx, max_udp_size, &frag);
+if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+    return result;
+}
 
+result = fcache_add_fragment(fcache, key, keysize, frag);
+if (result != ISC_R_SUCCESS) {
+    return result;
+}
+
+fprintf(stderr,
+        "DEBUG: cached initial fragment=0\n");
+
+fprintf(stderr,
+        "DEBUG: frag0 first question result=%d\n",
+        dns_message_firstname(frag, DNS_SECTION_QUESTION));
     unsigned start = 0;
     for (unsigned section = DNS_SECTION_ANSWER; section < DNS_SECTION_MAX; section++) {
         for (isc_result_t result = dns_message_firstname(msg, section); 
@@ -218,7 +243,25 @@ rdatalist->ttl = rdataset->ttl;
 			// if does not fit, go to next fragment
                     if (start > available_per_fragment) {
                         REQUIRE(!reset); // loop detection
-                        dns_message_addname(frag, new_name, section);
+ 
+			if (frag_nr == 0) {
+    result = render_fragment(mctx, max_udp_size, &frag);
+    if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+        return result;
+    }
+
+    result = fcache_add_fragment(fcache, key, keysize, frag);
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+
+    fprintf(stderr,
+            "DEBUG: cached initial fragment=0\n");
+}
+
+
+
+                       dns_message_addname(frag, new_name, section);
                         
                         // reset name
                         new_name = NULL;
@@ -232,11 +275,12 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
 			if (result != ISC_R_SUCCESS) {
                         	return result;
                         }
-			
+	fprintf(stderr,
+        "DEBUG: cached fragment=%u  second\n",
+        frag_nr);
 
 			// reset frag
                         start = 0;
-                        frag_nr++;
                         frag = NULL;
                         raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
                         
@@ -271,6 +315,9 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     }
 
     start = 0;
+	fprintf(stderr,
+        "DEBUG: second split increment frag_nr from %u\n",
+        frag_nr);
     frag_nr++;
     frag = NULL;
     raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
@@ -309,9 +356,10 @@ start += rdata.length;
         }
     }
 
-	if (frag_nr + 1 >= nr_fragments) {
-    return ISC_R_SUCCESS;
-}
+	fprintf(stderr,
+        "DEBUG: finishing fragmentation frag_nr=%u nr_fragments=%u\n",
+        frag_nr,
+        nr_fragments);
 
 
 	result = render_fragment(mctx, max_udp_size, &frag);
@@ -319,15 +367,60 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
 
+unsigned actual_fragments = frag_nr + 1;
+
+fprintf(stderr,
+        "DEBUG: actual last frag_nr=%u expected=%u\n",
+        frag_nr,
+        nr_fragments);
+
+fprintf(stderr,
+        "DEBUG: updating fragment count %u -> %u\n",
+        nr_fragments,
+        actual_fragments);
+
+result = fcache_update_fragment_count(
+    fcache, key, keysize, actual_fragments);
+
+if (result != ISC_R_SUCCESS) {
+    fprintf(stderr,
+            "DEBUG: cache count update failed: %d\n",
+            result);
+    return result;
+}
+
+fprintf(stderr,
+        "DEBUG: updated cache fragment count=%u\n",
+        actual_fragments);
+
+return ISC_R_SUCCESS;
 
 
+fprintf(stderr,
+"DEBUG: updated cache fragment count=%u\n",
+frag_nr + 1);
 
-        result = fcache_add_fragment(fcache, key, keysize, frag);
-    if (result != ISC_R_SUCCESS) {
-        return result;
-    }
 
-    return ISC_R_SUCCESS;
+	fprintf(stderr,
+        "DEBUG: cached final fragment=%u\n",
+        frag_nr);
+    
+	fprintf(stderr,
+"DEBUG: actual last frag_nr=%u expected=%u\n",
+frag_nr,
+nr_fragments);
+
+
+fprintf(stderr,
+"DEBUG: updating fragment count %u -> %u\n",
+nr_fragments,
+actual_fragments);
+/* Create/update the cache entry with the actual fragment count */
+result = fcache_add(fcache, key, keysize, actual_fragments);
+if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
+    return result;
+}
+	return ISC_R_SUCCESS;
 }
 
 

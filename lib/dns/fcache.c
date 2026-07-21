@@ -108,6 +108,45 @@ isc_result_t fcache_add(fcache_t *fcache, unsigned char *key, unsigned keysize, 
     return ISC_R_EXISTS;
 }
 
+isc_result_t
+fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
+                             unsigned keysize, unsigned nr_fragments)
+{
+    fragment_cache_entry_t *entry = NULL;
+    isc_result_t result =
+        isc_ht_find(fcache->ht, key, keysize, (void **)&entry);
+
+    if (result != ISC_R_SUCCESS) {
+        return result;
+    }
+
+    if (nr_fragments == 0 || nr_fragments > entry->nr_fragments) {
+        return ISC_R_RANGE;
+    }
+
+    if (nr_fragments == entry->nr_fragments) {
+        return ISC_R_SUCCESS;
+    }
+
+    unsigned old_nr_fragments = entry->nr_fragments;
+
+    isc_buffer_t **new_fragments =
+        isc_mem_get(fcache->mctx,
+                    nr_fragments * sizeof(isc_buffer_t *));
+
+    for (unsigned i = 0; i < nr_fragments; i++) {
+        new_fragments[i] = entry->fragments[i];
+    }
+
+    isc_mem_put(fcache->mctx, entry->fragments,
+                old_nr_fragments * sizeof(isc_buffer_t *));
+
+    entry->fragments = new_fragments;
+    entry->nr_fragments = nr_fragments;
+
+    return ISC_R_SUCCESS;
+}
+
 isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
     isc_result_t result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result == ISC_R_SUCCESS) {
