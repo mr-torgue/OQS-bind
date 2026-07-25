@@ -660,17 +660,15 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	 * 1. efficiency: quite a bit of parsing and rendering --> reduce
 	 * 2. hardcoded 1232: use variable name instead
 	 */
-	
+	fprintf(stderr,
+        "DEBUG: entered dispatch response handler, flags=0x%04x\n",
+        flags);
 	uint8_t udp_fragmentation_mode = disp->mgr->udp_fragmentation_mode;
 
-	unsigned int rcode = flags & 0x000f;
+	bool is_tc_fragment =
+        ((flags & DNS_MESSAGEFLAG_TC) != 0);
 
-	bool is_any_fragment =
-        ((flags & DNS_MESSAGEFLAG_TC) != 0) ||
-        (rcode == RAW_RCODE);
-	// QBF fragmentation
-	if ((udp_fragmentation_mode == 1 || udp_fragmentation_mode == 2) && is_any_fragment) {
-
+if (udp_fragmentation_mode == 1 || udp_fragmentation_mode == 2) {
 		fcache_t *fcache = disp->mgr->fcache;
 		// get source address
 		char from_addr_buf[ISC_SOCKADDR_FORMATSIZE];
@@ -692,6 +690,35 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 		dns_message_t *msg = NULL;
 		dns_message_create(disp->mgr->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
 		isc_result_t result = dns_message_parse(msg, &buf, DNS_MESSAGEPARSE_PRESERVEORDER);
+		bool is_fragment =
+        is_tc_fragment ||
+        (is_fragment_opt(msg) == ISC_R_SUCCESS);
+fprintf(stderr,
+        "DEBUG DISPATCH: parse=%d opcode=%u is_fragment=%d frag_nr=%u total=%u opt=%p\n",
+        result,
+        msg->opcode,
+        is_fragment,
+        msg->fragment_nr,
+        msg->nr_fragments,
+        (void *)msg->opt);
+if (!is_fragment) {
+        dns_message_detach(&msg);
+        goto done;
+}	
+
+	fprintf(stderr,
+        "DEBUG parsed: result=%d rcode=%u opt=%p counts q=%u a=%u add=%u\n",
+        result,
+        msg->rcode,
+        (void *)msg->opt,
+        msg->counts[DNS_SECTION_QUESTION],
+        msg->counts[DNS_SECTION_ANSWER],
+        msg->counts[DNS_SECTION_ADDITIONAL]);
+
+fprintf(stderr,
+        "DEBUG parsed is_fragment_opt=%d\n",
+        is_fragment_opt(msg));
+
 		if (msg->counts[DNS_SECTION_QUESTION] > 0) {
 			isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 				"Parse msg with name %s...", msg->sections[0].head->ndata); 
@@ -701,11 +728,12 @@ udp_recv(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 				"No name found in question"); 
 		}
 
+		fprintf(stderr, "DEBUG: is_fragment_opt returned %d\n", is_fragment_opt(msg));
 		// booleans for detecting if it is a fragment
 		if (is_fragment_opt(msg) == ISC_R_SUCCESS) {
-
+			fprintf(stderr, "DEBUG: entered fragment OPT block\n");
 			// create cache key
-			unsigned char key[64];
+			unsigned char key[69];
 			unsigned keysize = sizeof(key) / sizeof(key[0]);
 			fcache_create_key(id, to_addr_buf, key, &keysize); 
 			unsigned nr_fragments = msg->nr_fragments;
@@ -730,6 +758,20 @@ if (udp_fragmentation_mode == 2) {
                 reassemble_result = result;
         } else {
                 reassemble_result = raw_reassemble_fragments(disp->mgr->mctx, entry, &out_msg);
+	   fprintf(stderr,
+                        "DEBUG: raw_reassemble_fragments returned %s (%d)\n",
+                        isc_result_totext(reassemble_result),
+                        reassemble_result);
+
+		if (reassemble_result == ISC_R_SUCCESS &&
+                    out_msg != NULL &&
+                    out_msg->buffer != NULL)
+                {
+                        fprintf(stderr,
+                                "DEBUG: reassembled size=%u\n",
+                                out_msg->buffer->used);
+                }
+
         }
 } else {
         reassemble_result = reassemble_fragments(disp->mgr->mctx, fcache, key, keysize, &out_msg);
@@ -763,12 +805,14 @@ if (udp_fragmentation_mode == 2) {
 			// if it is not a fragment response, we assume it is a first fragment
 			// note that this is currently not well-defined
 			else {
+				fprintf(stderr, "DEBUG: entered first-fragment branch, nr_fragments=%u\n", nr_fragments);
 				result = fcache_add_with_fragment(fcache, key, keysize, msg, nr_fragments);
 				if (result == ISC_R_SUCCESS) {
 					REQUIRE(fcache_get(fcache, key, keysize, &out_ce) == ISC_R_SUCCESS); // should never fail because we just added it
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 						"Requesting %u additional fragments...", nr_fragments - 1); 
 
+					fprintf(stderr, "DEBUG: requesting %u fragments\n", nr_fragments - 1);
 					for (unsigned i = 1; i < nr_fragments; i++) {
 
 						isc_buffer_t frag_buf;
@@ -2154,7 +2198,17 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 
 static void
 fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
+<<<<<<< HEAD
         fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
+=======
+        
+	fprintf(stderr,
+                "DEBUG: fragment_connected eresult=%d\n",
+                eresult);
+
+
+	fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
+>>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
         dns_dispentry_t *resp = ctx->resp;
         isc_mem_t *mctx = resp->disp->mgr->mctx;
         isc_region_t region;
@@ -2167,7 +2221,16 @@ fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
         }
 
         isc_buffer_usedregion(ctx->buffer, &region);
+<<<<<<< HEAD
         isc_nm_send(handle, &region, fragment_send_done, ctx);
+=======
+        fprintf(stderr,
+                "DEBUG: sending fragment query\n");
+isc_nmhandle_t *sendhandle = NULL;
+isc_nmhandle_attach(handle, &sendhandle);	
+
+isc_nm_send(handle, &region, fragment_send_done, ctx);
+>>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
 }
 
 static void

@@ -133,7 +133,14 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
 }
 
 isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
-
+    fprintf(stderr,
+            "DEBUG raw_fragment entry: buffer=%p used=%u question=%u answer=%u authority=%u additional=%u\n",
+            (void *)msg->buffer,
+            msg->buffer != NULL ? msg->buffer->used : 0,
+            msg->counts[DNS_SECTION_QUESTION],
+            msg->counts[DNS_SECTION_ANSWER],
+            msg->counts[DNS_SECTION_AUTHORITY],
+            msg->counts[DNS_SECTION_ADDITIONAL]);
 
     isc_result_t result;
 
@@ -168,6 +175,13 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
         max_udp_size,
         nr_fragments);
 
+	if (nr_fragments <= 1) {
+    fprintf(stderr,
+            "DEBUG: response fits in one UDP packet; skipping RAW fragmentation\n");
+   dns_message_renderreset(msg);    
+
+return ISC_R_NOTFOUND;
+}
 
 	result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result != ISC_R_SUCCESS) {
@@ -362,11 +376,30 @@ start += rdata.length;
         nr_fragments);
 
 
-	result = render_fragment(mctx, max_udp_size, &frag);
+result = render_fragment(mctx, max_udp_size, &frag);
 if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
 
+<<<<<<< HEAD
+=======
+/*
+ * Store the final fragment in the cache.
+ */
+result = fcache_add_fragment(fcache, key, keysize, frag);
+if (result != ISC_R_SUCCESS) {
+    fprintf(stderr,
+            "DEBUG: failed to cache final fragment=%u result=%s\n",
+            frag_nr,
+            isc_result_totext(result));
+    return result;
+}
+
+fprintf(stderr,
+        "DEBUG: cached final fragment=%u\n",
+        frag_nr);
+
+>>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
 unsigned actual_fragments = frag_nr + 1;
 
 fprintf(stderr,
@@ -444,14 +477,32 @@ static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body
     }
 
     *body_offset = msg_size;
-
-    if (arcount > 0 && frag_region.length >= 11) {
-        *opt_size = 11;
-        *opt_offset = frag_region.length - *opt_size;
-        *body_size = (*opt_offset > *body_offset)
-                         ? (*opt_offset - *body_offset)
-                         : 0;
-    } else {
+	/*
+ * The RAW OPT RR is currently expected to be the final additional
+ * record in each fragment.
+ *
+ * OPT fixed RR fields:
+ *   root name  = 1 byte
+ *   type       = 2 bytes
+ *   class      = 2 bytes
+ *   TTL        = 4 bytes
+ *   RDLENGTH   = 2 bytes
+ * Total fixed header = 11 bytes
+ *
+ * RAW EDNS option:
+ *   option code   = 2 bytes
+ *   option length = 2 bytes
+ *   option value  = 2 bytes
+ * Total RAW option = 6 bytes
+ */
+if (arcount > 0 && frag_region.length >= 17) {
+    *opt_size = 17;
+    *opt_offset = frag_region.length - *opt_size;
+    *body_size = (*opt_offset > *body_offset)
+                     ? (*opt_offset - *body_offset)
+                     : 0;
+}
+     else {
         *opt_offset = 0;
         *opt_size = 0;
         *body_size = (frag_region.length > *body_offset)
@@ -494,22 +545,41 @@ while (scan < body_end) {
 }
     *is_truncated = false;
 
-    if (*opt_size >= 11) {
+	if (*opt_size >= 17 &&
+    *opt_offset + *opt_size <= frag_region.length)
+{
     unsigned char *opt = frag_region.base + *opt_offset;
-    unsigned rdlen = (opt[9] << 8) | opt[10];
 
-    if (rdlen >= 6) {
+    unsigned opt_type = ((unsigned)opt[1] << 8) | opt[2];
+    unsigned rdlen = ((unsigned)opt[9] << 8) | opt[10];
+
+    /*
+     * DNS_TYPE_OPT is 41.
+     * Ensure the calculated offset really points to an OPT RR.
+     */
+    if (opt_type == 41 && rdlen >= 6 &&
+        11U + rdlen <= *opt_size)
+    {
         unsigned char *option = opt + 11;
-        unsigned option_code = (option[0] << 8) | option[1];
-        unsigned option_len = (option[2] << 8) | option[3];
+        unsigned option_code =
+            ((unsigned)option[0] << 8) | option[1];
+        unsigned option_len =
+            ((unsigned)option[2] << 8) | option[3];
 
-        if (option_code == RAW_OPT_OPTION && option_len == 2) {
-            unsigned value = (option[4] << 8) | option[5];
-            unsigned flags = value & 0xf;
-            *is_truncated = ((flags & RAW_FLAG_RRTR) != 0);
+        if (option_code == RAW_OPT_OPTION &&
+            option_len == 2 &&
+            4U + option_len <= rdlen)
+        {
+            unsigned value =
+                ((unsigned)option[4] << 8) | option[5];
+
+            unsigned flags = value & 0x0f;
+            *is_truncated =
+                ((flags & RAW_FLAG_RRTR) != 0);
         }
     }
 }
+
     return ISC_R_SUCCESS;
 }
 

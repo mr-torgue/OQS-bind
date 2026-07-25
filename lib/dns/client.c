@@ -26,7 +26,7 @@
 #include <isc/safe.h>
 #include <isc/sockaddr.h>
 #include <isc/util.h>
-
+#include <stdio.h>
 #include <dns/adb.h>
 #include <dns/client.h>
 #include <dns/db.h>
@@ -257,6 +257,10 @@ dns_client_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr, isc_nm_t *nm,
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup_client;
 	}
+dns_dispatchmgr_setudpfragmentation(client->dispatchmgr, 2);
+fprintf(stderr, "DEBUG CLIENT: fragmentation mode set to 2\n");
+dns_dispatch_initfcache(client->dispatchmgr, loopmgr);
+
 	(void)setsourceports(mctx, client->dispatchmgr);
 
 	/*

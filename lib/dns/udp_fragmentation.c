@@ -297,7 +297,11 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
     REQUIRE(DNS_MESSAGE_VALID(source));
     REQUIRE(DNS_MESSAGE_VALID(target));
     isc_result_t ret = ISC_R_SUCCESS;
-    for (isc_result_t result = dns_message_firstname(source, section); 
+    fprintf(stderr,
+        "DEBUG: section_clone section=%u firstname_result=%d\n",
+        section,
+        dns_message_firstname(source, section));
+	for (isc_result_t result = dns_message_firstname(source, section); 
          result == ISC_R_SUCCESS;  
          result = dns_message_nextname(source, section)) {
         // clone name (shallow)
@@ -306,12 +310,21 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
         dns_name_t *new_name = NULL;
         dns_message_gettempname(target, &new_name);
         dns_name_clone(name, new_name);
-        // clone all rdatasets
+	fprintf(stderr,
+        "DEBUG: name attributes=%u\n",
+        name->attributes);
+	// clone all rdatasets
         for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
             dns_rdataset_t *new_rdataset = NULL;
             dns_message_gettemprdataset(target, &new_rdataset);
             dns_rdataset_clone(rdataset, new_rdataset);
-            // clone all rdata's
+        new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED;    
+	fprintf(stderr,
+        "DEBUG: rdataset type=%u class=%u attributes=0x%x\n",
+        new_rdataset->type,
+        new_rdataset->rdclass,
+        new_rdataset->attributes);
+	    // clone all rdata's
             for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
                 dns_rdata_t rdata = DNS_RDATA_INIT;
                 dns_rdataset_current(rdataset, &rdata);
@@ -322,7 +335,11 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
             }
             ISC_LIST_APPEND(new_name->list, new_rdataset, link);
         }
-        dns_message_addname(target, new_name, section);
+	dns_message_addname(target, new_name, section);
+	fprintf(stderr,
+        "DEBUG: target_count_after_addname=%u\n",
+        target->counts[section]);
+
     }
     // clone OPT if in the additional section
     if (source->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
@@ -338,57 +355,139 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
 /*
 Creates a fragment query for fragment fragment_nr using an OPT OPTION
 */
-isc_result_t create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer, uint fragment_nr, uint nr_fragments, isc_buffer_t **question_buffer) {
-    REQUIRE(question_buffer != NULL && *question_buffer == NULL);
-    
-    // parse buffer into question
-    dns_message_t *question = NULL;
-    dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &question);
-    isc_buffer_first(buffer); // start from 0
-    isc_result_t result = dns_message_parse(question, buffer, 0);
-    question->opcode = dns_opcode_fragment;
-    if (result == ISC_R_SUCCESS) {
-        // set OPT record
-        result = create_fragment_opt(question, fragment_nr, nr_fragments, 0);
-        if (result == ISC_R_SUCCESS) {
-            // parsing: only question and additional (OPT)
-            dns_compress_t cctx;
-            isc_buffer_allocate(mctx, question_buffer, 1232); // no need to allocate more
-            dns_compress_init(&cctx, mctx, 0);
-            result = dns_message_renderbegin(question, &cctx, *question_buffer);
-            if (result != ISC_R_SUCCESS) {
-                goto done;
-            }
-            result = dns_message_rendersection(question, DNS_SECTION_QUESTION, 0);
-            if (result != ISC_R_SUCCESS) {
-                goto done;
-            }
-            result = dns_message_rendersection(question, DNS_SECTION_ADDITIONAL, 0);
-            if (result != ISC_R_SUCCESS) {
-                goto done;
-            }
-            result = dns_message_renderend(question);
-            if (result != ISC_R_SUCCESS){ 
-                goto done;
-            }
-            dns_compress_invalidate(&cctx);
-        }
-        else {
-            isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
-                "Could not attach OPT record in create_fragment_query_opt!");
-            goto done;
-        }
-    }
-    else {
-        isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FRAGMENT, ISC_LOG_DEBUG(8),
+isc_result_t
+create_fragment_query_opt(isc_mem_t *mctx, isc_buffer_t *buffer,
+                          uint fragment_nr, uint nr_fragments,
+                          isc_buffer_t **question_buffer)
+{
+    REQUIRE(question_buffer != NULL);
+    REQUIRE(*question_buffer == NULL);
+
+    isc_result_t result = ISC_R_FAILURE;
+
+    dns_message_t *parsed = NULL;
+    dns_message_t *query = NULL;
+
+    dns_compress_t cctx;
+    bool compression_initialized = false;
+
+    /*
+     * First parse the original DNS query.
+     */
+    dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, &parsed);
+
+    isc_buffer_first(buffer);
+
+    result = dns_message_parse(parsed, buffer, 0);
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(
+            dns_lctx,
+            DNS_LOGCATEGORY_FRAGMENTATION,
+            DNS_LOGMODULE_FRAGMENT,
+            ISC_LOG_DEBUG(8),
             "Could not parse message in create_fragment_query_opt!");
         goto done;
     }
+
+    /*
+     * Do not modify the parsed message directly.
+     *
+     * dns_message_setopt() requires a message created for rendering.
+     */
+    dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, &query);
+
+    /*
+     * Preserve the original DNS message ID.
+     */
+    query->id = parsed->id;
+
+    /*
+     * This is a request for a particular RAW fragment.
+     */
+    query->opcode = dns_opcode_fragment;
+
+    /*
+     * Copy the original question into the new render message.
+     */
+    result = section_clone(parsed, query, DNS_SECTION_QUESTION);
+    if (result != ISC_R_SUCCESS) {
+        fprintf(stderr,
+                "DEBUG: failed to clone fragment query question: %d\n",
+                result);
+        goto done;
+    }
+
+    /*
+     * Attach the RAW-fragment OPT record to the render message.
+     */
+    result = create_fragment_opt(query, fragment_nr, nr_fragments, 0);
+    if (result != ISC_R_SUCCESS) {
+        isc_log_write(
+            dns_lctx,
+            DNS_LOGCATEGORY_FRAGMENTATION,
+            DNS_LOGMODULE_FRAGMENT,
+            ISC_LOG_DEBUG(8),
+            "Could not attach OPT record in create_fragment_query_opt!");
+        goto done;
+    }
+
+    /*
+     * Render the new query.
+     */
+     isc_buffer_allocate(mctx, question_buffer, 1232);
+
+if (*question_buffer == NULL) {
+    result = ISC_R_NOMEMORY;
+    goto done;
+}
+    dns_compress_init(&cctx, mctx, 0);
+    compression_initialized = true;
+
+    result = dns_message_renderbegin(query, &cctx, *question_buffer);
+    if (result != ISC_R_SUCCESS) {
+        goto done;
+    }
+
+    result = dns_message_rendersection(query, DNS_SECTION_QUESTION, 0);
+    if (result != ISC_R_SUCCESS) {
+        goto done;
+    }
+
+    result = dns_message_rendersection(query, DNS_SECTION_ADDITIONAL, 0);
+    if (result != ISC_R_SUCCESS) {
+        goto done;
+    }
+
+    result = dns_message_renderend(query);
+    if (result != ISC_R_SUCCESS) {
+        goto done;
+    }
+
+    fprintf(stderr,
+            "DEBUG: created fragment request frag=%u total=%u size=%u\n",
+            fragment_nr,
+            nr_fragments,
+            isc_buffer_usedlength(*question_buffer));
+
 done:
-    dns_message_detach(&question);
+    if (compression_initialized) {
+        dns_compress_invalidate(&cctx);
+    }
+
+    if (result != ISC_R_SUCCESS && *question_buffer != NULL) {
+        isc_buffer_free(question_buffer);
+    }
+
+    if (query != NULL) {
+        dns_message_detach(&query);
+    }
+
+    if (parsed != NULL) {
+        dns_message_detach(&parsed);
+    }
+
     return result;
 }
-
 /*
 Creates a fragment query by chaning the qname (LEGACY)
 */
@@ -539,6 +638,10 @@ isc_result_t render_fragment(isc_mem_t *mctx, unsigned msg_size, dns_message_t *
         printf("Could not render DNS_SECTION_QUESTION section, result: %d, buffer size: %u!\n", result, msg_size);
         return result;
     }
+	fprintf(stderr,
+        "DEBUG: question count after render=%u buffer_used=%zu\n",
+        message->counts[DNS_SECTION_QUESTION],
+        isc_buffer_usedlength(buffer));
     result = dns_message_rendersection(message, DNS_SECTION_ANSWER, options);
     if (result != ISC_R_SUCCESS) {
         printf("Could not render DNS_SECTION_ANSWER section, result: %d, buffer size: %u!\n", result, msg_size);

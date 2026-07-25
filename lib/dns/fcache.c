@@ -10,7 +10,7 @@
 #include <isc/timer.h>
 #include <dns/fcache.h>
 #include "include/dns/fcache.h"
-
+#include <dns/udp_fragmentation.h>
 
 // callback when a timer goes off
 static void fcache_timer_cb(void *arg) {
@@ -126,6 +126,162 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
 
     if (nr_fragments == entry->nr_fragments) {
         return ISC_R_SUCCESS;
+    isc_result_t result = ISC_R_SUCCESS;
+
+    if (nr_fragments == 0 || nr_fragments > 63) {
+        return ISC_R_RANGE;
+    }
+
+    LOCK(&fcache->lock);
+
+    result = isc_ht_find(fcache->ht, key, keysize, (void **)&entry);
+    if (result != ISC_R_SUCCESS) {
+        goto cleanup;
+    }
+
+    if (nr_fragments > entry->nr_fragments) {
+        result = ISC_R_RANGE;
+        goto cleanup;
+    }
+
+    if (nr_fragments == entry->nr_fragments) {
+        result = ISC_R_SUCCESS;
+        goto cleanup;
+    }
+
+    /*
+     * Ensure there are no cached fragments outside the new range.
+     */
+    uint64_t valid_bitmap =
+        (nr_fragments == 64)
+            ? UINT64_MAX
+            : ((UINT64_C(1) << nr_fragments) - 1);
+
+    if ((entry->bitmap & ~valid_bitmap) != 0) {
+        fprintf(stderr,
+                "FCACHE: fragments exist outside new count %u, bitmap=0x%llx\n",
+                nr_fragments,
+                (unsigned long long)entry->bitmap);
+
+        result = ISC_R_RANGE;
+        goto cleanup;
+    }
+
+    /*
+     * Patch the RAW EDNS option in every cached fragment.
+     *
+     * The RAW OPT RR is currently the final 17 bytes:
+     *
+     *   OPT fixed RR header: 11 bytes
+     *   option code:          2 bytes
+     *   option length:        2 bytes
+     *   option value:         2 bytes
+     */
+    for (unsigned i = 0; i < entry->nr_fragments; i++) {
+        if ((entry->bitmap & (UINT64_C(1) << i)) == 0) {
+            continue;
+        }
+
+        isc_buffer_t *frag_buf = entry->fragments[i];
+        if (frag_buf == NULL) {
+            result = ISC_R_FAILURE;
+            goto cleanup;
+        }
+
+        isc_region_t region;
+        isc_buffer_usedregion(frag_buf, &region);
+
+        if (region.length < 17) {
+            fprintf(stderr,
+                    "FCACHE: fragment %u too small for RAW OPT: %u bytes\n",
+                    i,
+                    region.length);
+
+            result = ISC_R_UNEXPECTEDEND;
+            goto cleanup;
+        }
+
+        unsigned opt_offset = region.length - 17;
+        unsigned char *opt = region.base + opt_offset;
+
+        /*
+         * OPT RR layout:
+         *   opt[0]     root name
+         *   opt[1..2]  type, must be 41
+         *   opt[9..10] RDLENGTH
+         */
+        unsigned opt_type =
+            ((unsigned)opt[1] << 8) | opt[2];
+
+        unsigned rdlength =
+            ((unsigned)opt[9] << 8) | opt[10];
+
+        if (opt[0] != 0 || opt_type != 41 || rdlength < 6) {
+            fprintf(stderr,
+                    "FCACHE: invalid OPT record in fragment %u "
+                    "(name=%u type=%u rdlength=%u)\n",
+                    i,
+                    opt[0],
+                    opt_type,
+                    rdlength);
+
+            result = ISC_R_FAILURE;
+            goto cleanup;
+        }
+
+        unsigned char *option = opt + 11;
+
+        unsigned option_code =
+            ((unsigned)option[0] << 8) | option[1];
+
+        unsigned option_length =
+            ((unsigned)option[2] << 8) | option[3];
+
+        if (option_code != OPTION_CODE || option_length != 2) {
+            fprintf(stderr,
+                    "FCACHE: RAW option not found in fragment %u "
+                    "(code=%u length=%u)\n",
+                    i,
+                    option_code,
+                    option_length);
+
+            result = ISC_R_NOTFOUND;
+            goto cleanup;
+        }
+
+        uint16_t old_value =
+            ((uint16_t)option[4] << 8) | option[5];
+
+        unsigned fragment_nr =
+            (old_value >> 10) & 0x3f;
+
+        unsigned flags =
+            old_value & 0x0f;
+
+        if (fragment_nr >= nr_fragments) {
+            fprintf(stderr,
+                    "FCACHE: fragment number %u is outside new total %u\n",
+                    fragment_nr,
+                    nr_fragments);
+
+            result = ISC_R_RANGE;
+            goto cleanup;
+        }
+
+        uint16_t new_value =
+            ((fragment_nr & 0x3f) << 10) |
+            ((nr_fragments & 0x3f) << 4) |
+            (flags & 0x0f);
+
+        option[4] = (unsigned char)(new_value >> 8);
+        option[5] = (unsigned char)(new_value & 0xff);
+
+        fprintf(stderr,
+                "FCACHE: patched fragment %u RAW value "
+                "0x%04x -> 0x%04x\n",
+                i,
+                old_value,
+                new_value);
     }
 
     unsigned old_nr_fragments = entry->nr_fragments;
@@ -138,15 +294,34 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
         new_fragments[i] = entry->fragments[i];
     }
 
+<<<<<<< HEAD
     isc_mem_put(fcache->mctx, entry->fragments,
+=======
+    isc_mem_put(fcache->mctx,
+                entry->fragments,
+>>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
                 old_nr_fragments * sizeof(isc_buffer_t *));
 
     entry->fragments = new_fragments;
     entry->nr_fragments = nr_fragments;
+<<<<<<< HEAD
 
     return ISC_R_SUCCESS;
 }
 
+=======
+    entry->bitmap &= valid_bitmap;
+
+    fprintf(stderr,
+            "FCACHE: fragment count updated %u -> %u\n",
+            old_nr_fragments,
+            nr_fragments);
+
+cleanup:
+    UNLOCK(&fcache->lock);
+    return result;
+}
+>>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
 isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
     isc_result_t result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result == ISC_R_SUCCESS) {

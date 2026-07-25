@@ -535,7 +535,10 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 
 	        if (udp_fragmentation_enabled && udp_fragmentation_mode == 2) {
                 is_fragment_opt(client->message);
-
+		fprintf(stderr,
+        "DEBUG: is_fragment=%d frag_nr=%u\n",
+        client->message->is_fragment,
+        client->message->fragment_nr);
                 if (client->message->is_fragment) {
                         fcache_t *fcache = client->manager->sctx->fcache;
                         unsigned char key[69];
@@ -549,14 +552,27 @@ bool udp_fragmentation_enabled = udp_fragmentation_mode != 0;
 			isc_result_t get_result = fcache_get_fragment(fcache, key, keysize,
                                               client->message->fragment_nr,
                                               &out_frag);
+if (get_result == ISC_R_SUCCESS) {
+        fprintf(stderr,
+                "DEBUG: found cached fragment=%u size=%u key_address=%s id=%u\n",
+                client->message->fragment_nr,
+                out_frag->used,
+                addr_buf,
+                client->message->id);
 
-
-if (get_result == ISC_R_SUCCESS)
-{
         buffer = *out_frag;
         goto sendbuffer;
 }
-                        goto cleanup;
+
+fprintf(stderr,
+        "DEBUG: failed cached fragment=%u result=%s key_address=%s id=%u\n",
+        client->message->fragment_nr,
+        isc_result_totext(get_result),
+        addr_buf,
+        client->message->id);
+
+goto cleanup;
+
                 }
         }
 
@@ -603,36 +619,76 @@ if (get_result == ISC_R_SUCCESS)
         result = raw_fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
         client->message->opt = NULL;
 }
+		if (result == ISC_R_NOTFOUND) {
+        result = ISC_R_SUCCESS;
+}
 		// succesfully fragmented
-		if (result == ISC_R_SUCCESS) {
+		else if (result == ISC_R_SUCCESS) {
 			// get first fragment from cache and set it as client->message
-			isc_buffer_t *out_frag = NULL;
-			dns_message_t *msg = NULL;
-			// create key
-			unsigned char key[69];
-			unsigned keysize = sizeof(key) / sizeof(key[0]);
-			fcache_create_key(client->message->id, addr_buf, key, &keysize);
-	
-			if(fcache_get_fragment(fcache, key, keysize, 0, &out_frag) == ISC_R_SUCCESS) {
-				dns_message_create(client->manager->mctx, DNS_MESSAGE_INTENTPARSE, &msg);
-				buffer = *out_frag;
-				//dns_message_parse(msg, out_frag, DNS_MESSAGEPARSE_PRESERVEORDER); // we should be able to get this from fcache
-				//client->message = msg;		
-				// remove fragment here (not yet we are not copying the buffer)
-				goto sendbuffer; // skip render
-			}
-			else {				
-				ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					"Could not find first fragment!");
-				goto cleanup;
-			}
-		}
-		else {				
-			ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-				"Could not do the fragmenting!");
-		
-			goto cleanup;
-		}
+
+	isc_buffer_t *out_frag = NULL;
+
+/*
+ * For the initial oversized response, send fragment 0.
+ * For a fragment query, send the fragment requested in the OPT record.
+ */
+unsigned requested_fragment = 0;
+
+if (client->message->is_fragment) {
+        requested_fragment = client->message->fragment_nr;
+}
+
+unsigned char key[69];
+unsigned keysize = sizeof(key) / sizeof(key[0]);
+
+fcache_create_key(client->message->id, addr_buf, key, &keysize);
+
+ns_client_log(client,
+              NS_LOGCATEGORY_CLIENT,
+              NS_LOGMODULE_CLIENT,
+              ISC_LOG_ERROR,
+              "RAW: retrieving cached fragment %u, message id=%u",
+              requested_fragment,
+              client->message->id);
+
+result = fcache_get_fragment(fcache,
+                             key,
+                             keysize,
+                             requested_fragment,
+                             &out_frag);
+
+if (result == ISC_R_SUCCESS) {
+        /*
+         * Copy the isc_buffer structure, not the underlying cached bytes.
+         * The fragment cache continues to own the backing memory.
+         */
+        buffer = *out_frag;
+
+        ns_client_log(client,
+                      NS_LOGCATEGORY_CLIENT,
+                      NS_LOGMODULE_CLIENT,
+                      ISC_LOG_ERROR,
+                      "RAW: sending cached fragment %u, size=%u",
+                      requested_fragment,
+                      buffer.used);
+
+        goto sendbuffer;
+}
+
+ns_client_log(client,
+              NS_LOGCATEGORY_CLIENT,
+              NS_LOGMODULE_CLIENT,
+              ISC_LOG_ERROR,
+              "RAW: could not find cached fragment %u: %s",
+              requested_fragment,
+              isc_result_totext(result));
+
+goto cleanup;
+
+
+}
+
+
 	}
 
 	
@@ -754,8 +810,29 @@ renderend:
 	}
 
 sendbuffer:
+fprintf(stderr,
+        "DEBUG: entered sendbuffer used=%u current=%u base=%p is_fragment=%d frag_nr=%u\n",
+        isc_buffer_usedlength(&buffer),
+        isc_buffer_remaininglength(&buffer),
+        buffer.base,
+        client->message->is_fragment,
+        client->message->fragment_nr);
+	fprintf(stderr,
+        "DEBUG: transport sendcb=%p tcp_client=%d tcpbuf=%p handle=%p\n",
+        (void *)client->sendcb,
+        TCP_CLIENT(client),
+        (void *)client->tcpbuf,
+        (void *)client->handle);
 	if (client->sendcb != NULL) {
+	  fprintf(stderr,
+                "DEBUG: calling sendcb for fragment=%u size=%u\n",
+                client->message->fragment_nr,
+                isc_buffer_usedlength(&buffer));
 		client->sendcb(&buffer);
+	fprintf(stderr,
+                "DEBUG: sendcb returned for fragment=%u\n",
+                client->message->fragment_nr);
+
 	} else if (TCP_CLIENT(client)) {
 		isc_buffer_usedregion(&buffer, &r);
 #ifdef HAVE_DNSTAP
@@ -767,9 +844,14 @@ sendbuffer:
 #endif /* HAVE_DNSTAP */
 
 		respsize = isc_buffer_usedlength(&buffer);
-
+		fprintf(stderr,
+        "DEBUG: before UDP client_sendpkg respsize=%u peer_fragment=%u\n",
+        respsize,
+        client->message->fragment_nr);
 		client_sendpkg(client, &buffer);
-
+		fprintf(stderr,
+        "DEBUG: after UDP client_sendpkg fragment=%u\n",
+        client->message->fragment_nr);
 		switch (isc_sockaddr_pf(&client->peeraddr)) {
 		case AF_INET:
 			isc_histomulti_inc(client->manager->sctx->tcpoutstats4,
@@ -794,13 +876,21 @@ sendbuffer:
 				    &client->requesttime, NULL, &buffer);
 		}
 #endif /* HAVE_DNSTAP */
-
 		respsize = isc_buffer_usedlength(&buffer);
 
-		client_sendpkg(client, &buffer);
+fprintf(stderr,
+        "DEBUG: actual UDP before client_sendpkg fragment=%u size=%u handle=%p\n",
+        client->message->fragment_nr,
+        respsize,
+        (void *)client->handle);
 
-		switch (isc_sockaddr_pf(&client->peeraddr)) {
-		case AF_INET:
+client_sendpkg(client, &buffer);
+
+fprintf(stderr,
+        "DEBUG: actual UDP after client_sendpkg fragment=%u\n",
+        client->message->fragment_nr);
+
+		switch (isc_sockaddr_pf(&client->peeraddr)) { case AF_INET:
 			isc_histomulti_inc(client->manager->sctx->udpoutstats4,
 					   DNS_SIZEHISTO_BUCKETOUT(respsize));
 			break;

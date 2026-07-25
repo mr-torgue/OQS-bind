@@ -73,9 +73,10 @@
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
 #include <dns/tsig.h>
-
+#include <dns/udp_fragmentation.h>
+#include <dns/fcache.h>
 #include <dst/dst.h>
-
+#include <dns/raw.h>
 #include <isccfg/namedconf.h>
 
 #include <irs/resconf.h>
@@ -103,6 +104,7 @@ isc_mem_t *mctx = NULL;
 isc_log_t *lctx = NULL;
 isc_nm_t *netmgr = NULL;
 isc_loopmgr_t *loopmgr = NULL;
+fcache_t *dig_fcache = NULL;
 isc_loop_t *mainloop = NULL;
 isc_sockaddr_t localaddr;
 isc_refcount_t sendcount = 0;
@@ -196,16 +198,22 @@ void (*dighost_trying)(char *frm, dig_lookup_t *lookup);
 
 void (*dighost_shutdown)(void);
 
+typedef struct raw_fragment_send_ctx {
+        dig_query_t *query;
+        isc_buffer_t *buffer;
+        isc_nmhandle_t *sendhandle;
+} raw_fragment_send_ctx_t;
+
 /* forward declarations */
 
 #define cancel_lookup(l) _cancel_lookup(l, __FILE__, __LINE__)
 static void
 _cancel_lookup(dig_lookup_t *lookup, const char *file, unsigned int line);
-
 static void
 recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
-	  void *arg);
-
+          void *arg);
+static void
+raw_fragment_send_done(isc_nmhandle_t *handle, isc_result_t result, void *arg);
 static void
 start_udp(dig_query_t *query);
 
@@ -1357,7 +1365,6 @@ setup_libs(void) {
 	}
 
 	isc_managers_create(&mctx, 1, &loopmgr, &netmgr);
-
 	isc_log_create(mctx, &lctx, &logconfig);
 	isc_log_setcontext(lctx);
 	dns_log_init(lctx);
@@ -2702,7 +2709,31 @@ nssearch_next(dig_lookup_t *l, dig_query_t *q) {
 		}
 	}
 }
+static void
+raw_fragment_send_done(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
+        raw_fragment_send_ctx_t *ctx = arg;
 
+        REQUIRE(ctx != NULL);
+        REQUIRE(ctx->query != NULL);
+        REQUIRE(ctx->buffer != NULL);
+        REQUIRE(ctx->sendhandle != NULL);
+        INSIST(handle == ctx->sendhandle);
+
+        fprintf(stderr,
+                "DIG RAW: fragment request send completed: %s\n",
+                isc_result_totext(result));
+
+        isc_refcount_decrement0(&sendcount);
+        debug("sendcount=%" PRIuFAST32,
+              isc_refcount_current(&sendcount));
+
+        isc_buffer_free(&ctx->buffer);
+        isc_nmhandle_detach(&ctx->sendhandle);
+        query_detach(&ctx->query);
+        isc_mem_put(mctx, ctx, sizeof(*ctx));
+
+        check_if_done();
+}
 /*%
  * Event handler for send completion.  Track send counter, and clear out
  * the query if the send was canceled.
@@ -3889,7 +3920,9 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	unsigned int msgflags;
 	int newedns;
 	isc_sockaddr_t peer;
-
+	isc_sockaddr_t local;
+	char peer_addr_buf[ISC_SOCKADDR_FORMATSIZE];
+char local_addr_buf[ISC_SOCKADDR_FORMATSIZE];
 	REQUIRE(DIG_VALID_QUERY(query));
 	REQUIRE(query->readhandle != NULL);
 	INSIST(!free_now);
@@ -4069,6 +4102,9 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	isc_buffer_add(&b, region->length);
 
 	peer = isc_nmhandle_peeraddr(handle);
+	local = isc_nmhandle_localaddr(handle);
+	isc_sockaddr_format(&peer, peer_addr_buf, sizeof(peer_addr_buf));
+isc_sockaddr_format(&local, local_addr_buf, sizeof(local_addr_buf));
 
 	result = dns_message_peekheader(&b, &id, &msgflags);
 	if (result != ISC_R_SUCCESS || l->sendmsg->id != id) {
@@ -4152,6 +4188,208 @@ recv_done(isc_nmhandle_t *handle, isc_result_t eresult, isc_region_t *region,
 	}
 
 	result = dns_message_parse(msg, &b, parseflags);
+	if (msg->opt != NULL) {
+        isc_result_t rawres = is_fragment_opt(msg);
+	unsigned char key[69];
+unsigned keysize = sizeof(key);
+fcache_create_key(id, local_addr_buf, key, &keysize);
+if (msg->fragment_nr == 0) {
+        result = fcache_add_with_fragment(
+                dig_fcache,
+                key,
+                keysize,
+                msg,
+                msg->nr_fragments);
+} else {
+        result = fcache_add_fragment(
+                dig_fcache,
+                key,
+                keysize,
+                msg);
+}
+
+fprintf(stderr,
+        "DIG RAW: cache fragment %u result=%s\n",
+        (unsigned)msg->fragment_nr,
+        isc_result_totext(result));
+
+
+        fprintf(stderr,
+                "\nDIG DEBUG:\n"
+                "rawres=%d\n"
+                "is_fragment=%d\n"
+                "frag_nr=%u\n"
+                "total=%u\n",
+                rawres,
+                msg->is_fragment,
+                (unsigned)msg->fragment_nr,
+                (unsigned)msg->nr_fragments);
+
+	if (rawres == ISC_R_SUCCESS &&
+    msg->is_fragment &&
+    msg->fragment_nr + 1 < msg->nr_fragments)
+{
+
+        isc_buffer_t original_fragment;
+        isc_buffer_t *request_buffer = NULL;
+        isc_region_t request_region;
+        raw_fragment_send_ctx_t *ctx = NULL;
+        dig_query_t *sendquery = NULL;
+	uint16_t next_fragment = msg->fragment_nr + 1;
+
+	fprintf(stderr,
+        "DIG RAW: fragment %u received; requesting fragment %u of %u\n",
+        (unsigned)msg->fragment_nr,
+        (unsigned)next_fragment,
+        (unsigned)msg->nr_fragments);
+
+        isc_buffer_init(&original_fragment,
+                        region->base,
+                        region->length);
+        isc_buffer_add(&original_fragment,
+                       region->length);
+
+
+	result = create_fragment_query_opt(
+        mctx,
+        &original_fragment,
+        next_fragment,
+        msg->nr_fragments,
+        &request_buffer);
+
+
+        if (result != ISC_R_SUCCESS) {
+		fprintf(stderr,
+        "DIG RAW: failed to create fragment %u request: %s\n",
+        (unsigned)next_fragment,
+        isc_result_totext(result));
+
+                goto cancel_lookup;
+        }
+
+        ctx = isc_mem_get(mctx, sizeof(*ctx));
+
+        *ctx = (raw_fragment_send_ctx_t){
+                .query = NULL,
+                .buffer = request_buffer,
+                .sendhandle = NULL,
+        };
+
+        query_attach(query, &sendquery);
+        ctx->query = sendquery;
+
+        isc_nmhandle_attach(query->handle,
+                            &ctx->sendhandle);
+
+	isc_buffer_usedregion(request_buffer,
+                      &request_region);
+
+/*
+ * Register the next UDP read before sending the fragment request.
+ * The server may respond immediately.
+ */
+isc_refcount_increment0(&recvcount);
+debug("recvcount=%" PRIuFAST32,
+      isc_refcount_current(&recvcount));
+
+fprintf(stderr,
+        "DIG RAW: registering read before fragment request send "
+        "handle=%p query=%p\n",
+        (void *)handle,
+        (void *)query);
+
+isc_nm_read(handle,
+            recv_done,
+            query);
+
+isc_refcount_increment0(&sendcount);
+debug("sendcount=%" PRIuFAST32,
+      isc_refcount_current(&sendcount));
+
+isc_nm_send(query->handle,
+            &request_region,
+            raw_fragment_send_done,
+            ctx);
+
+dns_message_detach(&msg);
+goto keep_query;
+}
+fprintf(stderr, "DIG RAW: reached end of fragment block\n");
+
+if (rawres == ISC_R_SUCCESS &&
+    msg->is_fragment &&
+    msg->fragment_nr + 1 == msg->nr_fragments)
+{
+        fragment_cache_entry_t *entry = NULL;
+        dns_message_t *reassembled_msg = NULL;
+
+        result = fcache_get(
+                dig_fcache,
+                key,
+                keysize,
+                &entry);
+
+        if (result != ISC_R_SUCCESS) {
+                fprintf(stderr,
+                        "DIG RAW: failed to get cache entry: %s\n",
+                        isc_result_totext(result));
+                goto cancel_lookup;
+        }
+
+        result = raw_reassemble_fragments(
+                mctx,
+                entry,
+                &reassembled_msg);
+
+        fprintf(stderr,
+                "DIG RAW: reassembly result=%s\n",
+                isc_result_totext(result));
+
+        if (result != ISC_R_SUCCESS || reassembled_msg == NULL) {
+                goto cancel_lookup;
+        }
+
+        dns_message_detach(&msg);
+        msg = reassembled_msg;
+}fprintf(stderr, "DIG RAW: reached end of fragment block\n");
+
+if (rawres == ISC_R_SUCCESS &&
+    msg->is_fragment &&
+    msg->fragment_nr + 1 == msg->nr_fragments)
+{
+        fragment_cache_entry_t *entry = NULL;
+        dns_message_t *reassembled_msg = NULL;
+
+        result = fcache_get(
+                dig_fcache,
+                key,
+                keysize,
+                &entry);
+
+        if (result != ISC_R_SUCCESS) {
+                fprintf(stderr,
+                        "DIG RAW: failed to get cache entry: %s\n",
+                        isc_result_totext(result));
+                goto cancel_lookup;
+        }
+
+        result = raw_reassemble_fragments(
+                mctx,
+                entry,
+                &reassembled_msg);
+
+        fprintf(stderr,
+                "DIG RAW: reassembly result=%s\n",
+                isc_result_totext(result));
+
+        if (result != ISC_R_SUCCESS || reassembled_msg == NULL) {
+                goto cancel_lookup;
+        }
+
+        dns_message_detach(&msg);
+        msg = reassembled_msg;
+}
+}
 	if (result == DNS_R_RECOVERABLE) {
 		dighost_warning("Warning: Message parser reports malformed "
 				"message packet.");
@@ -4597,7 +4835,7 @@ onrun_callback(void *arg) {
 void
 run_loop(void *arg) {
 	UNUSED(arg);
-
+	        fcache_init(&dig_fcache, loopmgr, 10, 30);
 	start_lookup();
 }
 
@@ -4702,7 +4940,7 @@ destroy_libs(void) {
 	if (memdebugging != 0) {
 		isc_mem_stats(mctx, stderr);
 	}
-
+	fcache_deinit(&dig_fcache);
 	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 
 #if ENABLE_LEAK_DETECTION
