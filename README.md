@@ -27,21 +27,25 @@ future and automating enabling and disabling them, but for now this must be done
 we support in DNSSEC are as follows:
 
 ### DNSSEC Algorithms
-|            Algorithm         | DNSSEC Algorithm ID |
-| ---------------------------- | ------------------- |
-| FALCON512                    |         17          |
-| P256_FALCON512 (Hybrid)      |         18          |
-| RSA3072_FALCON512 (Hybrid)   |         19          |
-| DILITHIUM2                   |         20          |
-| P256_DILITHIUM2 (Hybrid)     |         21          |
-| RSA3072_DILITHIUM2 (Hybrid)  |         22          |
-| SPHINCS+-SHA-256-128s Simple |         23          |
-| P256_SPHINCS+-SHA-256-128s Simple (Hybrid)    |         24          |
-| RSA3072_SPHINCS+-SHA-256-128s Simple (Hybrid) |         25          |
-| MAYO1                        |         26          |
-| P256_MAYO1                   |         27          |
-| SNOVA2454                    |         29          |
-| P256_SNOVA2454               |         30          |
+For an overview of all algorithms supported by oqs-provider, click [here](https://github.com/open-quantum-safe/oqs-provider/blob/main/ALGORITHMS.md).
+
+|            Algorithm         | DNSSEC Algorithm ID | Hybrid | Implemented |
+| ---------------------------- | ------------------- | ------ | ----------- |
+| falconpadded512              |         17          | No     | Yes         |
+| p256_falconpadded512         |         18          | Yes    | Yes         |
+| rsa3072_falconpadded512      |         19          | Yes    | Yes         |
+| falconpadded1024             |         20          | No     | Yes         |
+| p521_falconpadded1024        |         21          | Yes    | Yes         |
+| mldsa44                      |         22          | No     | Yes         |
+| p256_mldsa44                 |         23          | Yes    | Yes         |
+| rsa3072_mldsa44              |         24          | Yes    | Yes         |
+| slhdsasha2128s               |         25          | No     | Yes         |
+| p256_slhdsasha2128s          |         26          | Yes    | Yes         |
+| rsa3072_slhdsasha2128s       |         27          | Yes    | Yes         |
+| mayo1                        |         28          | No     | Yes         |
+| p256_mayo1                   |         29          | Yes    | Yes         |
+| snova2454                    |         30          | No     | Yes         |
+| p256_snova2454               |         31          | Yes    | Yes         |
 
 We opted to start the algorithm IDs at 17 because of the discussion seen
 [here](https://mailarchive.ietf.org/arch/msg/dnsop/2xKvE-g1WU5VozEDN7-h2e5y-MQ/).

@@ -162,8 +162,9 @@ usage(void) {
 	fprintf(stderr, "        ED25519 | ED448\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
 	fprintf(stderr, "        FALCON512 | P256_FALCON512 | RSA3072_FALCON512\n");	
-	fprintf(stderr, "        DILITHIUM2 | P256_DILITHIUM2 | RSA3072_DILITHIUM2\n");	
-	fprintf(stderr, "        SPHINCS+-SHA256-128S | P256_SPHINCS+-SHA256-128S | RSA3072_SPHINCS+-SHA256-128S\n");
+	fprintf(stderr, "        FALCON1024 | P521_FALCON1024\n");	
+	fprintf(stderr, "        MLDSA44 | P256_MLDSA44 | RSA3072_MLDSA44\n");	
+	fprintf(stderr, "        SLHDSASHA2128S | P256_SLHDSASHA2128S | RSA3072_SLHDSASHA2128S\n");
 	fprintf(stderr, "        MAYO1 | P256_MAYO1\n");
 	fprintf(stderr, "        SNOVA2454 | P256_SNOVA2454\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
@@ -183,12 +184,14 @@ usage(void) {
 	fprintf(stderr, "        FALCON512:\tignored\n");
 	fprintf(stderr, "        P256_FALCON512:\tignored\n");
 	fprintf(stderr, "        RSA3072_FALCON512:\tignored\n");
-	fprintf(stderr, "        DILITHIUM2:\tignored\n");
-	fprintf(stderr, "        P256_DILITHIUM2:\tignored\n");
-	fprintf(stderr, "        RSA3072_DILITHIUM2:\tignored\n");
-	fprintf(stderr, "        SPHINCS+-SHA256-128S:\tignored\n");
-	fprintf(stderr, "        P256_SPHINCS+-SHA256-128S:\tignored\n");
-	fprintf(stderr, "        RSA3072_SPHINCS+-SHA256-128S:\tignored\n");
+	fprintf(stderr, "        FALCON1024:\tignored\n");
+	fprintf(stderr, "        P521_FALCON1024:\tignored\n");
+	fprintf(stderr, "        MLDSA44:\tignored\n");
+	fprintf(stderr, "        P256_MLDSA44:\tignored\n");
+	fprintf(stderr, "        RSA3072_MLDSA44:\tignored\n");
+	fprintf(stderr, "        SLHDSASHA2128S:\tignored\n");
+	fprintf(stderr, "        P256_SLHDSASHA2128S:\tignored\n");
+	fprintf(stderr, "        RSA3072_SLHDSASHA2128S:\tignored\n");
 	fprintf(stderr, "        MAYO1:\tignored\n");
 	fprintf(stderr, "        P256_MAYO1:\tignored\n");
 	fprintf(stderr, "        SNOVA2454:\tignored\n");
@@ -383,12 +386,14 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_FALCON512:
 			case DST_ALG_P256_FALCON512:
 			case DST_ALG_RSA3072_FALCON512:
-			case DST_ALG_DILITHIUM2:
-			case DST_ALG_P256_DILITHIUM2:
-			case DST_ALG_RSA3072_DILITHIUM2:
-			case DST_ALG_SPHINCSSHA256128S:
-			case DST_ALG_P256_SPHINCSSHA256128S:
-			case DST_ALG_RSA3072_SPHINCSSHA256128S:
+			case DST_ALG_FALCON1024:
+			case DST_ALG_P521_FALCON1024:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_SLHDSASHA2128S:
+			case DST_ALG_P256_SLHDSASHA2128S:
+			case DST_ALG_RSA3072_SLHDSASHA2128S:
 			case DST_ALG_MAYO1:
 			case DST_ALG_P256_MAYO1:
 			case DST_ALG_SNOVA2454:
@@ -446,12 +451,14 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_FALCON512:
 			case DST_ALG_P256_FALCON512:
 			case DST_ALG_RSA3072_FALCON512:
-			case DST_ALG_DILITHIUM2:
-			case DST_ALG_P256_DILITHIUM2:
-			case DST_ALG_RSA3072_DILITHIUM2:
-			case DST_ALG_SPHINCSSHA256128S:
-			case DST_ALG_P256_SPHINCSSHA256128S:
-			case DST_ALG_RSA3072_SPHINCSSHA256128S:
+			case DST_ALG_FALCON1024:
+			case DST_ALG_P521_FALCON1024:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_SLHDSASHA2128S:
+			case DST_ALG_P256_SLHDSASHA2128S:
+			case DST_ALG_RSA3072_SLHDSASHA2128S:
 			case DST_ALG_MAYO1:
 			case DST_ALG_P256_MAYO1:
 			case DST_ALG_SNOVA2454:
@@ -629,22 +636,28 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	case DST_ALG_RSA3072_FALCON512:
 		ctx->size = 10392;
 		break;
-	case DST_ALG_DILITHIUM2:
+	case DST_ALG_FALCON1024:
+		ctx->size = 14344;
+		break;
+	case DST_ALG_P521_FALCON1024:
+		ctx->size = 15440;
+		break;
+	case DST_ALG_MLDSA44:
 		ctx->size = 10496;
 		break;
-	case DST_ALG_P256_DILITHIUM2:
+	case DST_ALG_P256_MLDSA44:
 		ctx->size = 11048;
 		break;
-	case DST_ALG_RSA3072_DILITHIUM2:
+	case DST_ALG_RSA3072_MLDSA44:
 		ctx->size = 13712; 
 		break;
-	case DST_ALG_SPHINCSSHA256128S:
+	case DST_ALG_SLHDSASHA2128S:
 		ctx->size = 256;
 		break;
-	case DST_ALG_P256_SPHINCSSHA256128S:
+	case DST_ALG_P256_SLHDSASHA2128S:
 		ctx->size = 808; // 101 * 8
 		break;
-	case DST_ALG_RSA3072_SPHINCSSHA256128S:
+	case DST_ALG_RSA3072_SLHDSASHA2128S:
 		ctx->size = 3472; 
 		break;
 	case DST_ALG_MAYO1:

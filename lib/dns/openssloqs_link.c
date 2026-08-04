@@ -43,12 +43,14 @@
 #define FALCON512_PRIVATEKEYSIZE	 1281
 #define P256_FALCON512_PRIVATEKEYSIZE	 1406 // 1281 + 32 + 93 (overhead)
 #define RSA3072_FALCON512_PRIVATEKEYSIZE	 3055 // 1281 + 384 + 93 (overhead)
-#define DILITHIUM2_PRIVATEKEYSIZE	 2560
-#define P256_DILITHIUM2_PRIVATEKEYSIZE	 2685 // 2560 + 32 + 93 (overhead)
-#define RSA3072_DILITHIUM2_PRIVATEKEYSIZE	  4334 // 2944 // 2560 + 384
-#define SPHINCSSHA256128S_PRIVATEKEYSIZE 64	
-#define P256_SPHINCSSHA256128S_PRIVATEKEYSIZE 189 // 64 + 32 + 93 (overhead)
-#define RSA3072_SPHINCSSHA256128S_PRIVATEKEYSIZE 1838 // 448 // 64 + 384	
+#define FALCON1024_PRIVATEKEYSIZE	 2305
+#define P521_FALCON1024_PRIVATEKEYSIZE	 2532 
+#define MLDSA44_PRIVATEKEYSIZE	 2560
+#define P256_MLDSA44_PRIVATEKEYSIZE	 2685 // 2560 + 32 + 93 (overhead)
+#define RSA3072_MLDSA44_PRIVATEKEYSIZE	  4334 // 2944 // 2560 + 384
+#define SLHDSASHA2128S_PRIVATEKEYSIZE 64	
+#define P256_SLHDSASHA2128S_PRIVATEKEYSIZE 189 // 64 + 32 + 93 (overhead)
+#define RSA3072_SLHDSASHA2128S_PRIVATEKEYSIZE 1838 // 448 // 64 + 384	
 #define MAYO1_PRIVATEKEYSIZE	 24
 #define P256_MAYO1_PRIVATEKEYSIZE	 149 // 24 + 32 + 93 (overhead)
 #define SNOVA2454_PRIVATEKEYSIZE 48 
@@ -115,98 +117,130 @@ openssloqs_alg_info(unsigned int key_alg) {
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_DILITHIUM2) {
+	if (key_alg == DST_ALG_FALCON1024) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "falconpadded1024", 
+			.key_size = DNS_KEY_FALCON1024SIZE,
+			.priv_key_size = FALCON1024_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_FALCON1024SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_FALCON1024_PRIVATEKEY,
+				.public_key_tag = TAG_FALCON1024_PUBLICKEY,
+				.engine_tag = TAG_FALCON1024_ENGINE,
+				.label_tag = TAG_FALCON1024_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P521_FALCON1024) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p521_falconpadded1024", 
+			.key_size = DNS_KEY_P521_FALCON1024SIZE,
+			.priv_key_size = P521_FALCON1024_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P521_FALCON1024SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P521_FALCON1024_PRIVATEKEY,
+				.public_key_tag = TAG_P521_FALCON1024_PUBLICKEY,
+				.engine_tag = TAG_P521_FALCON1024_ENGINE,
+				.label_tag = TAG_P521_FALCON1024_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_MLDSA44) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "mldsa44", //"dilithium2",
-			.key_size = DNS_KEY_DILITHIUM2SIZE,
-			.priv_key_size = DILITHIUM2_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_DILITHIUM2SIZE,
+			.key_size = DNS_KEY_MLDSA44SIZE,
+			.priv_key_size = MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_MLDSA44SIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_DILITHIUM2_PRIVATEKEY,
-				.public_key_tag = TAG_DILITHIUM2_PUBLICKEY,
-				.engine_tag = TAG_DILITHIUM2_ENGINE,
-				.label_tag = TAG_DILITHIUM2_LABEL,
+				.private_key_tag = TAG_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_MLDSA44_ENGINE,
+				.label_tag = TAG_MLDSA44_LABEL,
 			},
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_P256_DILITHIUM2) {
+	if (key_alg == DST_ALG_P256_MLDSA44) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "p256_mldsa44", //"p256_dilithium2",
-			.key_size = DNS_KEY_P256_DILITHIUM2SIZE,
-			.priv_key_size = P256_DILITHIUM2_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_P256_DILITHIUM2SIZE,
+			.key_size = DNS_KEY_P256_MLDSA44SIZE,
+			.priv_key_size = P256_MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P256_MLDSA44SIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_P256_DILITHIUM2_PRIVATEKEY,
-				.public_key_tag = TAG_P256_DILITHIUM2_PUBLICKEY,
-				.engine_tag = TAG_P256_DILITHIUM2_ENGINE,
-				.label_tag = TAG_P256_DILITHIUM2_LABEL,
+				.private_key_tag = TAG_P256_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_P256_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_P256_MLDSA44_ENGINE,
+				.label_tag = TAG_P256_MLDSA44_LABEL,
 			},
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_RSA3072_DILITHIUM2) {
+	if (key_alg == DST_ALG_RSA3072_MLDSA44) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "rsa3072_mldsa44", //"rsa3072_dilithium2",
-			.key_size = DNS_KEY_RSA3072_DILITHIUM2SIZE,
-			.priv_key_size = RSA3072_DILITHIUM2_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_RSA3072_DILITHIUM2SIZE,
+			.key_size = DNS_KEY_RSA3072_MLDSA44SIZE,
+			.priv_key_size = RSA3072_MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_RSA3072_MLDSA44SIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_RSA3072_DILITHIUM2_PRIVATEKEY,
-				.public_key_tag = TAG_RSA3072_DILITHIUM2_PUBLICKEY,
-				.engine_tag = TAG_RSA3072_DILITHIUM2_ENGINE,
-				.label_tag = TAG_RSA3072_DILITHIUM2_LABEL,
+				.private_key_tag = TAG_RSA3072_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_RSA3072_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_RSA3072_MLDSA44_ENGINE,
+				.label_tag = TAG_RSA3072_MLDSA44_LABEL,
 			},
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_SPHINCSSHA256128S) {
+	if (key_alg == DST_ALG_SLHDSASHA2128S) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "sphincssha2128ssimple",
-			.key_size = DNS_KEY_SPHINCSSHA256128SSIZE,
-			.priv_key_size = SPHINCSSHA256128S_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_SPHINCSSHA256128SSIZE,
+			.alg_name = "SLH-DSA-SHA2-128s", //"sphincssha2128ssimple",
+			.key_size = DNS_KEY_SLHDSASHA2128SSIZE,
+			.priv_key_size = SLHDSASHA2128S_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_SLHDSASHA2128SSIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_SPHINCSSHA256128S_PRIVATEKEY,
-				.public_key_tag = TAG_SPHINCSSHA256128S_PUBLICKEY,
-				.engine_tag = TAG_SPHINCSSHA256128S_ENGINE,
-				.label_tag = TAG_SPHINCSSHA256128S_LABEL,
+				.private_key_tag = TAG_SLHDSASHA2128S_PRIVATEKEY,
+				.public_key_tag = TAG_SLHDSASHA2128S_PUBLICKEY,
+				.engine_tag = TAG_SLHDSASHA2128S_ENGINE,
+				.label_tag = TAG_SLHDSASHA2128S_LABEL,
 			},
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_P256_SPHINCSSHA256128S) {
+	if (key_alg == DST_ALG_P256_SLHDSASHA2128S) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "p256_sphincssha2128ssimple",
-			.key_size = DNS_KEY_P256_SPHINCSSHA256128SSIZE,
-			.priv_key_size = P256_SPHINCSSHA256128S_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_P256_SPHINCSSHA256128SSIZE,
+			.key_size = DNS_KEY_P256_SLHDSASHA2128SSIZE,
+			.priv_key_size = P256_SLHDSASHA2128S_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P256_SLHDSASHA2128SSIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_P256_SPHINCSSHA256128S_PRIVATEKEY,
-				.public_key_tag = TAG_P256_SPHINCSSHA256128S_PUBLICKEY,
-				.engine_tag = TAG_P256_SPHINCSSHA256128S_ENGINE,
-				.label_tag = TAG_P256_SPHINCSSHA256128S_LABEL,
+				.private_key_tag = TAG_P256_SLHDSASHA2128S_PRIVATEKEY,
+				.public_key_tag = TAG_P256_SLHDSASHA2128S_PUBLICKEY,
+				.engine_tag = TAG_P256_SLHDSASHA2128S_ENGINE,
+				.label_tag = TAG_P256_SLHDSASHA2128S_LABEL,
 			},
 		};
 		return &oqs_alginfo;
 	}
-	if (key_alg == DST_ALG_RSA3072_SPHINCSSHA256128S) {
+	if (key_alg == DST_ALG_RSA3072_SLHDSASHA2128S) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "rsa3072_sphincssha2128ssimple",
-			.key_size = DNS_KEY_RSA3072_SPHINCSSHA256128SSIZE,
-			.priv_key_size = RSA3072_SPHINCSSHA256128S_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_RSA3072_SPHINCSSHA256128SSIZE,
+			.key_size = DNS_KEY_RSA3072_SLHDSASHA2128SSIZE,
+			.priv_key_size = RSA3072_SLHDSASHA2128S_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_RSA3072_SLHDSASHA2128SSIZE,
 			.tags = {
 				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_RSA3072_SPHINCSSHA256128S_PRIVATEKEY,
-				.public_key_tag = TAG_RSA3072_SPHINCSSHA256128S_PUBLICKEY,
-				.engine_tag = TAG_RSA3072_SPHINCSSHA256128S_ENGINE,
-				.label_tag = TAG_RSA3072_SPHINCSSHA256128S_LABEL,
+				.private_key_tag = TAG_RSA3072_SLHDSASHA2128S_PRIVATEKEY,
+				.public_key_tag = TAG_RSA3072_SLHDSASHA2128S_PUBLICKEY,
+				.engine_tag = TAG_RSA3072_SLHDSASHA2128S_ENGINE,
+				.label_tag = TAG_RSA3072_SLHDSASHA2128S_LABEL,
 			},
 		};
 		return &oqs_alginfo;
@@ -330,7 +364,7 @@ raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo,
 		goto ctxt_err;
 	}
 	if (EVP_PKEY_fromdata_init(ctx) <= 0 ||
-	    EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEY_PARAMETERS, params) <= 0)
+	    EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEYPAIR, params) <= 0) 
 	{
 		goto fromdata_err;
 	}
@@ -712,12 +746,14 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_FALCON512_ENGINE:
 		case TAG_P256_FALCON512_ENGINE:
 		case TAG_RSA3072_FALCON512_ENGINE:
-		case TAG_DILITHIUM2_ENGINE:
-		case TAG_P256_DILITHIUM2_ENGINE:
-		case TAG_RSA3072_DILITHIUM2_ENGINE:
-		case TAG_SPHINCSSHA256128S_ENGINE:
-		case TAG_P256_SPHINCSSHA256128S_ENGINE:
-		case TAG_RSA3072_SPHINCSSHA256128S_ENGINE:
+		case TAG_FALCON1024_ENGINE:
+		case TAG_P521_FALCON1024_ENGINE:
+		case TAG_MLDSA44_ENGINE:
+		case TAG_P256_MLDSA44_ENGINE:
+		case TAG_RSA3072_MLDSA44_ENGINE:
+		case TAG_SLHDSASHA2128S_ENGINE:
+		case TAG_P256_SLHDSASHA2128S_ENGINE:
+		case TAG_RSA3072_SLHDSASHA2128S_ENGINE:
 		case TAG_MAYO1_ENGINE:
 		case TAG_P256_MAYO1_ENGINE:
 		case TAG_SNOVA2454_ENGINE:
@@ -727,12 +763,14 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_FALCON512_LABEL:
 		case TAG_P256_FALCON512_LABEL:
 		case TAG_RSA3072_FALCON512_LABEL:
-		case TAG_DILITHIUM2_LABEL:
-		case TAG_P256_DILITHIUM2_LABEL:
-		case TAG_RSA3072_DILITHIUM2_LABEL:
-		case TAG_SPHINCSSHA256128S_LABEL:
-		case TAG_P256_SPHINCSSHA256128S_LABEL:
-		case TAG_RSA3072_SPHINCSSHA256128S_LABEL:
+		case TAG_FALCON1024_LABEL:
+		case TAG_P521_FALCON1024_LABEL:
+		case TAG_MLDSA44_LABEL:
+		case TAG_P256_MLDSA44_LABEL:
+		case TAG_RSA3072_MLDSA44_LABEL:
+		case TAG_SLHDSASHA2128S_LABEL:
+		case TAG_P256_SLHDSASHA2128S_LABEL:
+		case TAG_RSA3072_SLHDSASHA2128S_LABEL:
 		case TAG_MAYO1_LABEL:
 		case TAG_P256_MAYO1_LABEL:
 		case TAG_SNOVA2454_LABEL:
@@ -742,12 +780,14 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_FALCON512_PRIVATEKEY:
 		case TAG_P256_FALCON512_PRIVATEKEY:
 		case TAG_RSA3072_FALCON512_PRIVATEKEY:
-		case TAG_DILITHIUM2_PRIVATEKEY:
-		case TAG_P256_DILITHIUM2_PRIVATEKEY:
-		case TAG_RSA3072_DILITHIUM2_PRIVATEKEY:
-		case TAG_SPHINCSSHA256128S_PRIVATEKEY:
-		case TAG_P256_SPHINCSSHA256128S_PRIVATEKEY:
-		case TAG_RSA3072_SPHINCSSHA256128S_PRIVATEKEY:
+		case TAG_FALCON1024_PRIVATEKEY:
+		case TAG_P521_FALCON1024_PRIVATEKEY:
+		case TAG_MLDSA44_PRIVATEKEY:
+		case TAG_P256_MLDSA44_PRIVATEKEY:
+		case TAG_RSA3072_MLDSA44_PRIVATEKEY:
+		case TAG_SLHDSASHA2128S_PRIVATEKEY:
+		case TAG_P256_SLHDSASHA2128S_PRIVATEKEY:
+		case TAG_RSA3072_SLHDSASHA2128S_PRIVATEKEY:
 		case TAG_MAYO1_PRIVATEKEY:
 		case TAG_P256_MAYO1_PRIVATEKEY:
 		case TAG_SNOVA2454_PRIVATEKEY:
@@ -757,12 +797,14 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_FALCON512_PUBLICKEY:
 		case TAG_P256_FALCON512_PUBLICKEY:
 		case TAG_RSA3072_FALCON512_PUBLICKEY:
-		case TAG_DILITHIUM2_PUBLICKEY:
-		case TAG_P256_DILITHIUM2_PUBLICKEY:
-		case TAG_RSA3072_DILITHIUM2_PUBLICKEY:
-		case TAG_SPHINCSSHA256128S_PUBLICKEY:
-		case TAG_P256_SPHINCSSHA256128S_PUBLICKEY:
-		case TAG_RSA3072_SPHINCSSHA256128S_PUBLICKEY:
+		case TAG_FALCON1024_PUBLICKEY:
+		case TAG_P521_FALCON1024_PUBLICKEY:
+		case TAG_MLDSA44_PUBLICKEY:
+		case TAG_P256_MLDSA44_PUBLICKEY:
+		case TAG_RSA3072_MLDSA44_PUBLICKEY:
+		case TAG_SLHDSASHA2128S_PUBLICKEY:
+		case TAG_P256_SLHDSASHA2128S_PUBLICKEY:
+		case TAG_RSA3072_SLHDSASHA2128S_PUBLICKEY:
 		case TAG_MAYO1_PUBLICKEY:
 		case TAG_P256_MAYO1_PUBLICKEY:
 		case TAG_SNOVA2454_PUBLICKEY:

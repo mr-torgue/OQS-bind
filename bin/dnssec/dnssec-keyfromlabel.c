@@ -399,8 +399,20 @@ main(int argc, char **argv) {
 			case DST_ALG_ED25519:
 			case DST_ALG_ED448:
 			case DST_ALG_FALCON512:
-			case DST_ALG_DILITHIUM2:
-			case DST_ALG_SPHINCSSHA256128S:
+			case DST_ALG_P256_FALCON512:
+			case DST_ALG_RSA3072_FALCON512:
+			case DST_ALG_FALCON1024:
+			case DST_ALG_P521_FALCON1024:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_SLHDSASHA2128S:
+			case DST_ALG_P256_SLHDSASHA2128S:
+			case DST_ALG_RSA3072_SLHDSASHA2128S:
+			case DST_ALG_MAYO1:
+			case DST_ALG_P256_MAYO1:
+			case DST_ALG_SNOVA2454:
+			case DST_ALG_P256_SNOVA2454:
 				break;
 			default:
 				fatal("%s is incompatible with NSEC3; "

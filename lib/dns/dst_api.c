@@ -231,12 +231,14 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_FALCON512]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_DILITHIUM2]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_DILITHIUM2]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_SPHINCSSHA256128S]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_SPHINCSSHA256128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON1024]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P521_FALCON1024]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SLHDSASHA2128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_SLHDSASHA2128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_SLHDSASHA2128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MAYO1]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_MAYO1]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SNOVA2454]));
@@ -1488,23 +1490,29 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	case DST_ALG_RSA3072_FALCON512:
 		*n = DNS_SIG_RSA3072_FALCON512SIZE;
 		break;
-	case DST_ALG_DILITHIUM2:
-		*n = DNS_SIG_DILITHIUM2SIZE;
+	case DST_ALG_FALCON1024:
+		*n = DNS_SIG_FALCON1024SIZE;
 		break;
-	case DST_ALG_P256_DILITHIUM2:
-		*n = DNS_SIG_P256_DILITHIUM2SIZE;
+	case DST_ALG_P521_FALCON1024:
+		*n = DNS_SIG_P521_FALCON1024SIZE;
 		break;
-	case DST_ALG_RSA3072_DILITHIUM2:
-		*n = DNS_SIG_RSA3072_DILITHIUM2SIZE;
+	case DST_ALG_MLDSA44:
+		*n = DNS_SIG_MLDSA44SIZE;
 		break;
-	case DST_ALG_SPHINCSSHA256128S:
-		*n = DNS_SIG_SPHINCSSHA256128SSIZE;
+	case DST_ALG_P256_MLDSA44:
+		*n = DNS_SIG_P256_MLDSA44SIZE;
 		break;
-	case DST_ALG_P256_SPHINCSSHA256128S:
-		*n = DNS_SIG_P256_SPHINCSSHA256128SSIZE;
+	case DST_ALG_RSA3072_MLDSA44:
+		*n = DNS_SIG_RSA3072_MLDSA44SIZE;
 		break;
-	case DST_ALG_RSA3072_SPHINCSSHA256128S:
-		*n = DNS_SIG_RSA3072_SPHINCSSHA256128SSIZE;
+	case DST_ALG_SLHDSASHA2128S:
+		*n = DNS_SIG_SLHDSASHA2128SSIZE;
+		break;
+	case DST_ALG_P256_SLHDSASHA2128S:
+		*n = DNS_SIG_P256_SLHDSASHA2128SSIZE;
+		break;
+	case DST_ALG_RSA3072_SLHDSASHA2128S:
+		*n = DNS_SIG_RSA3072_SLHDSASHA2128SSIZE;
 		break;
 	case DST_ALG_MAYO1:
 		*n = DNS_SIG_MAYO1SIZE;
