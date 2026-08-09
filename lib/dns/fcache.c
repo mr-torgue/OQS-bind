@@ -294,22 +294,14 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
         new_fragments[i] = entry->fragments[i];
     }
 
-<<<<<<< HEAD
-    isc_mem_put(fcache->mctx, entry->fragments,
-=======
     isc_mem_put(fcache->mctx,
                 entry->fragments,
->>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
                 old_nr_fragments * sizeof(isc_buffer_t *));
 
     entry->fragments = new_fragments;
     entry->nr_fragments = nr_fragments;
-<<<<<<< HEAD
 
-    return ISC_R_SUCCESS;
-}
 
-=======
     entry->bitmap &= valid_bitmap;
 
     fprintf(stderr,
@@ -321,7 +313,6 @@ cleanup:
     UNLOCK(&fcache->lock);
     return result;
 }
->>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
 isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag, unsigned nr_fragments) {
     isc_result_t result = fcache_add(fcache, key, keysize, nr_fragments);
     if (result == ISC_R_SUCCESS) {
@@ -332,6 +323,12 @@ isc_result_t fcache_add_with_fragment(fcache_t *fcache, unsigned char *key, unsi
 
 isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_entry_t *entry, dns_message_t *frag) {
     REQUIRE(frag != NULL && (frag->buffer != NULL || frag->saved.base != NULL));
+	fprintf(stderr,
+        "FCACHE DEBUG: adding frag=%u buffer=%p used=%u saved=%u\n",
+        (unsigned)frag->fragment_nr,
+        (void *)frag->buffer,
+        frag->buffer ? frag->buffer->used : 0,
+        frag->saved.length);
     if (frag->fragment_nr >= entry->nr_fragments) {
         isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_FCACHE, ISC_LOG_DEBUG(10),
             "Can only add  where fragment_nr < nr_fragments: fragment_nr: %lu, nr_fragments: %u", frag->fragment_nr, entry->nr_fragments); 
@@ -347,7 +344,16 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
         isc_buffer_dup(fcache->mctx, &frag_buf, frag->buffer);
     }
     else {
-        isc_buffer_t tmp_buf;
+        fprintf(stderr,
+            "FCACHE DEBUG saved base=%p length=%u firstbytes=%02x %02x %02x %02x\n",
+            (void *)frag->saved.base,
+            frag->saved.length,
+            frag->saved.base[0],
+            frag->saved.base[1],
+            frag->saved.base[2],
+            frag->saved.base[3]);
+
+	isc_buffer_t tmp_buf;
         isc_buffer_init(&tmp_buf, frag->saved.base, frag->saved.length);
         isc_buffer_add(&tmp_buf, frag->saved.length);
         isc_buffer_dup(fcache->mctx, &frag_buf, &tmp_buf);

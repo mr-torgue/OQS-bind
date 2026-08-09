@@ -214,12 +214,24 @@ isc_result_t create__fragment_opt(dns_message_t *msg, const unsigned frag_nr, co
         // add the new opt data
         ednsopts[opts_count].code = OPTION_CODE;
         ednsopts[opts_count].length = 2;
-        // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
+        
+	// 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
         uint16_t data = ((frag_nr & 0x3f) << 10) | ((nr_fragments & 0x3f) << 4) | (fragment_flags & 0xf);
-        unsigned char value[2];
-        value[0] = (data >> 8);
-        value[1] = data & 0xff;
-        ednsopts[opts_count].value = value;
+	
+	ednsopts[opts_count].value =
+    		isc_mem_get(msg->mctx, 2);
+
+	ednsopts[opts_count].value[0] = (data >> 8);
+	ednsopts[opts_count].value[1] = data & 0xff;
+
+	fprintf(stderr,
+            "FRAG OPT CREATE: frag=%u total=%u data=0x%04x bytes=%02x %02x\n",
+            frag_nr,
+            nr_fragments,
+            data,
+            ednsopts[opts_count].value[0],
+            ednsopts[opts_count].value[1]);
+
         opts_count++;
     }
 

@@ -747,7 +747,12 @@ fprintf(stderr,
 				isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 					"Response to fragment query %lu!", msg->fragment_nr); 
 
-				result = fcache_add_fragment(fcache, key, keysize, msg);
+fprintf(stderr,
+        "DISPATCH DEBUG: before cache frag=%u region_length=%u msg_saved=%u\n",
+        (unsigned)msg->fragment_nr,
+        region->length,
+        msg->saved.length);				
+result = fcache_add_fragment(fcache, key, keysize, msg);
 				if (result == ISC_R_SUCCESS) {
 					dns_message_t *out_msg = NULL;
 					isc_result_t reassemble_result;
@@ -2198,17 +2203,13 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 
 static void
 fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
-<<<<<<< HEAD
         fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
-=======
         
 	fprintf(stderr,
                 "DEBUG: fragment_connected eresult=%d\n",
                 eresult);
 
 
-	fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
->>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
         dns_dispentry_t *resp = ctx->resp;
         isc_mem_t *mctx = resp->disp->mgr->mctx;
         isc_region_t region;
@@ -2221,16 +2222,14 @@ fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
         }
 
         isc_buffer_usedregion(ctx->buffer, &region);
-<<<<<<< HEAD
         isc_nm_send(handle, &region, fragment_send_done, ctx);
-=======
         fprintf(stderr,
                 "DEBUG: sending fragment query\n");
 isc_nmhandle_t *sendhandle = NULL;
 isc_nmhandle_attach(handle, &sendhandle);	
 
 isc_nm_send(handle, &region, fragment_send_done, ctx);
->>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
+
 }
 
 static void

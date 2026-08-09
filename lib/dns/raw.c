@@ -381,8 +381,6 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
 
-<<<<<<< HEAD
-=======
 /*
  * Store the final fragment in the cache.
  */
@@ -399,7 +397,6 @@ fprintf(stderr,
         "DEBUG: cached final fragment=%u\n",
         frag_nr);
 
->>>>>>> 822c40b526 (Implement client-side RAW OPT fragment caching and reassembly)
 unsigned actual_fragments = frag_nr + 1;
 
 fprintf(stderr,
@@ -620,9 +617,15 @@ unsigned saved_opt_size = 0;
         isc_buffer_t *frag_buf = entry->fragments[frag_nr];
         unsigned opt_offset, opt_size, body_offset, body_size, first_rr_offset, last_rr_offset;
         raw_get_sizes_offsets(frag_buf, &body_offset, &body_size, &opt_offset, &opt_size, &first_rr_offset, &last_rr_offset, &is_truncated);
-         
+    	fprintf(stderr,
+        "RAW DEBUG: frag=%u body_offset=%u body_size=%u opt_offset=%u opt_size=%u\n",
+        frag_nr,
+        body_offset,
+        body_size,
+        opt_offset,
+        opt_size);     
         /* Save the OPT record from the first fragment. */
-if (frag_nr == 0 && opt_size > 0) {
+if (frag_nr == entry->nr_fragments - 1 && opt_size > 0) {
     saved_opt_base = ((unsigned char *)frag_buf->base) + opt_offset;
     saved_opt_size = opt_size;
 }        
@@ -699,7 +702,13 @@ if (saved_opt_base != NULL && saved_opt_size > 0) {
 
         dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
 isc_buffer_first(out_buf);
+fprintf(stderr,
+        "RAW DEBUG: reassembled packet size=%u\n",
+        out_buf->used);
 result = dns_message_parse(*out_msg, out_buf, DNS_MESSAGEPARSE_IGNORETRUNCATION);
+fprintf(stderr,
+        "RAW DEBUG: parse result=%s\n",
+        isc_result_totext(result));
 if (result != ISC_R_SUCCESS) {
     dns_message_detach(out_msg);
     return result;
