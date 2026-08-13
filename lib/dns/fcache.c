@@ -113,19 +113,6 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
                              unsigned keysize, unsigned nr_fragments)
 {
     fragment_cache_entry_t *entry = NULL;
-    isc_result_t result =
-        isc_ht_find(fcache->ht, key, keysize, (void **)&entry);
-
-    if (result != ISC_R_SUCCESS) {
-        return result;
-    }
-
-    if (nr_fragments == 0 || nr_fragments > entry->nr_fragments) {
-        return ISC_R_RANGE;
-    }
-
-    if (nr_fragments == entry->nr_fragments) {
-        return ISC_R_SUCCESS;
     isc_result_t result = ISC_R_SUCCESS;
 
     if (nr_fragments == 0 || nr_fragments > 63) {
@@ -188,10 +175,19 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
             goto cleanup;
         }
 
+
         isc_region_t region;
         isc_buffer_usedregion(frag_buf, &region);
 
-        if (region.length < 17) {
+	if (region.length < 70) {
+    fprintf(stderr,
+            "FCACHE: fragment %u has no RAW OPT, skipping validation (%u bytes)\n",
+            i,
+            region.length);
+    continue;
+}
+
+        if (region.length < 11) {
             fprintf(stderr,
                     "FCACHE: fragment %u too small for RAW OPT: %u bytes\n",
                     i,
@@ -201,8 +197,19 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
             goto cleanup;
         }
 
-        unsigned opt_offset = region.length - 17;
+        unsigned opt_offset = 31; /*DNS header + question */
         unsigned char *opt = region.base + opt_offset;
+
+	fprintf(stderr,
+        "FCACHE OPT DUMP frag=%u offset=%u\n",
+        i,
+        opt_offset);
+
+for (unsigned x = 0; x < 40 && opt_offset + x < region.length; x++) {
+    fprintf(stderr, "%02x ", region.base[opt_offset + x]);
+}
+
+fprintf(stderr, "\n");
 
         /*
          * OPT RR layout:
@@ -229,34 +236,96 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
             goto cleanup;
         }
 
-        unsigned char *option = opt + 11;
 
-        unsigned option_code =
-            ((unsigned)option[0] << 8) | option[1];
+	unsigned rd_end = region.length;
 
-        unsigned option_length =
-            ((unsigned)option[2] << 8) | option[3];
+unsigned pos = 11;
+bool found_raw = false;
 
-        if (option_code != OPTION_CODE || option_length != 2) {
+while (pos + 4 <= rd_end) {
+
+    unsigned option_code =
+        ((unsigned)opt[pos] << 8) | opt[pos + 1];
+
+    unsigned option_length =
+        ((unsigned)opt[pos + 2] << 8) | opt[pos + 3];
+
+
+    fprintf(stderr,
+            "FCACHE OPTION SCAN frag=%u code=%u length=%u pos=%u\n",
+            i,
+            option_code,
+            option_length,
+            pos);
+
+
+    if (option_code == OPTION_CODE) {
+
+        if (option_length != 2) {
             fprintf(stderr,
-                    "FCACHE: RAW option not found in fragment %u "
-                    "(code=%u length=%u)\n",
-                    i,
-                    option_code,
+                    "FCACHE: RAW option wrong length %u\n",
                     option_length);
 
-            result = ISC_R_NOTFOUND;
+            result = ISC_R_FAILURE;
             goto cleanup;
         }
 
-        uint16_t old_value =
-            ((uint16_t)option[4] << 8) | option[5];
+	found_raw = true;
+
+unsigned char *option = opt + pos;
+
+uint16_t raw_value =
+    ((uint16_t)option[4] << 8) | option[5];
+
+unsigned fragment_nr =
+    (raw_value >> 10) & 0x3f;
+
+fprintf(stderr,
+        "FCACHE FOUND RAW OPTION frag=%u fragment=%u\n",
+        i,
+        fragment_nr);
+
+break;
+
+    }
+if (pos + 4 + option_length > rd_end) {
+    fprintf(stderr,
+            "FCACHE: option exceeds OPT length\n");
+    result = ISC_R_FAILURE;
+    goto cleanup;
+}
+
+pos += 4 + option_length;
+
+fprintf(stderr,
+        "FCACHE NEXT OPTION pos=%u rd_end=%u\n",
+        pos,
+        rd_end);
+
+}
+
+
+if (!found_raw) {
+
+    fprintf(stderr,
+            "FCACHE: RAW option not found in fragment %u\n",
+            i);
+
+    result = ISC_R_NOTFOUND;
+    goto cleanup;
+}
+
+
+	unsigned char *option = opt + pos;
+
+uint16_t raw_value =
+    ((uint16_t)option[4] << 8) | option[5];
 
         unsigned fragment_nr =
-            (old_value >> 10) & 0x3f;
+            (raw_value >> 10) & 0x3f;
 
         unsigned flags =
-            old_value & 0x0f;
+            raw_value & 0x0f;
 
         if (fragment_nr >= nr_fragments) {
             fprintf(stderr,
@@ -280,7 +349,7 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
                 "FCACHE: patched fragment %u RAW value "
                 "0x%04x -> 0x%04x\n",
                 i,
-                old_value,
+                raw_value,
                 new_value);
     }
 
@@ -300,8 +369,6 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
 
     entry->fragments = new_fragments;
     entry->nr_fragments = nr_fragments;
-
-
     entry->bitmap &= valid_bitmap;
 
     fprintf(stderr,

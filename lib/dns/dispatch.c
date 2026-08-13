@@ -816,7 +816,6 @@ if (udp_fragmentation_mode == 2) {
 					REQUIRE(fcache_get(fcache, key, keysize, &out_ce) == ISC_R_SUCCESS); // should never fail because we just added it
 					isc_log_write(dns_lctx, DNS_LOGCATEGORY_FRAGMENTATION, DNS_LOGMODULE_DISPATCH, ISC_LOG_DEBUG(5),
 						"Requesting %u additional fragments...", nr_fragments - 1); 
-
 					fprintf(stderr, "DEBUG: requesting %u fragments\n", nr_fragments - 1);
 					for (unsigned i = 1; i < nr_fragments; i++) {
 
@@ -2203,13 +2202,13 @@ tcp_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
 
 static void
 fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
-        fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
         
 	fprintf(stderr,
                 "DEBUG: fragment_connected eresult=%d\n",
                 eresult);
 
 
+	fragment_send_ctx_t *ctx = (fragment_send_ctx_t *)arg;
         dns_dispentry_t *resp = ctx->resp;
         isc_mem_t *mctx = resp->disp->mgr->mctx;
         isc_region_t region;
@@ -2222,14 +2221,23 @@ fragment_connected(isc_nmhandle_t *handle, isc_result_t eresult, void *arg) {
         }
 
         isc_buffer_usedregion(ctx->buffer, &region);
-        isc_nm_send(handle, &region, fragment_send_done, ctx);
-        fprintf(stderr,
+
+	fprintf(stderr,
+        "SEND FRAGMENT BUFFER: size=%u bytes=",
+        region.length);
+
+for (unsigned i = 0; i < region.length; i++) {
+        fprintf(stderr, "%02x ", region.base[i]);
+}
+
+fprintf(stderr, "\n");
+
+	fprintf(stderr,
                 "DEBUG: sending fragment query\n");
 isc_nmhandle_t *sendhandle = NULL;
 isc_nmhandle_attach(handle, &sendhandle);	
 
 isc_nm_send(handle, &region, fragment_send_done, ctx);
-
 }
 
 static void

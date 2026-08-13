@@ -103,13 +103,26 @@ isc_result_t is_fragment_opt(dns_message_t *msg) {
                     if (ednsopt.code == OPTION_CODE && ednsopt.length == OPTION_LENGTH) {
                         uint16_t fragment_nr, nr_fragments, flags;
                         unsigned value = ednsopt.value[0] << 8 | ednsopt.value[1];
-                        fragment_nr = value >> 10 & 0x3f;
+                        fprintf(stderr,
+        "IS_FRAGMENT_OPT DEBUG: code=%u value=0x%04x bytes=%02x %02x\n",
+        ednsopt.code,
+        value,
+        ednsopt.value[0],
+        ednsopt.value[1]);
+			
+			fragment_nr = value >> 10 & 0x3f;
                         nr_fragments = value >> 4 & 0x3f;
                         flags = value & 0xf;
                         msg->is_fragment = true;
                         msg->fragment_nr = fragment_nr;
                         msg->nr_fragments = nr_fragments;
-                        msg->fragment_flags = flags;
+                        fprintf(stderr,
+        "IS_FRAGMENT_OPT PARSED: frag=%u total=%u flags=%u\n",
+        fragment_nr,
+        nr_fragments,
+        flags);
+
+			msg->fragment_flags = flags;
                         // frag nr check
                         if (fragment_nr >= nr_fragments) {
                             return ISC_R_FAILURE;
@@ -337,32 +350,63 @@ isc_result_t section_clone(dns_message_t *source, dns_message_t *target, const u
         new_rdataset->rdclass,
         new_rdataset->attributes);
 	    // clone all rdata's
-            for (isc_result_t tresult = dns_rdataset_first(rdataset); tresult == ISC_R_SUCCESS; tresult = dns_rdataset_next(rdataset)) {
-                dns_rdata_t rdata = DNS_RDATA_INIT;
-                dns_rdataset_current(rdataset, &rdata);
-                dns_rdata_t *new_rdata = NULL;
-                dns_message_gettemprdata(target, &new_rdata);
-                dns_rdata_clone(&rdata, new_rdata);
-                ISC_LIST_APPEND(new_rdataset->rdlist.list->rdata, new_rdata, link); // append to list
-            }
-            ISC_LIST_APPEND(new_name->list, new_rdataset, link);
-        }
-	dns_message_addname(target, new_name, section);
+
+ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+
+fprintf(stderr,
+        "DEBUG BEFORE ADDNAME: section=%u list_empty=%d\n",
+        section,
+        ISC_LIST_EMPTY(new_name->list));
+
+dns_message_addname(target, new_name, section);
+
+fprintf(stderr,
+        "DEBUG AFTER ADDNAME: section=%u count=%u\n",
+        section,
+        target->counts[section]);
+}
+fprintf(stderr,
+        "DEBUG: addname done count=%u\n",
+        target->counts[section]);
+
+
 	fprintf(stderr,
         "DEBUG: target_count_after_addname=%u\n",
         target->counts[section]);
 
     }
     // clone OPT if in the additional section
-    if (source->opt != NULL && section == DNS_SECTION_ADDITIONAL) {
-        REQUIRE(dns_rdataset_count(source->opt) == 1);
-        dns_rdataset_t *new_opt_rdataset = NULL;
-        dns_message_gettemprdataset(target, &new_opt_rdataset);    
-        dns_rdataset_clone(source->opt, new_opt_rdataset);
-        ret = dns_message_setopt(target, new_opt_rdataset);
-    }
-    return ret;
+
+if (source->opt != NULL &&
+    section == DNS_SECTION_ADDITIONAL) {
+
+    dns_rdataset_t *new_opt = NULL;
+
+    dns_message_gettemprdataset(target, &new_opt);
+
+    /*
+     * Clone the whole OPT rdataset.
+     * This keeps all EDNS options.
+     */
+    dns_rdataset_clone(source->opt, new_opt);
+
+dns_rdata_t debug_rdata = DNS_RDATA_INIT;
+
+if (dns_rdataset_first(new_opt) == ISC_R_SUCCESS) {
+
+    dns_rdataset_current(new_opt, &debug_rdata);
+
+    fprintf(stderr,
+            "OPT CLONE COUNT=%u LENGTH=%u\n",
+            dns_rdataset_count(new_opt),
+            debug_rdata.length);
 }
+    ret = dns_message_setopt(target, new_opt);
+}
+
+return ret;
+}
+
 
 /*
 Creates a fragment query for fragment fragment_nr using an OPT OPTION

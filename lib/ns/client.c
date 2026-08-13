@@ -615,7 +615,9 @@ goto cleanup;
 
 
 		else if (udp_fragmentation_mode == 2) {
-        client->message->opt = client->opt;
+         fprintf(stderr, "CLIENT DEBUG: entering RAW mode\n");
+
+	client->message->opt = client->opt;
         result = raw_fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
         client->message->opt = NULL;
 }

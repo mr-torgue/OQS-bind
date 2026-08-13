@@ -1932,6 +1932,11 @@ update_min_section_ttl(dns_message_t *restrict msg,
 isc_result_t
 dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 			  unsigned int options) {
+	fprintf(stderr,
+        "RENDER SECTION id=%u count=%u\n",
+        sectionid,
+        msg->counts[sectionid]);
+
 	dns_namelist_t *section;
 	dns_name_t *name, *next_name;
 	dns_rdataset_t *rdataset, *next_rdataset;
@@ -2747,6 +2752,11 @@ dns_message_setopt(dns_message_t *msg, dns_rdataset_t *opt) {
 	 */
 
 	REQUIRE(DNS_MESSAGE_VALID(msg));
+	fprintf(stderr,
+        "SETOPT ENTER: opt=%p type=%u count=%u\n",
+        (void *)opt,
+        opt->type,
+        dns_rdataset_count(opt));
 	REQUIRE(opt->type == dns_rdatatype_opt);
 	REQUIRE(msg->from_to_wire == DNS_MESSAGE_INTENTRENDER);
 	REQUIRE(msg->state == DNS_SECTION_ANY);
@@ -2758,6 +2768,17 @@ dns_message_setopt(dns_message_t *msg, dns_rdataset_t *opt) {
 		goto cleanup;
 	}
 	dns_rdataset_current(opt, &rdata);
+	fprintf(stderr,
+        "OPT RENDER RESERVE: rdata.length=%u reserved=%u\n",
+        rdata.length,
+        11 + rdata.length);
+
+for (unsigned int i = 0; i < rdata.length; i++) {
+        fprintf(stderr,"%02x ", rdata.data[i]);
+}
+fprintf(stderr,"\n");
+
+
 	msg->opt_reserved = 11 + rdata.length;
 	result = dns_message_renderreserve(msg, msg->opt_reserved);
 	if (result != ISC_R_SUCCESS) {
@@ -2765,7 +2786,17 @@ dns_message_setopt(dns_message_t *msg, dns_rdataset_t *opt) {
 		goto cleanup;
 	}
 
+
+	fprintf(stderr,
+        "SETOPT BEFORE ASSIGN: type=%u count=%u\n",
+        opt->type,
+        dns_rdataset_count(opt));
+
 	msg->opt = opt;
+
+	fprintf(stderr,
+        "SETOPT AFTER ASSIGN msg->opt=%p\n",
+        (void *)msg->opt);
 
 	return (ISC_R_SUCCESS);
 
@@ -4575,10 +4606,18 @@ dns_message_buildopt(dns_message_t *message, dns_rdataset_t **rdatasetp,
 	if (count != 0U) {
 		isc_buffer_t *buf = NULL;
 		bool seenpad = false;
-		for (i = 0; i < count; i++) {
-			len += ednsopts[i].length + 4;
-		}
 
+		for (i = 0; i < count; i++) {
+
+        fprintf(stderr,
+                "BUILDOPT INPUT[%u] code=%u length=%u value=%p\n",
+                i,
+                ednsopts[i].code,
+                ednsopts[i].length,
+                (void *)ednsopts[i].value);
+
+        len += ednsopts[i].length + 4;
+}
 		if (len > 0xffffU) {
 			result = ISC_R_NOSPACE;
 			goto cleanup;
@@ -4598,7 +4637,14 @@ dns_message_buildopt(dns_message_t *message, dns_rdataset_t **rdatasetp,
 			if (ednsopts[i].length != 0) {
 				isc_buffer_putmem(buf, ednsopts[i].value,
 						  ednsopts[i].length);
-			}
+fprintf(stderr,
+                "BUILDOPT WRITE code=%u length=%u bytes=%02x %02x\n",
+                ednsopts[i].code,
+                ednsopts[i].length,
+                ((unsigned char *)ednsopts[i].value)[0],
+                ((unsigned char *)ednsopts[i].value)[1]);			
+
+}
 		}
 
 		/* Padding must be the final option */
@@ -4607,8 +4653,20 @@ dns_message_buildopt(dns_message_t *message, dns_rdataset_t **rdatasetp,
 			isc_buffer_putuint16(buf, 0);
 		}
 		rdata->data = isc_buffer_base(buf);
+		fprintf(stderr,
+        "BUILDOPT FINAL RDATA LENGTH=%u\n",
+        len);
 		rdata->length = len;
 		dns_message_takebuffer(message, &buf);
+		fprintf(stderr,
+        "BUILDOPT RDATA LENGTH=%u\n",
+        rdata->length);
+
+for (unsigned j = 0; j < rdata->length; j++) {
+    fprintf(stderr,"%02x ", rdata->data[j]);
+}
+fprintf(stderr,"\n");
+
 		if (seenpad) {
 			message->padding_off = len;
 		}
