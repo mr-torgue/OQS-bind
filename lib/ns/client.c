@@ -614,12 +614,44 @@ goto cleanup;
 		// RAW
 
 
-		else if (udp_fragmentation_mode == 2) {
-         fprintf(stderr, "CLIENT DEBUG: entering RAW mode\n");
+else if (udp_fragmentation_mode == 2) {
 
-	client->message->opt = client->opt;
-        result = raw_fragment(client->manager->mctx, fcache, client->message, addr_buf, 1232);
+        client->message->opt = client->opt;
+
+        result = raw_fragment(client->manager->mctx,
+                              fcache,
+                              client->message,
+                              addr_buf,
+                              1232);
+
         client->message->opt = NULL;
+          client->message->buffer = NULL;
+
+        if (result == ISC_R_SUCCESS) {
+                isc_buffer_t *out_frag = NULL;
+
+                unsigned char key[69];
+                unsigned keysize = sizeof(key);
+
+                fcache_create_key(client->message->id,
+                                  addr_buf,
+                                  key,
+                                  &keysize);
+
+                result = fcache_get_fragment(fcache,
+                                             key,
+                                             keysize,
+                                             0,
+                                             &out_frag);
+
+                if (result == ISC_R_SUCCESS) {
+                        buffer = *out_frag;
+
+                        goto sendbuffer;
+                }
+
+                goto cleanup;
+        }
 }
 		if (result == ISC_R_NOTFOUND) {
         result = ISC_R_SUCCESS;
@@ -720,7 +752,6 @@ goto cleanup;
 
 	dns_compress_init(&cctx, client->manager->mctx, compflags);
 	cleanup_cctx = true;
-
 	result = dns_message_renderbegin(client->message, &cctx, &buffer);
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
@@ -810,7 +841,6 @@ renderend:
 	if (cleanup_cctx) {
 		dns_compress_invalidate(&cctx);
 	}
-
 sendbuffer:
 fprintf(stderr,
         "DEBUG: entered sendbuffer used=%u current=%u base=%p is_fragment=%d frag_nr=%u\n",

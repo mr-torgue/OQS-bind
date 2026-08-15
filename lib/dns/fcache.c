@@ -179,7 +179,7 @@ fcache_update_fragment_count(fcache_t *fcache, unsigned char *key,
         isc_region_t region;
         isc_buffer_usedregion(frag_buf, &region);
 
-	if (region.length < 70) {
+	if (region.length < 17) {
     fprintf(stderr,
             "FCACHE: fragment %u has no RAW OPT, skipping validation (%u bytes)\n",
             i,
@@ -408,8 +408,18 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
     // copy into a new buffer
     isc_buffer_t *frag_buf = NULL;
     if (frag->buffer != NULL) {
-        isc_buffer_dup(fcache->mctx, &frag_buf, frag->buffer);
-    }
+        fprintf(stderr,
+        "FCACHE BEFORE DUP frag=%u buffer=%p\n",
+        frag->fragment_nr,
+        (void *)frag->buffer);
+
+	isc_buffer_dup(fcache->mctx, &frag_buf, frag->buffer);
+    
+	 fprintf(stderr,
+        "FCACHE AFTER DUP newbuffer=%p\n",
+        (void *)frag_buf);
+
+}
     else {
         fprintf(stderr,
             "FCACHE DEBUG saved base=%p length=%u firstbytes=%02x %02x %02x %02x\n",
@@ -429,7 +439,16 @@ isc_result_t fcache_add_fragment_with_entry(fcache_t *fcache, fragment_cache_ent
     // Store the fragment
     entry->fragments[frag->fragment_nr] = frag_buf;
     entry->bitmap |= (1 << frag->fragment_nr);
-    return ISC_R_SUCCESS;
+    
+fprintf(stderr,
+        "FCACHE STORED frag=%u msgbuffer=%p cachebuffer=%p\n",
+        (unsigned)frag->fragment_nr,
+        (void *)frag->buffer,
+        (void *)frag_buf);
+
+
+
+return ISC_R_SUCCESS;
 }
 
 isc_result_t fcache_add_fragment(fcache_t *fcache, unsigned char *key, unsigned keysize, dns_message_t *frag) {

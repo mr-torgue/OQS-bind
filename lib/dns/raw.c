@@ -44,14 +44,7 @@ creates and initializes a fragment response by including the following:
 static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t *msg, dns_message_t **frag, const unsigned frag_nr, const unsigned nr_fragments, const unsigned fragment_flags) {
     REQUIRE(frag != NULL && *frag == NULL);
     dns_message_create(mctx, DNS_MESSAGE_INTENTRENDER, frag);
-
-
-
-
-
-
-
-	isc_result_t result;
+    isc_result_t result;
 
     // set header metadata
     (*frag)->id = msg->id;
@@ -74,17 +67,9 @@ static isc_result_t raw_create_fragment_response(isc_mem_t *mctx, dns_message_t 
         perror("Could not clone DNS_QUESTION_SECTION!\n");
         return result;
     }
-	result = raw_create_opt(mctx, msg, *frag,
-                        frag_nr,
-                        nr_fragments,
-                        fragment_flags);
-
+    result = create__fragment_opt(*frag, frag_nr, nr_fragments, fragment_flags, false);
     if (result != ISC_R_SUCCESS) {
-        fprintf(stderr,
-        "Could not create OPT record result=%s\n",
-        isc_result_totext(result));
-	//dns_message_detach(frag);
-	//perror("Could not create OPT record!\n");
+        perror("Could not create OPT record!\n");
         return result;
     }
     return ISC_R_SUCCESS;
@@ -112,37 +97,14 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
         isc_buffer_init(&optbuf, rdata.data, rdata.length);
         isc_buffer_add(&optbuf, rdata.length);
 
-       // parse count and ednsopts and add to array
-	while (isc_buffer_remaininglength(&optbuf) >= 4) {
-
-    REQUIRE(opts_count < DNS_EDNSOPTIONS);
-
-    ednsopts[opts_count].code =
-        isc_buffer_getuint16(&optbuf);
-
-    ednsopts[opts_count].length =
-        isc_buffer_getuint16(&optbuf);
-
-
-    if (isc_buffer_remaininglength(&optbuf) <
-        ednsopts[opts_count].length) {
-        result = ISC_R_UNEXPECTEDEND;
-    }
-
-
-    ednsopts[opts_count].value =
-        isc_buffer_current(&optbuf);
-
-
-    isc_buffer_forward(&optbuf,
-                       ednsopts[opts_count].length);
-
-
-    opts_count++;
-}
-
-
-
+        // parse count and ednsopts and add to array
+        while (isc_buffer_remaininglength(&optbuf) >= 4) {
+            REQUIRE(opts_count < DNS_EDNSOPTIONS);
+            ednsopts[opts_count].code = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].length = isc_buffer_getuint16(&optbuf);
+            ednsopts[opts_count].value = isc_buffer_current(&optbuf);
+            opts_count++;
+        }
 
         // copy values
         version = msg->opt->ttl >> 16;
@@ -150,94 +112,24 @@ static isc_result_t raw_create_opt(isc_mem_t *mctx, dns_message_t *msg, dns_mess
         udpsize = msg->opt->rdclass;
     }
     // add the new opt data
-	fprintf(stderr,
-"DEBUG ADDING RAW OPTION code=%u frag=%u total=%u\n",
-RAW_OPT_OPTION,
-frag_nr,
-nr_fragments);
-fprintf(stderr,
-"DEBUG ADDING RAW OPTION code=%u frag=%u total=%u\n",
-RAW_OPT_OPTION,
-frag_nr,
-nr_fragments);
-
-
-	
-
-ednsopts[opts_count].code = RAW_OPT_OPTION;
-ednsopts[opts_count].length = 2;
-
-uint16_t data =
-    (frag_nr << 10) |
-    (nr_fragments << 4) |
-    (fragment_flags & 0xf);
-
-unsigned char *value = isc_mem_get(msg->mctx, 2);
-
-value[0] = (data >> 8) & 0xff;
-value[1] = data & 0xff;
-
-fprintf(stderr,
-        "RAW VALUE BYTES=%02x %02x\n",
-        value[0],
-        value[1]);
-
-ednsopts[opts_count].value = value;
-fprintf(stderr,
-        "RAW OPTION VALUE=%02x %02x\n",
-        value[0],
-        value[1]);
-opts_count++;
-
-
+    ednsopts[opts_count].code = RAW_OPT_OPTION;
+    ednsopts[opts_count].length = 2;
+    // 6 bits for frag_nr, 6 bits for nr_fragments, and 4 bits for flags
+    uint16_t data = (frag_nr << 10) | (nr_fragments << 4) | (fragment_flags & 0xf);
+    unsigned char value[2];
+    value[0] = (data >> 8);
+    value[1] = data & 0xff;
+    ednsopts[opts_count].value = value;
+    opts_count++;
 
     // build and set opt record
-	// build and set opt record
-fprintf(stderr,
-"DEBUG BUILD OPT FINAL COUNT=%lu\n",
-opts_count);
-
-for (size_t i = 0; i < opts_count; i++) {
-    fprintf(stderr,
-    "OPT[%lu] code=%u length=%u\n",
-    i,
-    ednsopts[i].code,
-    ednsopts[i].length);
-}
-
-for (size_t i = 0; i < opts_count; i++) {
-    fprintf(stderr,
-            "BEFORE BUILDOPT option[%lu] code=%u length=%u value=%p\n",
-            i,
-            ednsopts[i].code,
-            ednsopts[i].length,
-            (void *)ednsopts[i].value);
-}
-
-	fprintf(stderr, "FINAL OPT COUNT=%lu\n", opts_count);
-
-for (size_t j = 0; j < opts_count; j++) {
-    fprintf(stderr,
-        "FINAL OPT[%lu] code=%u length=%u value=%p\n",
-        j,
-        ednsopts[j].code,
-        ednsopts[j].length,
-        (void *)ednsopts[j].value);
-}
-
-	result = dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
-	    	
+    result = dns_message_buildopt(frag, &opt, version, udpsize, flags, ednsopts, opts_count);
+    	
 	if (result != ISC_R_SUCCESS) {
     return result;
 }
 
-	if (opt != NULL) {
-    fprintf(stderr, "ADDING OPT TO ADDITIONAL SECTION\n");
 	return dns_message_setopt(frag, opt);
-
-}
-
-	return ISC_R_SUCCESS;
 }
 
 isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg, char *client_address, const unsigned max_udp_size) {
@@ -273,22 +165,15 @@ isc_result_t raw_fragment(isc_mem_t *mctx, fcache_t *fcache, dns_message_t *msg,
 
     
     // calculate header and question size
-    unsigned header_size = DNS_HEADER_SIZE;
-    unsigned question_size = 0; // TODO
-    unsigned opt_size = 0; // TODO
-    fprintf(stderr,
-"RAW SIZE DEBUG: header=%u question=%u opt=%u msgsize=%u\n",
-header_size,
-question_size,
-opt_size,
-msgsize);
-	unsigned nr_fragments = get_nr_fragments(max_udp_size, msgsize, header_size, question_size, opt_size);
-	
-	nr_fragments = 3;
-
-fprintf(stderr,
-"DEBUG OVERRIDE nr_fragments=%u\n",
-nr_fragments);
+unsigned header_size = DNS_HEADER_SIZE;
+unsigned question_size = 0;
+unsigned opt_size = 0;
+unsigned nr_fragments =
+    get_nr_fragments(max_udp_size,
+                     msgsize,
+                     header_size,
+                     question_size,
+                     opt_size);
 
 
 	fprintf(stderr,
@@ -310,79 +195,30 @@ return ISC_R_NOTFOUND;
     }
 
 	unsigned available_per_fragment = max_udp_size - header_size - question_size - opt_size;
-//unsigned available_per_fragment =
-  //  max_udp_size - 48;
+
     // create fragment
     unsigned frag_nr = 0;
     dns_message_t *frag = NULL;
     unsigned fragment_flags = 0;
     raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
-fprintf(stderr,
-        "RAW BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-	
-result = render_fragment(mctx, max_udp_size, &frag);
-fprintf(stderr,
-"DEBUG FRAG AFTER RENDER: frag=%lu used=%u answer=%u additional=%u\n",
-frag->fragment_nr,
-frag->buffer ? frag->buffer->used : 0,
-frag->counts[DNS_SECTION_ANSWER],
-frag->counts[DNS_SECTION_ADDITIONAL]);
+	result = render_fragment(mctx, max_udp_size, &frag);
 if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
 
-
 result = fcache_add_fragment(fcache, key, keysize, frag);
-
 if (result != ISC_R_SUCCESS) {
     return result;
 }
 
 fprintf(stderr,
-"DEBUG: cached fragment AFTER RENDER\n");
-
-fprintf(stderr,
-        "RAW AFTER RENDER: frag=%lu used=%u\n",
-        frag->fragment_nr,
-        frag->buffer ? frag->buffer->used : 0);
-
-if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
-    return result;
-}
-
-fprintf(stderr,
-        "RAW FRAGMENT BEFORE CACHE: frag=%lu q=%u a=%u auth=%u add=%u buffer=%p used=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_QUESTION],
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL],
-        (void *)frag->buffer,
-        frag->buffer ? frag->buffer->used : 0);
-
-
+        "DEBUG: cached initial fragment=0\n");
 
 fprintf(stderr,
         "DEBUG: frag0 first question result=%d\n",
         dns_message_firstname(frag, DNS_SECTION_QUESTION));
     unsigned start = 0;
     for (unsigned section = DNS_SECTION_ANSWER; section < DNS_SECTION_MAX; section++) {
-
-	fprintf(stderr,
-        "DEBUG COPYING SECTION=%u\n",
-        section);
-
-	result = section_clone(msg, frag, section);
-
-    if (result != ISC_R_SUCCESS) {
-        return result;
-    }
-
-
         for (isc_result_t result = dns_message_firstname(msg, section); 
             result == ISC_R_SUCCESS;  
             result = dns_message_nextname(msg, section)) {
@@ -391,7 +227,6 @@ fprintf(stderr,
             dns_name_t *new_name = NULL;
             dns_message_gettempname(frag, &new_name);         
             dns_name_clone(name, new_name);
-            dns_message_addname(frag, new_name, section);
             
             for (dns_rdataset_t *rdataset = ISC_LIST_HEAD(name->list); rdataset != NULL; rdataset = ISC_LIST_NEXT(rdataset, link)) {
                 bool reset = false;
@@ -400,18 +235,14 @@ fprintf(stderr,
 		dns_rdataset_t *new_rdataset = NULL;
 dns_rdatalist_t *rdatalist = NULL;
 
-dns_message_gettemprdataset(frag, &new_rdataset);
-dns_message_gettemprdatalist(frag, &rdatalist);
-
-rdatalist->rdclass = rdataset->rdclass;
-rdatalist->type = rdataset->type;
-rdatalist->ttl = rdataset->ttl;
-
-new_rdataset->methods = rdataset->methods;
-new_rdataset->attributes = rdataset->attributes;
+  dns_message_gettemprdataset(frag, &new_rdataset);
+  dns_rdataset_clone(rdataset, new_rdataset);
+  ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+  new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED;
 
 
-           ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+
+
 
                 isc_result_t tresult = dns_rdataset_first(rdataset);
                 while (tresult == ISC_R_SUCCESS) {
@@ -430,20 +261,6 @@ new_rdataset->attributes = rdataset->attributes;
                         REQUIRE(!reset); // loop detection
  
 			if (frag_nr == 0) {
-	fprintf(stderr,
-        "RAW BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
-	fprintf(stderr,
-        "SERVER FRAG BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
     result = render_fragment(mctx, max_udp_size, &frag);
     if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
         return result;
@@ -460,19 +277,11 @@ new_rdataset->attributes = rdataset->attributes;
 
 
 
-                       dns_message_addname(frag, new_name, section);
                         
                         // reset name
                         new_name = NULL;
                         dns_message_gettempname(frag, &new_name);       
                         dns_name_clone(name, new_name);   
-	fprintf(stderr,
-        "RAW BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
                         result = render_fragment(mctx, max_udp_size, &frag);
 if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
 	return result;
@@ -481,13 +290,16 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
 			if (result != ISC_R_SUCCESS) {
                         	return result;
                         }
-	fprintf(stderr,
+//dns_message_detach(&frag);	
+
+fprintf(stderr,
         "DEBUG: cached fragment=%u  second\n",
         frag_nr);
 
 			// reset frag
                         start = 0;
-                        frag = NULL;
+                        dns_message_renderreset(frag);
+			frag = NULL;
                         raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
                         
 
@@ -496,82 +308,10 @@ if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
 			dns_name_clone(name, new_name);
 	
 			new_rdataset = NULL;
-			dns_message_gettemprdataset(frag, &new_rdataset);
-
-			new_rdataset->methods = rdataset->methods;
-new_rdataset->attributes = rdataset->attributes;
-
-			reset = true;
-                        // don't go to next rdata
-                    }
-                    else {
-                        reset = false;
-                        dns_rdata_t *new_rdata = NULL;
-                        dns_message_gettemprdata(frag, &new_rdata);
-                        dns_rdata_clone(&rdata, new_rdata);
-                        // not enough space, truncate
-			if (start + rdata.length > available_per_fragment) {
-    dns_message_addname(frag, new_name, section);
-
-	fprintf(stderr,
-        "RAW BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
-	fprintf(stderr,
-        "SERVER FRAG BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
-	fprintf(stderr,
-"BEFORE FINAL RENDER: frag=%u additional=%u buffer=%p\n",
-frag->fragment_nr,
-frag->counts[DNS_SECTION_ADDITIONAL],
-(void *)frag->buffer);
-
-
-    result = render_fragment(mctx, max_udp_size, &frag);
-    if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
-        return result;
-    }
-
-    result = fcache_add_fragment(fcache, key, keysize, frag);
-    if (result != ISC_R_SUCCESS) {
-        return result;
-    }
-
-    start = 0;
-	fprintf(stderr,
-        "DEBUG: second split increment frag_nr from %u\n",
-        frag_nr);
-    frag_nr++;
-    fprintf(stderr,
-"DEBUG: NEW FRAG CREATED frag_nr=%u total=%u\n",
-frag_nr,
-nr_fragments);
-
-    frag = NULL;
-    result = raw_create_fragment_response(mctx, msg, &frag, frag_nr, nr_fragments, 0);
-	if (result != ISC_R_SUCCESS) {
-    return result;
-}
-
-    new_name = NULL;
-    dns_message_gettempname(frag, &new_name);
-    dns_name_clone(name, new_name);
-
-    new_rdataset = NULL;
-    rdatalist = NULL;
-    dns_message_gettemprdataset(frag, &new_rdataset);
-    dns_message_gettemprdatalist(frag, &rdatalist);
-
-    rdatalist->rdclass = rdataset->rdclass;
-    rdatalist->type = rdataset->type;
-    rdatalist->ttl = rdataset->ttl;
+  dns_message_gettemprdataset(frag, &new_rdataset);
+  dns_rdataset_clone(rdataset, new_rdataset);
+  ISC_LIST_APPEND(new_name->list, new_rdataset, link);
+  new_rdataset->attributes &= ~DNS_RDATASETATTR_RENDERED;
 
     start += RR_HEADER_SIZE;
     if (!name->attributes.nocompress) {
@@ -581,7 +321,6 @@ nr_fragments);
     }
 }
 
-ISC_LIST_APPEND(rdatalist->rdata, new_rdata, link);
 start += rdata.length;
 
 
@@ -592,42 +331,14 @@ start += rdata.length;
             }      
                 
         }
-    }
-
-	fprintf(stderr,
-"DEBUG LOOP END: frag_nr=%u nr_fragments=%u start=%u\n",
-frag_nr,
-nr_fragments,
-start);
-
 
 	fprintf(stderr,
         "DEBUG: finishing fragmentation frag_nr=%u nr_fragments=%u\n",
         frag_nr,
         nr_fragments);
-fprintf(stderr,
-        "RAW BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-fprintf(stderr,
-        "SERVER FRAG BEFORE RENDER: frag=%lu answer=%u authority=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_AUTHORITY],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
+
+
 result = render_fragment(mctx, max_udp_size, &frag);
-
-fprintf(stderr,
-        "DEBUG FRAG AFTER RENDER: frag=%lu used=%u answer=%u additional=%u\n",
-        frag->fragment_nr,
-        frag->buffer ? frag->buffer->used : 0,
-        frag->counts[DNS_SECTION_ANSWER],
-        frag->counts[DNS_SECTION_ADDITIONAL]);
-
-
-
 if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
     return result;
 }
@@ -643,13 +354,14 @@ if (result != ISC_R_SUCCESS) {
             isc_result_totext(result));
     return result;
 }
+//dns_message_detach(&frag);
 
 fprintf(stderr,
         "DEBUG: cached final fragment=%u\n",
         frag_nr);
 
 unsigned actual_fragments = frag_nr + 1;
-
+nr_fragments = actual_fragments;
 fprintf(stderr,
         "DEBUG: actual last frag_nr=%u expected=%u\n",
         frag_nr,
@@ -668,52 +380,19 @@ if (result != ISC_R_SUCCESS) {
             "DEBUG: cache count update failed: %d\n",
             result);
     return result;
-}
+    }
 
 fprintf(stderr,
         "DEBUG: updated cache fragment count=%u\n",
         actual_fragments);
 
+    dns_message_renderreset(msg);
 return ISC_R_SUCCESS;
 
 
-fprintf(stderr,
-"DEBUG: updated cache fragment count=%u\n",
-frag_nr + 1);
 
 
-	fprintf(stderr,
-        "DEBUG: cached final fragment=%u\n",
-        frag_nr);
-    
-	fprintf(stderr,
-"DEBUG: actual last frag_nr=%u expected=%u\n",
-frag_nr,
-nr_fragments);
-
-
-fprintf(stderr,
-"DEBUG: updating fragment count %u -> %u\n",
-nr_fragments,
-actual_fragments);
-
-fprintf(stderr,
-"FINAL FRAG BEFORE FCACHE_ADD: frag=%u buffer=%p used=%u length=%u additional=%u\n",
-frag_nr,
-(void *)frag->buffer,
-frag->buffer ? frag->buffer->used : 0,
-frag->buffer ? frag->buffer->length : 0,
-frag->counts[DNS_SECTION_ADDITIONAL]);
-
-/* Create/update the cache entry with the actual fragment count */
-result = fcache_add(fcache, key, keysize, actual_fragments);
-if (result != ISC_R_SUCCESS && result != ISC_R_EXISTS) {
-    return result;
 }
-	return ISC_R_SUCCESS;
-}
-
-
 //
 static isc_result_t raw_get_sizes_offsets(isc_buffer_t *frag_buf, unsigned *body_offset, unsigned *body_size,
                                 unsigned *opt_offset, unsigned *opt_size,
@@ -854,7 +533,13 @@ isc_result_t raw_reassemble_fragments(isc_mem_t *mctx, fragment_cache_entry_t *e
     REQUIRE(out_msg != NULL && *out_msg == NULL);
     isc_result_t result;
     // check if all fragments are in cache
-    if (entry->bitmap != (1u << entry->nr_fragments) - 1) {    
+fprintf(stderr,
+        "RAW REASSEMBLE DEBUG: bitmap=0x%x expected=0x%x nr_fragments=%u\n",
+        entry->bitmap,
+        (1u << entry->nr_fragments) - 1,
+        entry->nr_fragments);    
+
+if (entry->bitmap != (1u << entry->nr_fragments) - 1) {    
     return ISC_R_INPROGRESS;
     }
 
@@ -877,6 +562,9 @@ unsigned saved_opt_size = 0;
         isc_buffer_t *frag_buf = entry->fragments[frag_nr];
         unsigned opt_offset, opt_size, body_offset, body_size, first_rr_offset, last_rr_offset;
         raw_get_sizes_offsets(frag_buf, &body_offset, &body_size, &opt_offset, &opt_size, &first_rr_offset, &last_rr_offset, &is_truncated);
+          fprintf(stderr,"BODY HEX frag=%u: ", frag_nr);
+          for(unsigned j=0; j<body_size && j<32; j++) fprintf(stderr,"%02x ", ((unsigned char *)frag_buf->base)[body_offset+j]);
+          fprintf(stderr,"\n");
     	fprintf(stderr,
         "RAW DEBUG: frag=%u body_offset=%u body_size=%u opt_offset=%u opt_size=%u\n",
         frag_nr,
@@ -885,7 +573,7 @@ unsigned saved_opt_size = 0;
         opt_offset,
         opt_size);     
         /* Save the OPT record from the first fragment. */
-if (opt_size > 0 && saved_opt_base == NULL) {
+if (frag_nr == entry->nr_fragments - 1 && opt_size > 0) {
     saved_opt_base = ((unsigned char *)frag_buf->base) + opt_offset;
     saved_opt_size = opt_size;
 }        
@@ -960,30 +648,20 @@ if (saved_opt_base != NULL && saved_opt_size > 0) {
 }
 
 
-dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
-
+        dns_message_create(mctx, DNS_MESSAGE_INTENTPARSE, out_msg);
 isc_buffer_first(out_buf);
-
 fprintf(stderr,
-"RAW DEBUG: reassembled packet size=%u\n",
-out_buf->used);
-
-result = dns_message_parse(*out_msg, out_buf,
-                           DNS_MESSAGEPARSE_IGNORETRUNCATION);
-
+        "RAW DEBUG: reassembled packet size=%u\n",
+        out_buf->used);
+result = dns_message_parse(*out_msg, out_buf, DNS_MESSAGEPARSE_IGNORETRUNCATION);
+fprintf(stderr,
+        "RAW DEBUG: parse result=%s\n",
+        isc_result_totext(result));
 if (result != ISC_R_SUCCESS) {
     dns_message_detach(out_msg);
-    isc_buffer_free(&out_buf);
     return result;
 }
 
-/*
- * Parsed message keeps the buffer.
- * Detach it so ns_client_send() can render normally.
- */
-
-
 return ISC_R_SUCCESS;
-
 }
 
