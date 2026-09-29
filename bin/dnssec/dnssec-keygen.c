@@ -161,9 +161,11 @@ usage(void) {
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
 	fprintf(stderr, "        ED25519 | ED448\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
+	fprintf(stderr, "        MLDSA44 | P256_MLDSA44 | RSA3072_MLDSA44\n");	
+	fprintf(stderr, "        MLDSA65 | P384_MLDSA65\n");	
+	fprintf(stderr, "        MLDSA87 | P521_MLDSA87\n");	
 	fprintf(stderr, "        FALCON512 | P256_FALCON512 | RSA3072_FALCON512\n");	
 	fprintf(stderr, "        FALCON1024 | P521_FALCON1024\n");	
-	fprintf(stderr, "        MLDSA44 | P256_MLDSA44 | RSA3072_MLDSA44\n");	
 	fprintf(stderr, "        SLHDSASHA2128S | P256_SLHDSASHA2128S | RSA3072_SLHDSASHA2128S\n");
 	fprintf(stderr, "        MAYO1 | P256_MAYO1\n");
 	fprintf(stderr, "        SNOVA2454 | P256_SNOVA2454\n");
@@ -181,14 +183,18 @@ usage(void) {
 	fprintf(stderr, "        ECDSAP384SHA384:\tignored\n");
 	fprintf(stderr, "        ED25519:\tignored\n");
 	fprintf(stderr, "        ED448:\tignored\n");
+	fprintf(stderr, "        MLDSA44:\tignored\n");
+	fprintf(stderr, "        P256_MLDSA44:\tignored\n");
+	fprintf(stderr, "        RSA3072_MLDSA44:\tignored\n");
+	fprintf(stderr, "        MLDSA65:\tignored\n");
+	fprintf(stderr, "        P384_MLDSA65:\tignored\n");
+	fprintf(stderr, "        MLDSA87:\tignored\n");
+	fprintf(stderr, "        P521_MLDSA87:\tignored\n");
 	fprintf(stderr, "        FALCON512:\tignored\n");
 	fprintf(stderr, "        P256_FALCON512:\tignored\n");
 	fprintf(stderr, "        RSA3072_FALCON512:\tignored\n");
 	fprintf(stderr, "        FALCON1024:\tignored\n");
 	fprintf(stderr, "        P521_FALCON1024:\tignored\n");
-	fprintf(stderr, "        MLDSA44:\tignored\n");
-	fprintf(stderr, "        P256_MLDSA44:\tignored\n");
-	fprintf(stderr, "        RSA3072_MLDSA44:\tignored\n");
 	fprintf(stderr, "        SLHDSASHA2128S:\tignored\n");
 	fprintf(stderr, "        P256_SLHDSASHA2128S:\tignored\n");
 	fprintf(stderr, "        RSA3072_SLHDSASHA2128S:\tignored\n");
@@ -383,14 +389,18 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_ECDSA384:
 			case DST_ALG_ED25519:
 			case DST_ALG_ED448:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_MLDSA65:
+			case DST_ALG_P384_MLDSA65:
+			case DST_ALG_MLDSA87:
+			case DST_ALG_P521_MLDSA87:
 			case DST_ALG_FALCON512:
 			case DST_ALG_P256_FALCON512:
 			case DST_ALG_RSA3072_FALCON512:
 			case DST_ALG_FALCON1024:
 			case DST_ALG_P521_FALCON1024:
-			case DST_ALG_MLDSA44:
-			case DST_ALG_P256_MLDSA44:
-			case DST_ALG_RSA3072_MLDSA44:
 			case DST_ALG_SLHDSASHA2128S:
 			case DST_ALG_P256_SLHDSASHA2128S:
 			case DST_ALG_RSA3072_SLHDSASHA2128S:
@@ -448,14 +458,18 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_ECDSA384:
 			case DST_ALG_ED25519:
 			case DST_ALG_ED448:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_MLDSA65:
+			case DST_ALG_P384_MLDSA65:
+			case DST_ALG_MLDSA87:
+			case DST_ALG_P521_MLDSA87:
 			case DST_ALG_FALCON512:
 			case DST_ALG_P256_FALCON512:
 			case DST_ALG_RSA3072_FALCON512:
 			case DST_ALG_FALCON1024:
 			case DST_ALG_P521_FALCON1024:
-			case DST_ALG_MLDSA44:
-			case DST_ALG_P256_MLDSA44:
-			case DST_ALG_RSA3072_MLDSA44:
 			case DST_ALG_SLHDSASHA2128S:
 			case DST_ALG_P256_SLHDSASHA2128S:
 			case DST_ALG_RSA3072_SLHDSASHA2128S:
@@ -627,6 +641,27 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	case DST_ALG_ED448:
 		ctx->size = 456;
 		break;
+	case DST_ALG_MLDSA44:
+		ctx->size = 10496;
+		break;
+	case DST_ALG_P256_MLDSA44:
+		ctx->size = 11048;
+		break;
+	case DST_ALG_RSA3072_MLDSA44:
+		ctx->size = 13712; 
+		break;
+	case DST_ALG_MLDSA65:
+		ctx->size = 15616;
+		break;
+	case DST_ALG_P384_MLDSA65:
+		ctx->size = 16424;
+		break;
+	case DST_ALG_MLDSA87:
+		ctx->size = 20736;
+		break;
+	case DST_ALG_P521_MLDSA87:
+		ctx->size = 21832;
+		break;
 	case DST_ALG_FALCON512:
 		ctx->size = 7176;
 		break;
@@ -641,15 +676,6 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		break;
 	case DST_ALG_P521_FALCON1024:
 		ctx->size = 15440;
-		break;
-	case DST_ALG_MLDSA44:
-		ctx->size = 10496;
-		break;
-	case DST_ALG_P256_MLDSA44:
-		ctx->size = 11048;
-		break;
-	case DST_ALG_RSA3072_MLDSA44:
-		ctx->size = 13712; 
 		break;
 	case DST_ALG_SLHDSASHA2128S:
 		ctx->size = 256;

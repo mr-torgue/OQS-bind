@@ -40,14 +40,18 @@
 		goto err; \
 	}
 
+#define MLDSA44_PRIVATEKEYSIZE	 2560
+#define P256_MLDSA44_PRIVATEKEYSIZE	 2685 // 2560 + 32 + 93 (overhead)
+#define RSA3072_MLDSA44_PRIVATEKEYSIZE	  4334 // 2944 // 2560 + 384
+#define MLDSA65_PRIVATEKEYSIZE	 4032
+#define P384_MLDSA65_PRIVATEKEYSIZE	 4173 // 4032 + 48 + 93 (overhead)
+#define MLDSA87_PRIVATEKEYSIZE	 4896
+#define P521_MLDSA87_PRIVATEKEYSIZE	 5055 // 4896 + 66 + 93 (overhead)
 #define FALCON512_PRIVATEKEYSIZE	 1281
 #define P256_FALCON512_PRIVATEKEYSIZE	 1406 // 1281 + 32 + 93 (overhead)
 #define RSA3072_FALCON512_PRIVATEKEYSIZE	 3055 // 1281 + 384 + 93 (overhead)
 #define FALCON1024_PRIVATEKEYSIZE	 2305
 #define P521_FALCON1024_PRIVATEKEYSIZE	 2532 // 2305 + 66 + 93 = 2464
-#define MLDSA44_PRIVATEKEYSIZE	 2560
-#define P256_MLDSA44_PRIVATEKEYSIZE	 2685 // 2560 + 32 + 93 (overhead)
-#define RSA3072_MLDSA44_PRIVATEKEYSIZE	  4334 // 2944 // 2560 + 384
 #define SLHDSASHA2128S_PRIVATEKEYSIZE 64	
 #define P256_SLHDSASHA2128S_PRIVATEKEYSIZE 189 // 64 + 32 + 93 (overhead)
 #define RSA3072_SLHDSASHA2128S_PRIVATEKEYSIZE 1838 // 448 // 64 + 384	
@@ -69,6 +73,118 @@ typedef struct oqs_alginfo {
 
 static const oqs_alginfo_t *
 openssloqs_alg_info(unsigned int key_alg) {
+	if (key_alg == DST_ALG_MLDSA44) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "mldsa44", //"dilithium2",
+			.key_size = DNS_KEY_MLDSA44SIZE,
+			.priv_key_size = MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_MLDSA44SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_MLDSA44_ENGINE,
+				.label_tag = TAG_MLDSA44_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P256_MLDSA44) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p256_mldsa44", //"p256_dilithium2",
+			.key_size = DNS_KEY_P256_MLDSA44SIZE,
+			.priv_key_size = P256_MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P256_MLDSA44SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P256_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_P256_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_P256_MLDSA44_ENGINE,
+				.label_tag = TAG_P256_MLDSA44_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_RSA3072_MLDSA44) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "rsa3072_mldsa44", //"rsa3072_dilithium2",
+			.key_size = DNS_KEY_RSA3072_MLDSA44SIZE,
+			.priv_key_size = RSA3072_MLDSA44_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_RSA3072_MLDSA44SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_RSA3072_MLDSA44_PRIVATEKEY,
+				.public_key_tag = TAG_RSA3072_MLDSA44_PUBLICKEY,
+				.engine_tag = TAG_RSA3072_MLDSA44_ENGINE,
+				.label_tag = TAG_RSA3072_MLDSA44_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_MLDSA65) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "mldsa65", //"dilithium3",
+			.key_size = DNS_KEY_MLDSA65SIZE,
+			.priv_key_size = MLDSA65_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_MLDSA65SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_MLDSA65_PRIVATEKEY,
+				.public_key_tag = TAG_MLDSA65_PUBLICKEY,
+				.engine_tag = TAG_MLDSA65_ENGINE,
+				.label_tag = TAG_MLDSA65_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P384_MLDSA65) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p384_mldsa65", //"p384_dilithium3",
+			.key_size = DNS_KEY_P384_MLDSA65SIZE,
+			.priv_key_size = P384_MLDSA65_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P384_MLDSA65SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P384_MLDSA65_PRIVATEKEY,
+				.public_key_tag = TAG_P384_MLDSA65_PUBLICKEY,
+				.engine_tag = TAG_P384_MLDSA65_ENGINE,
+				.label_tag = TAG_P384_MLDSA65_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_MLDSA87) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "mldsa87", //"dilithium5",
+			.key_size = DNS_KEY_MLDSA87SIZE,
+			.priv_key_size = MLDSA87_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_MLDSA87SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_MLDSA87_PRIVATEKEY,
+				.public_key_tag = TAG_MLDSA87_PUBLICKEY,
+				.engine_tag = TAG_MLDSA87_ENGINE,
+				.label_tag = TAG_MLDSA87_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_P521_MLDSA87) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "p521_mldsa87", //"p521_dilithium5",
+			.key_size = DNS_KEY_P521_MLDSA87SIZE,
+			.priv_key_size = P521_MLDSA87_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_P521_MLDSA87SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_P521_MLDSA87_PRIVATEKEY,
+				.public_key_tag = TAG_P521_MLDSA87_PUBLICKEY,
+				.engine_tag = TAG_P521_MLDSA87_ENGINE,
+				.label_tag = TAG_P521_MLDSA87_LABEL,
+			},
+		};
+		return &oqs_alginfo;
+	}
 	if (key_alg == DST_ALG_FALCON512) {
 		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "falconpadded512", //"falcon512",
@@ -145,54 +261,6 @@ openssloqs_alg_info(unsigned int key_alg) {
 				.public_key_tag = TAG_P521_FALCON1024_PUBLICKEY,
 				.engine_tag = TAG_P521_FALCON1024_ENGINE,
 				.label_tag = TAG_P521_FALCON1024_LABEL,
-			},
-		};
-		return &oqs_alginfo;
-	}
-	if (key_alg == DST_ALG_MLDSA44) {
-		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "mldsa44", //"dilithium2",
-			.key_size = DNS_KEY_MLDSA44SIZE,
-			.priv_key_size = MLDSA44_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_MLDSA44SIZE,
-			.tags = {
-				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_MLDSA44_PRIVATEKEY,
-				.public_key_tag = TAG_MLDSA44_PUBLICKEY,
-				.engine_tag = TAG_MLDSA44_ENGINE,
-				.label_tag = TAG_MLDSA44_LABEL,
-			},
-		};
-		return &oqs_alginfo;
-	}
-	if (key_alg == DST_ALG_P256_MLDSA44) {
-		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "p256_mldsa44", //"p256_dilithium2",
-			.key_size = DNS_KEY_P256_MLDSA44SIZE,
-			.priv_key_size = P256_MLDSA44_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_P256_MLDSA44SIZE,
-			.tags = {
-				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_P256_MLDSA44_PRIVATEKEY,
-				.public_key_tag = TAG_P256_MLDSA44_PUBLICKEY,
-				.engine_tag = TAG_P256_MLDSA44_ENGINE,
-				.label_tag = TAG_P256_MLDSA44_LABEL,
-			},
-		};
-		return &oqs_alginfo;
-	}
-	if (key_alg == DST_ALG_RSA3072_MLDSA44) {
-		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "rsa3072_mldsa44", //"rsa3072_dilithium2",
-			.key_size = DNS_KEY_RSA3072_MLDSA44SIZE,
-			.priv_key_size = RSA3072_MLDSA44_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_RSA3072_MLDSA44SIZE,
-			.tags = {
-				.ntags = OQS_NTAGS,
-				.private_key_tag = TAG_RSA3072_MLDSA44_PRIVATEKEY,
-				.public_key_tag = TAG_RSA3072_MLDSA44_PUBLICKEY,
-				.engine_tag = TAG_RSA3072_MLDSA44_ENGINE,
-				.label_tag = TAG_RSA3072_MLDSA44_LABEL,
 			},
 		};
 		return &oqs_alginfo;
@@ -743,14 +811,18 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
+		case TAG_MLDSA44_ENGINE:
+		case TAG_P256_MLDSA44_ENGINE:
+		case TAG_RSA3072_MLDSA44_ENGINE:
+		case TAG_MLDSA65_ENGINE:
+		case TAG_P384_MLDSA65_ENGINE:
+		case TAG_MLDSA87_ENGINE:
+		case TAG_P521_MLDSA87_ENGINE:
 		case TAG_FALCON512_ENGINE:
 		case TAG_P256_FALCON512_ENGINE:
 		case TAG_RSA3072_FALCON512_ENGINE:
 		case TAG_FALCON1024_ENGINE:
 		case TAG_P521_FALCON1024_ENGINE:
-		case TAG_MLDSA44_ENGINE:
-		case TAG_P256_MLDSA44_ENGINE:
-		case TAG_RSA3072_MLDSA44_ENGINE:
 		case TAG_SLHDSASHA2128S_ENGINE:
 		case TAG_P256_SLHDSASHA2128S_ENGINE:
 		case TAG_RSA3072_SLHDSASHA2128S_ENGINE:
@@ -760,14 +832,18 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_P256_SNOVA2454_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
+		case TAG_MLDSA44_LABEL:
+		case TAG_P256_MLDSA44_LABEL:
+		case TAG_RSA3072_MLDSA44_LABEL:
+		case TAG_MLDSA65_LABEL:
+		case TAG_P384_MLDSA65_LABEL:
+		case TAG_MLDSA87_LABEL:
+		case TAG_P521_MLDSA87_LABEL:
 		case TAG_FALCON512_LABEL:
 		case TAG_P256_FALCON512_LABEL:
 		case TAG_RSA3072_FALCON512_LABEL:
 		case TAG_FALCON1024_LABEL:
 		case TAG_P521_FALCON1024_LABEL:
-		case TAG_MLDSA44_LABEL:
-		case TAG_P256_MLDSA44_LABEL:
-		case TAG_RSA3072_MLDSA44_LABEL:
 		case TAG_SLHDSASHA2128S_LABEL:
 		case TAG_P256_SLHDSASHA2128S_LABEL:
 		case TAG_RSA3072_SLHDSASHA2128S_LABEL:
@@ -777,14 +853,18 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_P256_SNOVA2454_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
+		case TAG_MLDSA44_PRIVATEKEY:
+		case TAG_P256_MLDSA44_PRIVATEKEY:
+		case TAG_RSA3072_MLDSA44_PRIVATEKEY:
+		case TAG_MLDSA65_PRIVATEKEY:
+		case TAG_P384_MLDSA65_PRIVATEKEY:
+		case TAG_MLDSA87_PRIVATEKEY:
+		case TAG_P521_MLDSA87_PRIVATEKEY:
 		case TAG_FALCON512_PRIVATEKEY:
 		case TAG_P256_FALCON512_PRIVATEKEY:
 		case TAG_RSA3072_FALCON512_PRIVATEKEY:
 		case TAG_FALCON1024_PRIVATEKEY:
 		case TAG_P521_FALCON1024_PRIVATEKEY:
-		case TAG_MLDSA44_PRIVATEKEY:
-		case TAG_P256_MLDSA44_PRIVATEKEY:
-		case TAG_RSA3072_MLDSA44_PRIVATEKEY:
 		case TAG_SLHDSASHA2128S_PRIVATEKEY:
 		case TAG_P256_SLHDSASHA2128S_PRIVATEKEY:
 		case TAG_RSA3072_SLHDSASHA2128S_PRIVATEKEY:
@@ -794,14 +874,18 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		case TAG_P256_SNOVA2454_PRIVATEKEY:
 			privkey_index = i;
 			break;
+		case TAG_MLDSA44_PUBLICKEY:
+		case TAG_P256_MLDSA44_PUBLICKEY:
+		case TAG_RSA3072_MLDSA44_PUBLICKEY:
+		case TAG_MLDSA65_PUBLICKEY:
+		case TAG_P384_MLDSA65_PUBLICKEY:
+		case TAG_MLDSA87_PUBLICKEY:
+		case TAG_P521_MLDSA87_PUBLICKEY:
 		case TAG_FALCON512_PUBLICKEY:
 		case TAG_P256_FALCON512_PUBLICKEY:
 		case TAG_RSA3072_FALCON512_PUBLICKEY:
 		case TAG_FALCON1024_PUBLICKEY:
 		case TAG_P521_FALCON1024_PUBLICKEY:
-		case TAG_MLDSA44_PUBLICKEY:
-		case TAG_P256_MLDSA44_PUBLICKEY:
-		case TAG_RSA3072_MLDSA44_PUBLICKEY:
 		case TAG_SLHDSASHA2128S_PUBLICKEY:
 		case TAG_P256_SLHDSASHA2128S_PUBLICKEY:
 		case TAG_RSA3072_SLHDSASHA2128S_PUBLICKEY:

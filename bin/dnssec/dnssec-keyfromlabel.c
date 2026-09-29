@@ -60,7 +60,15 @@ usage(void) {
 			"        NSEC3RSASHA1 |\n"
 			"        RSASHA256 | RSASHA512 |\n"
 			"        ECDSAP256SHA256 | ECDSAP384SHA384 |\n"
-			"        ED25519 | ED448\n");
+			"        ED25519 | ED448\n"
+			"        MLDSA44 | P256_MLDSA44 | RSA3072_MLDSA44\n"
+			"        MLDSA65 | P384_MLDSA65\n"
+			"        MLDSA87 | P521_MLDSA87\n"
+			"        FALCON512 | P256_FALCON512 | RSA3072_FALCON512\n"
+			"        FALCON1024 | P521_FALCON1024\n"
+			"        SLHDSASHA2128S | P256_SLHDSASHA2128S | RSA3072_SLHDSASHA2128S\n"
+			"        MAYO1 | P256_MAYO1\n"
+			"        SNOVA2454 | P256_SNOVA2454\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -c class (default: IN)\n");
 	fprintf(stderr, "    -E <engine>:\n");
@@ -398,14 +406,18 @@ main(int argc, char **argv) {
 			case DST_ALG_ECDSA384:
 			case DST_ALG_ED25519:
 			case DST_ALG_ED448:
+			case DST_ALG_MLDSA44:
+			case DST_ALG_P256_MLDSA44:
+			case DST_ALG_RSA3072_MLDSA44:
+			case DST_ALG_MLDSA65:
+			case DST_ALG_P384_MLDSA65:
+			case DST_ALG_MLDSA87:
+			case DST_ALG_P521_MLDSA87:
 			case DST_ALG_FALCON512:
 			case DST_ALG_P256_FALCON512:
 			case DST_ALG_RSA3072_FALCON512:
 			case DST_ALG_FALCON1024:
 			case DST_ALG_P521_FALCON1024:
-			case DST_ALG_MLDSA44:
-			case DST_ALG_P256_MLDSA44:
-			case DST_ALG_RSA3072_MLDSA44:
 			case DST_ALG_SLHDSASHA2128S:
 			case DST_ALG_P256_SLHDSASHA2128S:
 			case DST_ALG_RSA3072_SLHDSASHA2128S:

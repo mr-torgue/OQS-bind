@@ -109,6 +109,41 @@ static struct parse_map map[] = {
 	{ TAG_HMACSHA512_KEY, "Key:" },
 	{ TAG_HMACSHA512_BITS, "Bits:" },
 
+	{ TAG_MLDSA44_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_MLDSA44_PUBLICKEY, "PublicKey:" },
+	{ TAG_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_P256_MLDSA44_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P256_MLDSA44_PUBLICKEY, "PublicKey:" },
+	{ TAG_P256_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P256_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_RSA3072_MLDSA44_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_RSA3072_MLDSA44_PUBLICKEY, "PublicKey:" },
+	{ TAG_RSA3072_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_RSA3072_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_MLDSA65_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_MLDSA65_PUBLICKEY, "PublicKey:" },
+	{ TAG_MLDSA65_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_MLDSA65_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_P384_MLDSA65_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P384_MLDSA65_PUBLICKEY, "PublicKey:" },
+	{ TAG_P384_MLDSA65_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P384_MLDSA65_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_MLDSA87_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_MLDSA87_PUBLICKEY, "PublicKey:" },
+	{ TAG_MLDSA87_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_MLDSA87_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_P521_MLDSA87_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_P521_MLDSA87_PUBLICKEY, "PublicKey:" },
+	{ TAG_P521_MLDSA87_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_P521_MLDSA87_LABEL, "Label:" },   // Probably won't use for now
+
 	{ TAG_FALCON512_PRIVATEKEY, "PrivateKey:" },
 	{ TAG_FALCON512_PUBLICKEY, "PublicKey:" },
 	{ TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
@@ -133,21 +168,6 @@ static struct parse_map map[] = {
 	{ TAG_P521_FALCON1024_PUBLICKEY, "PublicKey:" },
 	{ TAG_P521_FALCON1024_ENGINE, "Engine:" }, // Probably won't use for now
 	{ TAG_P521_FALCON1024_LABEL, "Label:" },   // Probably won't use for now
-
-	{ TAG_MLDSA44_PRIVATEKEY, "PrivateKey:" },
-	{ TAG_MLDSA44_PUBLICKEY, "PublicKey:" },
-	{ TAG_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
-	{ TAG_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
-
-	{ TAG_P256_MLDSA44_PRIVATEKEY, "PrivateKey:" },
-	{ TAG_P256_MLDSA44_PUBLICKEY, "PublicKey:" },
-	{ TAG_P256_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
-	{ TAG_P256_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
-
-	{ TAG_RSA3072_MLDSA44_PRIVATEKEY, "PrivateKey:" },
-	{ TAG_RSA3072_MLDSA44_PUBLICKEY, "PublicKey:" },
-	{ TAG_RSA3072_MLDSA44_ENGINE, "Engine:" }, // Probably won't use for now
-	{ TAG_RSA3072_MLDSA44_LABEL, "Label:" },   // Probably won't use for now
 
 	{ TAG_SLHDSASHA2128S_PRIVATEKEY, "PrivateKey:" },
 	{ TAG_SLHDSASHA2128S_PUBLICKEY, "PublicKey:" },
@@ -472,14 +492,18 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 		return (check_hmac_sha(priv, HMACSHA384_NTAGS, alg));
 	case DST_ALG_HMACSHA512:
 		return (check_hmac_sha(priv, HMACSHA512_NTAGS, alg));
+	case DST_ALG_MLDSA44:
+	case DST_ALG_P256_MLDSA44:
+	case DST_ALG_RSA3072_MLDSA44:
+	case DST_ALG_MLDSA65:
+	case DST_ALG_P384_MLDSA65:
+	case DST_ALG_MLDSA87:
+	case DST_ALG_P521_MLDSA87:
 	case DST_ALG_FALCON512:
 	case DST_ALG_P256_FALCON512:
 	case DST_ALG_RSA3072_FALCON512:
 	case DST_ALG_FALCON1024:
 	case DST_ALG_P521_FALCON1024:
-	case DST_ALG_MLDSA44:
-	case DST_ALG_P256_MLDSA44:
-	case DST_ALG_RSA3072_MLDSA44:
 	case DST_ALG_SLHDSASHA2128S:
 	case DST_ALG_P256_SLHDSASHA2128S:
 	case DST_ALG_RSA3072_SLHDSASHA2128S:
@@ -829,6 +853,27 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	case DST_ALG_HMACSHA512:
 		fprintf(fp, "(HMAC_SHA512)\n");
 		break;
+	case DST_ALG_MLDSA44:
+		fprintf(fp, "(MLDSA44)\n");
+		break;
+	case DST_ALG_P256_MLDSA44:
+		fprintf(fp, "(P256_MLDSA44)\n");
+		break;
+	case DST_ALG_RSA3072_MLDSA44:
+		fprintf(fp, "(RSA3072_MLDSA44)\n");
+		break;
+	case DST_ALG_MLDSA65:
+		fprintf(fp, "(MLDSA65)\n");
+		break;
+	case DST_ALG_P384_MLDSA65:
+		fprintf(fp, "(P384_MLDSA65)\n");
+		break;
+	case DST_ALG_MLDSA87:
+		fprintf(fp, "(MLDSA87)\n");
+		break;
+	case DST_ALG_P521_MLDSA87:
+		fprintf(fp, "(P521_MLDSA87)\n");
+		break;
 	case DST_ALG_FALCON512:
 		fprintf(fp, "(FALCON512)\n");
 		break;
@@ -843,15 +888,6 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		break;
 	case DST_ALG_P521_FALCON1024:
 		fprintf(fp, "(P521_FALCON1024)\n");
-		break;
-	case DST_ALG_MLDSA44:
-		fprintf(fp, "(MLDSA44)\n");
-		break;
-	case DST_ALG_P256_MLDSA44:
-		fprintf(fp, "(P256_MLDSA44)\n");
-		break;
-	case DST_ALG_RSA3072_MLDSA44:
-		fprintf(fp, "(RSA3072_MLDSA44)\n");
 		break;
 	case DST_ALG_SLHDSASHA2128S:
 		fprintf(fp, "(SLHDSASHA2128S)\n");

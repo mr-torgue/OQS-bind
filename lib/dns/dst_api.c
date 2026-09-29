@@ -228,14 +228,18 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 #if HAVE_GSSAPI
 	RETERR(dst__gssapi_init(&dst_t_func[DST_ALG_GSSAPI]));
 #endif /* HAVE_GSSAPI */
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_MLDSA44]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MLDSA65]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P384_MLDSA65]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MLDSA87]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P521_MLDSA87]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON1024]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P521_FALCON1024]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_MLDSA44]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_MLDSA44]));
-	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_MLDSA44]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SLHDSASHA2128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_P256_SLHDSASHA2128S]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_RSA3072_SLHDSASHA2128S]));
@@ -1481,6 +1485,27 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 	case DST_ALG_GSSAPI:
 		*n = 128; /*%< XXX */
 		break;
+	case DST_ALG_MLDSA44:
+		*n = DNS_SIG_MLDSA44SIZE;
+		break;
+	case DST_ALG_P256_MLDSA44:
+		*n = DNS_SIG_P256_MLDSA44SIZE;
+		break;
+	case DST_ALG_RSA3072_MLDSA44:
+		*n = DNS_SIG_RSA3072_MLDSA44SIZE;
+		break;
+	case DST_ALG_MLDSA65:
+		*n = DNS_SIG_MLDSA65SIZE;
+		break;
+	case DST_ALG_P384_MLDSA65:
+		*n = DNS_SIG_P384_MLDSA65SIZE;
+		break;
+	case DST_ALG_MLDSA87:
+		*n = DNS_SIG_MLDSA87SIZE;
+		break;
+	case DST_ALG_P521_MLDSA87:
+		*n = DNS_SIG_P521_MLDSA87SIZE;
+		break;
 	case DST_ALG_FALCON512:
 		*n = DNS_SIG_FALCON512SIZE;
 		break;
@@ -1495,15 +1520,6 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 		break;
 	case DST_ALG_P521_FALCON1024:
 		*n = DNS_SIG_P521_FALCON1024SIZE;
-		break;
-	case DST_ALG_MLDSA44:
-		*n = DNS_SIG_MLDSA44SIZE;
-		break;
-	case DST_ALG_P256_MLDSA44:
-		*n = DNS_SIG_P256_MLDSA44SIZE;
-		break;
-	case DST_ALG_RSA3072_MLDSA44:
-		*n = DNS_SIG_RSA3072_MLDSA44SIZE;
 		break;
 	case DST_ALG_SLHDSASHA2128S:
 		*n = DNS_SIG_SLHDSASHA2128SSIZE;
